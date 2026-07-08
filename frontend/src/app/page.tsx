@@ -31,7 +31,7 @@ interface ChatMessage {
 
 export default function Dashboard() {
   const [symbols] = useState(["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT"]);
-  const [timeframes] = useState(["15m", "1h", "4h", "1d"]);
+  const [timeframes] = useState(["1m", "5m", "15m", "30m", "1h", "4h", "1d"]);
   
   const [selectedSymbol, setSelectedSymbol] = useState("BTCUSDT");
   const [searchInput, setSearchInput] = useState("");
@@ -49,6 +49,11 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(false);
   const [backendHealth, setBackendHealth] = useState<"online" | "offline">("offline");
 
+  // News states
+  const [news, setNews] = useState<any[]>([]);
+  const [newsLoading, setNewsLoading] = useState(false);
+  const [activeView, setActiveView] = useState<"dashboard" | "news">("dashboard");
+
   // Chat interface state
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [inputMessage, setInputMessage] = useState("");
@@ -62,6 +67,7 @@ export default function Dashboard() {
     checkHealth();
     fetchStrategies();
     fetchHistory();
+    fetchNews();
   }, []);
 
   // Scroll chat to bottom
@@ -119,6 +125,21 @@ export default function Dashboard() {
       }
     } catch (e) {
       console.error("Error fetching history:", e);
+    }
+  };
+
+  const fetchNews = async () => {
+    setNewsLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/news`);
+      if (res.ok) {
+        const data = await res.json();
+        setNews(data);
+      }
+    } catch (e) {
+      console.error("Error fetching news:", e);
+    } finally {
+      setNewsLoading(false);
     }
   };
 
@@ -256,7 +277,10 @@ export default function Dashboard() {
 
   const getIntervalForTradingView = (tf: string) => {
     switch (tf) {
+      case "1m": return "1";
+      case "5m": return "5";
       case "15m": return "15";
+      case "30m": return "30";
       case "1h": return "60";
       case "4h": return "240";
       case "1d": return "D";
@@ -283,6 +307,40 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {/* Navigation Tabs */}
+        <div className="flex items-center gap-2 bg-[#141626]/80 border border-[#1E2235] rounded-xl p-1">
+          <button
+            onClick={() => setActiveView("dashboard")}
+            className={`px-4 py-2 rounded-lg text-xs font-semibold tracking-wider uppercase transition-all flex items-center gap-1.5 ${
+              activeView === "dashboard"
+                ? "bg-[#6366F1] text-white shadow-md shadow-indigo-500/10"
+                : "text-gray-400 hover:text-gray-200"
+            }`}
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2v-4zM14 16a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2v-4z" />
+            </svg>
+            Dashboard
+          </button>
+          <button
+            onClick={() => setActiveView("news")}
+            id="btn-news-feed"
+            className={`px-4 py-2 rounded-lg text-xs font-semibold tracking-wider uppercase transition-all flex items-center gap-1.5 ${
+              activeView === "news"
+                ? "bg-[#6366F1] text-white shadow-md shadow-indigo-500/10"
+                : "text-gray-400 hover:text-gray-200"
+            }`}
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1M19 20a2 2 0 002-2V8a2 2 0 00-2-2h-5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+            News Feed
+            {news.length > 0 && (
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+            )}
+          </button>
+        </div>
+
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2 bg-[#161924] border border-[#242736] px-3.5 py-1.5 rounded-lg text-sm">
             <span className={`w-2.5 h-2.5 rounded-full ${backendHealth === "online" ? "bg-emerald-500 animate-pulse" : "bg-rose-500"}`}></span>
@@ -294,10 +352,95 @@ export default function Dashboard() {
       </header>
 
       {/* Main Container */}
-      <main className="flex-1 p-6 grid grid-cols-1 xl:grid-cols-4 gap-6 max-w-[1800px] w-full mx-auto">
+      <main className={`flex-1 p-6 ${activeView === "news" ? "flex flex-col" : "grid grid-cols-1 xl:grid-cols-4"} gap-6 max-w-[1800px] w-full mx-auto pb-16`}>
         
-        {/* LEFT COLUMN: Strategy Control Panel */}
-        <section className="xl:col-span-1 flex flex-col gap-6" id="strategy-section">
+        {activeView === "news" ? (
+          <section className="flex flex-col gap-6" id="news-feed-section">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-md font-bold text-white uppercase tracking-wider">Crypto News Feed</h2>
+                <p className="text-xs text-gray-500 font-mono">Daily cryptocurrency updates, announcements and analysis</p>
+              </div>
+              <button
+                onClick={fetchNews}
+                disabled={newsLoading}
+                id="btn-refresh-news"
+                className="bg-[#1E2138]/60 border border-[#1E2235] hover:border-indigo-500 text-white text-xs px-4 py-2 rounded-xl transition-all font-semibold flex items-center gap-2"
+              >
+                {newsLoading ? (
+                  <span className="w-3.5 h-3.5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin"></span>
+                ) : (
+                  <svg className="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 8H17" />
+                  </svg>
+                )}
+                Refresh
+              </button>
+            </div>
+
+            {newsLoading && news.length === 0 ? (
+              <div className="flex-1 flex flex-col items-center justify-center py-20 gap-3">
+                <span className="w-8 h-8 border-3 border-indigo-500 border-t-transparent rounded-full animate-spin"></span>
+                <span className="text-xs text-gray-500 font-mono">Loading news articles...</span>
+              </div>
+            ) : news.length === 0 ? (
+              <div className="bg-[#11131F]/90 border border-[#1E2235] rounded-2xl p-10 text-center text-gray-500">
+                <svg className="w-12 h-12 text-gray-600 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1M19 20a2 2 0 002-2V8a2 2 0 00-2-2h-5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+                <p className="font-semibold text-sm text-white mb-1">No news articles found</p>
+                <p className="text-xs text-gray-500 mb-4 font-mono">Failed to fetch RSS feed. Please check your network connection.</p>
+                <button onClick={fetchNews} className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-4 py-2 rounded-xl transition-colors font-semibold">Try Again</button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 overflow-y-auto max-h-[calc(100vh-220px)] pb-12 pr-1" id="news-cards-container">
+                {news.map((item, idx) => (
+                  <div key={idx} className="bg-[#11131F]/90 border border-[#1E2235] hover:border-indigo-500/40 rounded-2xl overflow-hidden flex flex-col shadow-xl transition-all hover:translate-y-[-2px] group">
+                    {/* Image Area */}
+                    <div className="h-44 bg-[#0E1017] relative overflow-hidden border-b border-[#1E2235]">
+                      {item.imageUrl ? (
+                        <img 
+                          src={item.imageUrl} 
+                          alt={item.title} 
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#1E2138]/40 to-[#0F111E]">
+                          <svg className="w-8 h-8 text-indigo-500/20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1M19 20a2 2 0 002-2V8a2 2 0 00-2-2h-5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                          </svg>
+                        </div>
+                      )}
+                      <div className="absolute top-3 left-3 bg-[#6366F1]/90 text-white text-[9px] font-bold px-2 py-0.5 rounded uppercase tracking-wider font-mono">News</div>
+                    </div>
+                    {/* Content Area */}
+                    <div className="p-4 flex flex-col gap-2 flex-1 justify-between">
+                      <div className="flex flex-col gap-2">
+                        <span className="text-[10px] text-gray-500 font-mono">{item.pubDate}</span>
+                        <h3 className="text-xs font-bold text-white line-clamp-2 leading-snug group-hover:text-indigo-300 transition-colors">{item.title}</h3>
+                        <p className="text-[11px] text-gray-400 line-clamp-3 leading-relaxed font-mono mt-1">{item.description}</p>
+                      </div>
+                      <a 
+                        href={item.link} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="mt-4 border border-[#1E2235] hover:border-indigo-600 hover:bg-indigo-600/10 text-[#6366F1] hover:text-white text-[11px] font-semibold py-2 rounded-xl text-center transition-all flex items-center justify-center gap-1.5 font-mono"
+                      >
+                        Read Full Article
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                      </a>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        ) : (
+          <>
+            {/* LEFT COLUMN: Strategy Control Panel */}
+            <section className="xl:col-span-1 flex flex-col gap-6" id="strategy-section">
           {/* Strategy Details Block */}
           <div className="bg-[#11131F]/90 border border-[#1E2235] rounded-2xl p-5 flex flex-col gap-4 shadow-xl">
             <div className="flex items-center justify-between">
@@ -537,7 +680,20 @@ export default function Dashboard() {
             <div className="flex-1 w-full rounded-xl overflow-hidden border border-[#1E2235]/60 bg-black/40">
               <iframe
                 id="tradingview-chart-widget"
-                src={`https://s.tradingview.com/widgetembed/?frameElementId=tradingview-chart-widget&symbol=BINANCE%3A${selectedSymbol}&interval=${getIntervalForTradingView(selectedTimeframe)}&theme=dark&style=1&timezone=Etc%2FUTC&studies=RSI%40tv-basicstudies%3BEMA%40tv-basicstudies%3BMACD%40tv-basicstudies`}
+                src={`https://s.tradingview.com/widgetembed/?frameElementId=tradingview-chart-widget&symbol=BINANCE%3A${selectedSymbol}&interval=${getIntervalForTradingView(selectedTimeframe)}&theme=dark&style=1&timezone=Etc%2FUTC&hide_volume=true`}
+                className="w-full h-full border-none"
+                allowFullScreen
+              />
+            </div>
+          </div>
+
+          {/* TradingView RSI Chart */}
+          <div className="bg-[#11131F]/90 border border-[#1E2235] rounded-2xl p-4 shadow-xl h-[450px] flex flex-col gap-2 relative">
+            <span className="text-[10px] font-semibold text-[#8B5CF6] uppercase tracking-widest font-mono px-1">Relative Strength Index (RSI)</span>
+            <div className="flex-1 w-full rounded-xl overflow-hidden border border-[#1E2235]/60 bg-black/40">
+              <iframe
+                id="tradingview-rsi-widget"
+                src={`https://s.tradingview.com/widgetembed/?frameElementId=tradingview-rsi-widget&symbol=BINANCE%3A${selectedSymbol}&interval=${getIntervalForTradingView(selectedTimeframe)}&theme=dark&style=2&timezone=Etc%2FUTC&studies=RSI%40tv-basicstudies&hide_volume=true`}
                 className="w-full h-full border-none"
                 allowFullScreen
               />
@@ -722,8 +878,38 @@ export default function Dashboard() {
             </button>
           </form>
         </section>
+          </>
+        )}
 
       </main>
+
+      {/* Bottom Fixed News Ticker */}
+      {news.length > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 bg-[#0E1017] border-t border-[#1E2235] py-2 z-50 h-9 flex items-center backdrop-blur-md bg-opacity-95 shadow-[0_-5px_20px_rgba(0,0,0,0.4)]">
+          <div className="bg-[#6366F1] text-white text-[9px] font-bold px-3 py-1 flex items-center gap-1 uppercase tracking-wider shrink-0 h-full font-sans select-none z-10">
+            <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></span>
+            Live Headlines
+          </div>
+          <div className="marquee-container flex-1" id="news-marquee-container">
+            <div className="marquee-content flex gap-8 pr-8">
+              {/* Render twice for continuous loop */}
+              {[...news, ...news].map((item, idx) => (
+                <a 
+                  key={idx}
+                  href={item.link} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 text-xs font-mono text-gray-400 hover:text-white transition-colors shrink-0 group select-none"
+                >
+                  <span className="text-[#8B5CF6]">•</span>
+                  <span className="group-hover:underline">{item.title}</span>
+                  <span className="text-gray-600 text-[10px]">({item.pubDate.split(' ')[4] || ''})</span>
+                </a>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

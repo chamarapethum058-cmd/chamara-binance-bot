@@ -11,7 +11,7 @@ from .schemas import (
     AnalysisRequest, AnalysisResponse,
     PreferenceCreate, PreferenceResponse
 )
-from .services import BinanceService, AIService
+from .services import BinanceService, AIService, NewsService
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -156,6 +156,14 @@ def set_preference(pref: PreferenceCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(db_pref)
     return db_pref
+
+# NEWS ENDPOINTS
+@app.get("/api/news")
+async def get_crypto_news():
+    try:
+        return await NewsService.fetch_news()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # ANALYSIS ENDPOINTS
 @app.get("/api/analysis/history", response_model=List[AnalysisResponse])
