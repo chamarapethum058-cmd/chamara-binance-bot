@@ -1,0 +1,10 @@
+{
+  "name": "project-falcon-root",
+  "version": "1.0.0",
+  "description": "Root orchestrator for Project Falcon",
+  "scripts": {
+    "dev:frontend": "cd frontend && npm.cmd run dev",
+    "dev:backend": "cd backend && .\\.venv\\Scripts\\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000",
+    "dev": "npx.cmd -y concurrently \"npm.cmd run dev:frontend\" \"npm.cmd run dev:backend\""
+  }
+}
