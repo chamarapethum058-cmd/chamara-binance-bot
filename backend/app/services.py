@@ -107,6 +107,7 @@ CRITICAL RULES:
 4. Adhere strictly to the rules of the user's strategy. Do not invent new indicators or run outside analysis.
 5. Identify why setup is valid or invalid based on the strategy rules.
 6. Provide clear, educational explanations to help the trader learn.
+7. You MUST output all explanation fields ("reasoning", "invalidation", "risk_notes") in both English and Sinhala translation. First write the explanation in English, then add a divider line (e.g. "\\n\\n--- \\n\\n**සිංහල පරිවර්තනය (Sinhala Translation):**\\n"), followed by its complete Sinhala translation using Sinhala Unicode characters. Make sure the translation is clear and easy to read.
 
 -----------------------------------------
 USER'S TRADING STRATEGY RULES:
@@ -128,9 +129,9 @@ Determine if there are valid setups (e.g. Trend alignment, BOS/CHOCH, tapping Or
 Format your output strictly as a JSON object with the following fields:
 1. "signal": Must be one of ["BULLISH", "BEARISH", "NEUTRAL", "NEUTRAL_WAITING"]
 2. "confidence": Integer percentage from 0 to 100 representing strength/alignment of indicators.
-3. "reasoning": Comprehensive text explaining your technical observations (market structure, trend, key levels, volume) and how they map to the strategy rules. Act as a teacher.
-4. "invalidation": Clear conditions under which this setup or analysis is considered wrong, along with recommended Stop Loss placement guidelines.
-5. "risk_notes": Explicit warnings about trading risk, high volatility warnings, and position size suggestions (e.g. keeping risk to 1%).
+3. "reasoning": Comprehensive text explaining your technical observations (market structure, trend, key levels, volume) and how they map to the strategy rules. Act as a teacher. This field MUST contain the English text, followed by the Sinhala translation directly underneath (separated by a divider).
+4. "invalidation": Clear conditions under which this setup or analysis is considered wrong, along with recommended Stop Loss placement guidelines. This field MUST contain the English text, followed by the Sinhala translation directly underneath (separated by a divider).
+5. "risk_notes": Explicit warnings about trading risk, high volatility warnings, and position size suggestions (e.g. keeping risk to 1%). This field MUST contain the English text, followed by the Sinhala translation directly underneath (separated by a divider).
 
 OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formatting.
 """
@@ -166,10 +167,25 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
         reasoning = (
             f"This is a demonstration analysis for {symbol} on the {timeframe} timeframe. "
             f"Note: To enable full AI Brain reasoning, you need to configure your Gemini API Key in the settings. "
-            f"Based on basic candlestick rules, the market is currently consolidating near {current_price}."
+            f"Based on basic candlestick rules, the market is currently consolidating near {current_price}.\n\n"
+            f"---\n\n"
+            f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
+            f"මෙය {timeframe} කාලරාමුව තුළ {symbol} සඳහා ආදර්ශ විශ්ලේෂණයකි. "
+            f"සටහන: සම්පූර්ණ AI Brain විශ්ලේෂණය සක්‍රිය කිරීමට, ඔබ settings හි ඔබගේ Gemini API Key එක ඇතුලත් කල යුතුය. "
+            f"මූලික candlestick නීතිවලට අනුව, වෙළඳපොළ දැනට {current_price} අසල ඒකාබද්ධ වෙමින් පවතී."
         )
-        invalidation = "If price breaks outside the immediate consolidated range, this neutral outlook is invalid."
-        risk_notes = "Always use a protective stop loss. Never risk more than 1% of your account size."
+        invalidation = (
+            "If price breaks outside the immediate consolidated range, this neutral outlook is invalid.\n\n"
+            "---\n\n"
+            "**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
+            "මිල ආසන්නතම ඒකාබද්ධ පරාසයෙන් පිටතට බිඳී ගියහොත්, මෙම මධ්‍යස්ථ දැක්ම වලංගු නොවේ."
+        )
+        risk_notes = (
+            "Always use a protective stop loss. Never risk more than 1% of your account size.\n\n"
+            "---\n\n"
+            "**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
+            "සැමවිටම ආරක්ෂිත stop loss එකක් භාවිතා කරන්න. කිසිවිටෙක ඔබේ ගිණුමේ ප්‍රමාණයෙන් 1% කට වඩා අවදානමට ලක් නොකරන්න."
+        )
         
         return {
             "signal": signal,
@@ -178,6 +194,38 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
             "invalidation": invalidation,
             "risk_notes": risk_notes
         }
+
+    @classmethod
+    async def translate_text(
+        cls,
+        text: str,
+        api_key: Optional[str] = None
+    ) -> str:
+        """
+        Translate English technical analysis text to Sinhala.
+        """
+        active_key = api_key or settings.GEMINI_API_KEY
+        if not active_key:
+            logger.warning("GEMINI_API_KEY not configured. Cannot translate text.")
+            return ""
+            
+        try:
+            client = genai.Client(api_key=active_key)
+            prompt = (
+                "You are an expert English to Sinhala translator specializing in financial markets and trading terminology. "
+                "Translate the following English technical analysis or trading guidance into clear, natural, and accurate Sinhala. "
+                "Ensure that terms like Order Block, CHOCH, BOS, or Fair Value Gap are translated naturally or kept as recognizable terms in Sinhala script where appropriate (e.g. 'Order Block (ඕඩර් බ්ලොක්)'). "
+                "Do NOT include any introduction, explanations, notes, or quotes. Output ONLY the translated text.\n\n"
+                f"Text to translate:\n{text}"
+            )
+            response = client.models.generate_content(
+                model='gemini-3.5-flash',
+                contents=prompt
+            )
+            return response.text.strip()
+        except Exception as e:
+            logger.error(f"Gemini translation failed: {e}")
+            return ""
 
     @classmethod
     async def chat_response(
@@ -240,6 +288,276 @@ USER'S TRADING STRATEGY RULES:
         except Exception as e:
             logger.error(f"Gemini API chat failed: {e}")
             return f"Error contacting AI Brain: {str(e)}"
+
+    @classmethod
+    async def analyze_silver_bullet(
+        cls,
+        req: Dict[str, Any],
+        api_key: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Evaluate market scenario against the ICT Silver Bullet strategy.
+        """
+        symbol = req.get("symbol") or "XAUUSD"
+        scenario_text = req.get("scenario_text") or ""
+        htf_trend = req.get("htf_trend") or "UNKNOWN"
+        pullback_days = req.get("pullback_days")
+        pdh = req.get("pdh")
+        pdl = req.get("pdl")
+        daily_open = req.get("daily_open")
+        daily_close = req.get("daily_close")
+        asian_sweep = req.get("asian_sweep")
+        demand_mitigation = req.get("demand_mitigation")
+        ltf_shift = req.get("ltf_shift")
+        current_price = req.get("current_price")
+
+        # Programmatic sanity check for incomplete details
+        if not scenario_text and (pdh is None or pdl is None):
+            return {
+                "is_valid": False,
+                "status_message": "Please provide the Previous Daily High/Low details or current session structure to determine the setup.",
+                "market_structure_status": "Incomplete Data",
+                "daily_bias": "NEUTRAL",
+                "liquidity_target": None,
+                "entry_price_area": None,
+                "stop_loss_level": None,
+                "target_reward_ratio": None,
+                "reasoning": "Previous Daily High/Low details are missing.\n\n---\n\n**සිංහල පරිවර්තනය (Sinhala Translation):**\nපෙර දෛනික උපරිම/අවම විස්තර නොමැත.",
+                "invalidation": "Incomplete Data.\n\n---\n\n**සිංහල පරිවර්තනය (Sinhala Translation):**\nඅසම්පූර්ණ දත්ත.",
+                "risk_notes": "Incomplete Data.\n\n---\n\n**සිංහල පරිවර්තනය (Sinhala Translation):**\nඅසම්පූර්ණ දත්ත."
+            }
+
+        prompt = f"""
+You are the AI Brain of Project Falcon, a Personal AI Trading Assistant.
+Your task is to analyze the market scenario and price data against the **ICT Silver Bullet: Daily Bias & Liquidity Flow Strategy ({symbol})**.
+
+-----------------------------------------
+STRATEGY RULES:
+- Asset: {symbol}
+- Higher Timeframe (HTF) Trend: Bullish structure (making HH/HL) OR experiencing a multi-day pullback (e.g., 3 consecutive bearish days) hitting a key institutional demand zone with fractal order flow shifting bullish.
+- Key Levels: PDH (Previous Daily High), PDL (Previous Daily Low), Daily Open, Daily Close.
+- Liquidity Sweep Logic (Daily Bias confirmation):
+  1. Price opens near the previous close.
+  2. Drives downward during the Asian Session.
+  3. Sweeps the PDL (Previous Daily Low).
+  4. Mitigates a HTF 15-Minute/5-Minute Demand Zone.
+  *Once PDL is swept and lower timeframe demand is mitigated, the Daily Bias for the session is strictly BULLISH, targeting the PDH.*
+- Entry Trigger:
+  - Look for a Lower Timeframe (LTF) Shift in Market Structure (MSS/CHoCH) or aggressive bullish displacement out of the demand zone after the PDL sweep.
+  - Limit Order entry at the 15-Min/5-Min Demand Range / Order Block.
+  - Stop-Loss (SL) placed safely below the sweep low.
+  - Take-Profit (TP): Option 1: 1:3 to 1:3.3 Risk-to-Reward. Option 2: Target the PDH (Previous Daily High) or previous session high.
+
+-----------------------------------------
+USER INPUT DATA:
+- Raw Scenario Text: {scenario_text}
+- Structured Form Data:
+  * HTF Trend: {htf_trend}
+  * Pullback Days: {pullback_days}
+  * Previous Daily High (PDH): {pdh}
+  * Previous Daily Low (PDL): {pdl}
+  * Daily Open: {daily_open}
+  * Daily Close: {daily_close}
+  * Asian Session Swept PDL: {asian_sweep}
+  * Mitigated 15m/5m Demand Zone: {demand_mitigation}
+  * London Session LTF Shift: {ltf_shift}
+  * Current Price: {current_price}
+
+-----------------------------------------
+YOUR TASK:
+1. CHECK COMPLETENESS:
+   - Does the user input contain the Previous Daily High (PDH), Previous Daily Low (PDL), and session/structure details?
+   - If critical levels are missing, return "is_valid": false.
+
+2. VERIFY SETUP FLOW (Only if valid):
+   - Analyze trend, liquidity sweep, demand mitigation, and LTF shifts.
+   - Create detailed explanations for "market_structure_status", "reasoning", "invalidation", and "risk_notes".
+   - You MUST output all status and explanation fields ("market_structure_status", "reasoning", "invalidation", "risk_notes") in both English and Sinhala translation. First write the content in English, then add a divider line (e.g. "\\n\\n--- \\n\\n**සිංහල පරිවර්තනය (Sinhala Translation):**\\n"), followed by its complete Sinhala translation using Sinhala Unicode characters.
+
+-----------------------------------------
+OUTPUT FORMAT:
+Return a JSON object with these exact keys:
+1. "is_valid": boolean (true if info is complete, false if incomplete)
+2. "status_message": string (if invalid, set to "Please provide the Previous Daily High/Low details or current session structure to determine the setup.", otherwise "Success")
+3. "market_structure_status": string (confirming Daily Trend & Fractal Order Flow)
+4. "daily_bias": string ("BULLISH" or "NEUTRAL")
+5. "liquidity_target": float or string (should be the PDH value or "PDH")
+6. "entry_price_area": string (e.g., "Limit at 15m Order Block: [value]")
+7. "stop_loss_level": float or string (below the sweep low)
+8. "target_reward_ratio": string (e.g., "1:3" or "1:3.3")
+9. "reasoning": string (English + Sinhala translation)
+10. "invalidation": string (English + Sinhala translation)
+11. "risk_notes": string (English + Sinhala translation)
+
+OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formatting.
+"""
+
+        active_key = api_key or settings.GEMINI_API_KEY
+        if not active_key:
+            logger.warning("GEMINI_API_KEY not configured. Falling back to rule-based Silver Bullet analysis.")
+            return cls._get_mock_silver_bullet(req)
+
+        try:
+            client = genai.Client(api_key=active_key)
+            response = client.models.generate_content(
+                model='gemini-3.5-flash',
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json"
+                )
+            )
+            result = json.loads(response.text.strip())
+            return result
+        except Exception as e:
+            logger.error(f"Gemini API Silver Bullet analysis failed: {e}. Falling back to mock analysis.")
+            return cls._get_mock_silver_bullet(req)
+
+    @classmethod
+    def _get_mock_silver_bullet(cls, req: Dict[str, Any]) -> Dict[str, Any]:
+        """Provides a structured mock analysis for Silver Bullet strategy if API key fails."""
+        symbol = req.get("symbol") or "XAUUSD"
+        scenario_text = req.get("scenario_text") or ""
+        htf_trend = req.get("htf_trend") or "UNKNOWN"
+        pullback_days = req.get("pullback_days")
+        pdh = req.get("pdh")
+        pdl = req.get("pdl")
+        daily_open = req.get("daily_open")
+        daily_close = req.get("daily_close")
+        asian_sweep = req.get("asian_sweep")
+        demand_mitigation = req.get("demand_mitigation")
+        ltf_shift = req.get("ltf_shift")
+        current_price = req.get("current_price")
+
+        # Extract levels if text-based scenario is provided instead
+        if scenario_text and not pdh and not pdl:
+            import re
+            pdh_match = re.search(r'(?:pdh|previous daily high)[^\d]*(\d+(?:\.\d+)?)', scenario_text, re.IGNORECASE)
+            pdl_match = re.search(r'(?:pdl|previous daily low)[^\d]*(\d+(?:\.\d+)?)', scenario_text, re.IGNORECASE)
+            if pdh_match:
+                pdh = float(pdh_match.group(1))
+            if pdl_match:
+                pdl = float(pdl_match.group(1))
+
+        if pdh is None or pdl is None:
+            return {
+                "is_valid": False,
+                "status_message": "Please provide the Previous Daily High/Low details or current session structure to determine the setup.",
+                "market_structure_status": "Incomplete Data",
+                "daily_bias": "NEUTRAL",
+                "liquidity_target": None,
+                "entry_price_area": None,
+                "stop_loss_level": None,
+                "target_reward_ratio": None,
+                "reasoning": "Missing critical daily price levels (PDH/PDL).\n\n---\n\n**සිංහල පරිවර්තනය (Sinhala Translation):**\nඅත්‍යවශ්‍ය දෛනික මිල මට්ටම් (PDH/PDL) නොමැත.",
+                "invalidation": "Cannot perform analysis without daily range context.\n\n---\n\n**සිංහල පරිවර්තනය (Sinhala Translation):**\nදෛනික පරාසය නොමැතිව විශ්ලේෂණය කළ නොහැක.",
+                "risk_notes": "Input data incomplete.\n\n---\n\n**සිංහල පරිවර්තනය (Sinhala Translation):**\nදත්ත අසම්පූර්ණයි."
+            }
+
+        # Check conditions
+        is_htf_bullish = htf_trend.upper() == "BULLISH" or (pullback_days is not None and pullback_days >= 3)
+        if scenario_text:
+            text_lower = scenario_text.lower()
+            if "bullish" in text_lower or "higher high" in text_lower or "pullback" in text_lower:
+                is_htf_bullish = True
+            if "sweep" in text_lower or "swept" in text_lower:
+                asian_sweep = True
+            if "mitigate" in text_lower or "mitigation" in text_lower or "demand" in text_lower:
+                demand_mitigation = True
+            if "shift" in text_lower or "choch" in text_lower or "mss" in text_lower or "displacement" in text_lower:
+                ltf_shift = True
+
+        if is_htf_bullish and asian_sweep and demand_mitigation and ltf_shift:
+            entry_price = pdl - 1.5 if pdl else (current_price or 2320.0)
+            stop_loss = entry_price - 5.0
+            target = pdh if pdh else (entry_price + 20)
+            
+            risk = entry_price - stop_loss
+            reward = target - entry_price
+            rr_ratio = reward / risk if risk > 0 else 3.0
+            
+            return {
+                "is_valid": True,
+                "status_message": "Success",
+                "market_structure_status": (
+                    f"HTF structure is BULLISH. Fractal order flow aligned after hitting Institutional Demand Zone below PDL.\n\n"
+                    f"---\n\n"
+                    f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
+                    f"ප්‍රධාන Trend එක Bullish (ඉහළට) තියෙන්නේ. මිල පහළට ගිහින් Previous Daily Low (PDL) එක sweep කරලා, Institutional Demand Zone එකට ඇතුල් වෙලා තියෙනවා."
+                ),
+                "daily_bias": "BULLISH",
+                "liquidity_target": pdh,
+                "entry_price_area": f"Limit buy order at {entry_price:.2f}",
+                "stop_loss_level": stop_loss,
+                "target_reward_ratio": f"1:{rr_ratio:.2f}",
+                "reasoning": (
+                    f"1. Daily structure is bullish, making higher highs. Multi-day pullback has hit discount matrix area.\n"
+                    f"2. Asian session successfully swept Previous Daily Low (PDL) at {pdl:.2f}, sweeping retail buyers.\n"
+                    f"3. HTF 15m/5m Demand Zone has been mitigated, engineering institutional buy liquidity.\n"
+                    f"4. Lower Timeframe (5m) Shift in Market Structure (MSS) confirmed in London Session, signaling bullish reversal.\n\n"
+                    f"---\n\n"
+                    f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
+                    f"1. දෛනික වෙළඳපල ව්‍යුහය (Daily Structure) Bullish වන අතර ඉහළ උපරිමයන් සාදයි. දින කිහිපයක පසුබැසීම discount matrix කලාපයට ළඟා වී ඇත.\n"
+                    f"2. ආසියානු සැසිය (Asian Session) තුළදී පෙර දෛනික අවමය (PDL) {pdl:.2f} මට්ටමේදී සාර්ථකව sweep කර ඇත.\n"
+                    f"3. 15m/5m Demand Zone එක සක්‍රීය වී ආයතනික මිලදී ගැනීමේ ද්‍රවශීලතාවය (liquidity) සකස් කර ඇත.\n"
+                    f"4. ලන්ඩන් සැසිය තුළදී 5m කාලරාමුවෙහි Market Structure Shift (MSS) එකක් සනාථ වී ඇත."
+                ),
+                "invalidation": (
+                    f"Setup is invalidated if price breaches below the sweep low at {stop_loss:.2f} before triggering limit entry, or if structure breaks to the downside.\n\n"
+                    f"---\n\n"
+                    f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
+                    f"මිල {stop_loss:.2f} sweep low මට්ටමට වඩා පහළින් ගියහොත් හෝ ව්‍යුහය පහළට බිඳ වැටුණහොත් මෙම setup එක වලංගු නොවේ."
+                ),
+                "risk_notes": (
+                    f"Risk 1% of account size maximum. Set Stop Loss strictly at {stop_loss:.2f} and target PDH at {pdh:.2f} with a reward ratio of 1:{rr_ratio:.1f}.\n\n"
+                    f"---\n\n"
+                    f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
+                    f"ඔබේ ගිණුමේ ප්‍රමාණයෙන් උපරිම 1% ක් පමණක් අවදානමට ලක් කරන්න. Stop Loss එක දැඩි ලෙස {stop_loss:.2f} මට්ටමේ තබා, 1:{rr_ratio:.1f} ක අවදානම්-ප්‍රතිලාභ අනුපාතයක් සමඟින් {pdh:.2f} මට්ටම ඉලක්ක කරන්න."
+                )
+            }
+        else:
+            reasons = []
+            if not is_htf_bullish: reasons.append("Daily structure trend is not bullish/pullback aligned")
+            if not asian_sweep: reasons.append("No Asian Session PDL sweep detected")
+            if not demand_mitigation: reasons.append("HTF Demand Zone mitigation is missing")
+            if not ltf_shift: reasons.append("Lower timeframe market structure shift (MSS) not confirmed")
+
+            reason_str = ", ".join(reasons)
+            return {
+                "is_valid": True,
+                "status_message": "Success",
+                "market_structure_status": (
+                    "HTF structure is Bullish, but setup conditions are incomplete.\n\n"
+                    "---\n\n"
+                    "**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
+                    "ප්‍රධාන Trend එක Bullish (ඉහළට) වුවත්, setup එක සම්පූර්ණ වීමට අවශ්‍ය කොන්දේසි සපුරා නොමැත."
+                ),
+                "daily_bias": "NEUTRAL",
+                "liquidity_target": pdh,
+                "entry_price_area": "No Entry Triggered",
+                "stop_loss_level": None,
+                "target_reward_ratio": "N/A",
+                "reasoning": (
+                    f"The Daily Bias is NEUTRAL because setup conditions are incomplete: {reason_str}.\n"
+                    f"Wait for the liquidity sweep of PDL ({pdl:.2f}) and subsequent demand mitigation with a LTF CHoCH shift during the London session.\n\n"
+                    f"---\n\n"
+                    f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
+                    f"පහත සඳහන් setup කොන්දේසි සම්පූර්ණ නොවීම නිසා Daily Bias එක මධ්‍යස්ථ (NEUTRAL) වේ: {reason_str}.\n"
+                    f"PDL ({pdl:.2f}) sweep වන තෙක් සහ ලන්ඩන් සැසිය තුළදී LTF CHoCH shift එකක් සමඟ demand mitigation එකක් සිදුවන තෙක් රැඳී සිටින්න."
+                ),
+                "invalidation": (
+                    f"No active setup to invalidate yet.\n\n"
+                    f"---\n\n"
+                    f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
+                    f"තවමත් වලංගු නොවන කිරීමට සක්‍රීය setup එකක් නොමැත."
+                ),
+                "risk_notes": (
+                    f"Do not enter trades on a neutral bias. Wait for alignment.\n\n"
+                    f"---\n\n"
+                    f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
+                    f"මධ්‍යස්ථ bias එකක් ඇති විට ගනුදෙනු නොකරන්න. කොන්දේසි සපුරාලන තෙක් රැඳී සිටින්න."
+                )
+            }
+
 
 
 

@@ -57,7 +57,7 @@ export default function Dashboard() {
   // News states
   const [news, setNews] = useState<any[]>([]);
   const [newsLoading, setNewsLoading] = useState(false);
-  const [activeView, setActiveView] = useState<"dashboard" | "news">("dashboard");
+  const [activeView, setActiveView] = useState<"dashboard" | "news" | "silverbullet">("dashboard");
 
   // Chat interface state
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -65,7 +65,92 @@ export default function Dashboard() {
   const [chatLoading, setChatLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
+  // Silver Bullet States
+  const [sbInputMode, setSbInputMode] = useState<"form" | "text">("form");
+  const [sbSymbol, setSbSymbol] = useState("GOLD");
+  const [sbScenarioText, setSbScenarioText] = useState("");
+  const [sbHtfTrend, setSbHtfTrend] = useState("BULLISH");
+  const [sbPullbackDays, setSbPullbackDays] = useState(3);
+  const [sbPdh, setSbPdh] = useState<number | "">(2350);
+  const [sbPdl, setSbPdl] = useState<number | "">(2320);
+  const [sbOpen, setSbOpen] = useState<number | "">(2325);
+  const [sbClose, setSbClose] = useState<number | "">(2330);
+  const [sbAsianSweep, setSbAsianSweep] = useState(true);
+  const [sbDemandMitigation, setSbDemandMitigation] = useState(true);
+  const [sbLtfShift, setSbLtfShift] = useState(true);
+  const [sbCurrentPrice, setSbCurrentPrice] = useState<number | "">(2323);
+  
+  const [sbResult, setSbResult] = useState<any | null>(null);
+  const [sbLoading, setSbLoading] = useState(false);
+  const [sbSearchLoading, setSbSearchLoading] = useState(false);
+  const [sbSearchError, setSbSearchError] = useState<string | null>(null);
+
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+
+  const fetchLivePrices = async () => {
+    if (!sbSymbol.trim()) return;
+    setSbSearchLoading(true);
+    setSbSearchError(null);
+    try {
+      const res = await fetch(`${API_BASE}/market/price?symbol=${encodeURIComponent(sbSymbol.trim())}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.pdh !== undefined) setSbPdh(Number(data.pdh));
+        if (data.pdl !== undefined) setSbPdl(Number(data.pdl));
+        if (data.open !== undefined) setSbOpen(Number(data.open));
+        if (data.close !== undefined) setSbClose(Number(data.close));
+        if (data.current_price !== undefined) setSbCurrentPrice(Number(data.current_price));
+      } else {
+        const err = await res.json();
+        setSbSearchError(err.detail || "Failed to fetch prices");
+      }
+    } catch (error: any) {
+      console.error(error);
+      setSbSearchError("Network error. Please try again.");
+    } finally {
+      setSbSearchLoading(false);
+    }
+  };
+
+  const triggerSilverBulletAnalysis = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setSbLoading(true);
+    setSbResult(null);
+    try {
+      const payload: any = {
+        symbol: sbSymbol,
+        scenario_text: sbInputMode === "text" ? sbScenarioText : null,
+        htf_trend: sbInputMode === "form" ? sbHtfTrend : null,
+        pullback_days: sbInputMode === "form" ? Number(sbPullbackDays) : null,
+        pdh: sbInputMode === "form" && sbPdh !== "" ? Number(sbPdh) : null,
+        pdl: sbInputMode === "form" && sbPdl !== "" ? Number(sbPdl) : null,
+        daily_open: sbInputMode === "form" && sbOpen !== "" ? Number(sbOpen) : null,
+        daily_close: sbInputMode === "form" && sbClose !== "" ? Number(sbClose) : null,
+        asian_sweep: sbInputMode === "form" ? sbAsianSweep : null,
+        demand_mitigation: sbInputMode === "form" ? sbDemandMitigation : null,
+        ltf_shift: sbInputMode === "form" ? sbLtfShift : null,
+        current_price: sbInputMode === "form" && sbCurrentPrice !== "" ? Number(sbCurrentPrice) : null,
+      };
+
+      const res = await fetch(`${API_BASE}/silverbullet/analyze`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setSbResult(data);
+      } else {
+        alert("Failed to analyze Silver Bullet setup.");
+      }
+    } catch (err) {
+      console.error("Silver Bullet error:", err);
+      alert("Error: Backend is offline or failed.");
+    } finally {
+      setSbLoading(false);
+    }
+  };
 
   // Fetch initial data
   useEffect(() => {
@@ -118,6 +203,117 @@ export default function Dashboard() {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatMessages]);
+
+  // Sinhala translation state & utility functions
+  const [translations, setTranslations] = useState<Record<string, string>>({});
+  const [translating, setTranslating] = useState<Record<string, boolean>>({});
+
+  const parseTextWithTranslation = (text: string): { english: string; sinhala: string | null } => {
+    if (!text) return { english: "", sinhala: null };
+    const markers = [
+      "--- \n\n**සිංහල පරිවර්තනය (Sinhala Translation):**",
+      "---\n\n**සිංහල පරිවර්තනය (Sinhala Translation):**",
+      "**සිංහල පරිවර්තනය (Sinhala Translation):**",
+      "**සිංහල පරිවර්තනය**",
+      "---"
+    ];
+    for (const marker of markers) {
+      const idx = text.indexOf(marker);
+      if (idx !== -1) {
+        const english = text.substring(0, idx).trim();
+        let sinhala = text.substring(idx + marker.length).trim();
+        sinhala = sinhala.replace(/^\*+/, "").replace(/\*+$/, "").trim();
+        return { english, sinhala };
+      }
+    }
+    return { english: text, sinhala: null };
+  };
+
+  const fetchTranslation = async (analysisId: number, fieldKey: string, text: string) => {
+    const cacheKey = `${analysisId}_${fieldKey}`;
+    setTranslating(prev => ({ ...prev, [cacheKey]: true }));
+    try {
+      const res = await fetch(`${API_BASE}/translate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.translated) {
+          setTranslations(prev => ({ ...prev, [cacheKey]: data.translated }));
+        }
+      }
+    } catch (e) {
+      console.error("Error fetching translation:", e);
+    } finally {
+      setTranslating(prev => ({ ...prev, [cacheKey]: false }));
+    }
+  };
+
+  useEffect(() => {
+    if (!currentAnalysis) return;
+    const fieldsToTranslate = [
+      { key: "reasoning", val: currentAnalysis.reasoning },
+      { key: "invalidation", val: currentAnalysis.invalidation },
+      { key: "risk_notes", val: currentAnalysis.risk_notes }
+    ];
+    fieldsToTranslate.forEach(field => {
+      const hasSinhala = /[\u0D80-\u0DFF]/.test(field.val || "");
+      const cacheKey = `${currentAnalysis.id}_${field.key}`;
+      if (field.val && !hasSinhala && !translations[cacheKey] && !translating[cacheKey]) {
+        fetchTranslation(currentAnalysis.id, field.key, field.val);
+      }
+    });
+  }, [currentAnalysis]);
+
+  const renderFieldText = (originalText: string, fieldKey: string) => {
+    if (!currentAnalysis) return null;
+    const hasSinhala = /[\u0D80-\u0DFF]/.test(originalText || "");
+    let englishText = originalText;
+    let sinhalaText: string | null = null;
+
+    if (hasSinhala) {
+      const parsed = parseTextWithTranslation(originalText);
+      englishText = parsed.english;
+      sinhalaText = parsed.sinhala;
+    } else {
+      const cacheKey = `${currentAnalysis.id}_${fieldKey}`;
+      sinhalaText = translations[cacheKey] || null;
+    }
+
+    const cacheKey = `${currentAnalysis.id}_${fieldKey}`;
+    const isLoading = translating[cacheKey];
+
+    return (
+      <div className="flex flex-col gap-3">
+        <div className="whitespace-pre-wrap">{englishText}</div>
+        {(sinhalaText || isLoading) && (
+          <div className="mt-2 pt-3 border-t border-[#1E2235]/60 flex flex-col gap-2 transition-all duration-300 ease-in-out">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold text-indigo-400 tracking-wider uppercase bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20 font-sans">
+                සිංහල පරිවර්තනය • Sinhala Translation
+              </span>
+            </div>
+            <div className="text-gray-300 leading-relaxed font-sans text-[13px] bg-[#0E101A]/60 p-3.5 rounded-lg border border-[#1E2235]/80 min-h-[45px] flex flex-col justify-center shadow-inner">
+              {isLoading ? (
+                <div className="flex items-center gap-2 text-indigo-400 text-xs py-1">
+                  <svg className="animate-spin h-3.5 w-3.5 text-indigo-400" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <span>පරිවර්තනය වෙමින් පවතී... (Translating...)</span>
+                </div>
+              ) : (
+                <div className="whitespace-pre-wrap font-normal leading-relaxed">{sinhalaText}</div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
 
   const handleSearchSymbol = () => {
     if (!searchInput.trim()) return;
@@ -399,6 +595,20 @@ export default function Dashboard() {
               <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
             )}
           </button>
+          <button
+            onClick={() => setActiveView("silverbullet")}
+            id="btn-silver-bullet"
+            className={`px-4 py-2 rounded-lg text-xs font-semibold tracking-wider uppercase transition-all flex items-center gap-1.5 ${
+              activeView === "silverbullet"
+                ? "bg-[#6366F1] text-white shadow-md shadow-indigo-500/10"
+                : "text-gray-400 hover:text-gray-200"
+            }`}
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            Silver Bullet
+          </button>
         </div>
 
         <div className="flex items-center gap-4">
@@ -426,7 +636,7 @@ export default function Dashboard() {
       </header>
 
       {/* Main Container */}
-      <main className={`flex-1 p-6 ${activeView === "news" ? "flex flex-col" : "grid grid-cols-1 xl:grid-cols-4"} gap-6 max-w-[1800px] w-full mx-auto pb-16`}>
+      <main className={`flex-1 p-6 ${activeView !== "dashboard" ? "flex flex-col" : "grid grid-cols-1 xl:grid-cols-4"} gap-6 max-w-[1800px] w-full mx-auto pb-16`}>
         
         {activeView === "news" ? (
           <section className="flex flex-col gap-6" id="news-feed-section">
@@ -510,6 +720,578 @@ export default function Dashboard() {
                 ))}
               </div>
             )}
+          </section>
+        ) : activeView === "silverbullet" ? (
+          <section className="flex flex-col gap-6 w-full animate-fadeIn" id="silver-bullet-section">
+            <div className="flex flex-col gap-1">
+              <h2 className="text-xl font-bold tracking-tight text-white uppercase flex items-center gap-2">
+                <svg className="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                ICT Silver Bullet Assistant
+                <span className="text-[10px] bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-2 py-0.5 rounded font-mono ml-2">Multi-Asset Support</span>
+              </h2>
+              <p className="text-xs text-gray-400">Evaluate Daily Bias and Liquidity Sweeps programmatically or via AI scenario logic.</p>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+              {/* INPUT PANEL */}
+              <div className="lg:col-span-5 bg-[#11131F]/90 border border-[#1E2235] rounded-2xl p-6 shadow-xl flex flex-col gap-5">
+                <div className="flex items-center justify-between border-b border-[#1E2235] pb-4">
+                  <h3 className="text-sm font-semibold tracking-wide text-white">Scenario Input</h3>
+                  <div className="flex bg-[#141626] border border-[#1E2235] rounded-lg p-0.5">
+                    <button
+                      onClick={() => setSbInputMode("form")}
+                      className={`px-3 py-1 rounded text-[11px] font-semibold transition-all ${
+                        sbInputMode === "form"
+                          ? "bg-[#6366F1] text-white shadow-md"
+                          : "text-gray-400 hover:text-gray-200"
+                      }`}
+                    >
+                      Form Builder
+                    </button>
+                    <button
+                      onClick={() => setSbInputMode("text")}
+                      className={`px-3 py-1 rounded text-[11px] font-semibold transition-all ${
+                        sbInputMode === "text"
+                          ? "bg-[#6366F1] text-white shadow-md"
+                          : "text-gray-400 hover:text-gray-200"
+                      }`}
+                    >
+                      Raw Scenario
+                    </button>
+                  </div>
+                </div>
+
+                <form onSubmit={triggerSilverBulletAnalysis} className="flex flex-col gap-4">
+                  {/* Asset Symbol Input */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider font-mono">Trading Asset / Symbol</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="e.g. GOLD, BTC, ETH, EURUSD..."
+                        value={sbSymbol}
+                        onChange={(e) => setSbSymbol(e.target.value.toUpperCase())}
+                        className="bg-[#141626] border border-[#1E2235] rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#6366F1] font-mono flex-grow"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={fetchLivePrices}
+                        disabled={sbSearchLoading || !sbSymbol.trim()}
+                        className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-800/40 text-white border border-indigo-500/20 px-4 py-2.5 rounded-xl text-xs font-semibold font-mono tracking-wide transition-all shadow-md active:scale-95 flex items-center gap-1.5"
+                      >
+                        {sbSearchLoading ? (
+                          <>
+                            <svg className="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                            </svg>
+                            Searching...
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                            Search
+                          </>
+                        )}
+                      </button>
+                    </div>
+                    {sbSearchError && (
+                      <span className="text-[10px] text-rose-400 font-semibold font-mono leading-relaxed mt-0.5">{sbSearchError}</span>
+                    )}
+                  </div>
+
+                  {sbInputMode === "form" ? (
+                    <div className="flex flex-col gap-4">
+                      {/* Trend and Pullback */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">HTF Trend (Daily)</label>
+                          <select
+                            value={sbHtfTrend}
+                            onChange={(e) => setSbHtfTrend(e.target.value)}
+                            className="bg-[#141626] border border-[#1E2235] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#6366F1]"
+                          >
+                            <option value="BULLISH">Bullish (Higher Highs/Lows)</option>
+                            <option value="BEARISH">Bearish (Lower Highs/Lows)</option>
+                            <option value="CONSOLIDATING">Consolidating / Range</option>
+                          </select>
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Pullback Days</label>
+                          <input
+                            type="number"
+                            min="0"
+                            max="10"
+                            value={sbPullbackDays}
+                            onChange={(e) => setSbPullbackDays(Number(e.target.value))}
+                            className="bg-[#141626] border border-[#1E2235] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#6366F1]"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Daily Levels */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Previous Daily High (PDH)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            placeholder="e.g. 2350"
+                            value={sbPdh}
+                            onChange={(e) => setSbPdh(e.target.value === "" ? "" : Number(e.target.value))}
+                            className="bg-[#141626] border border-[#1E2235] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#6366F1]"
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Previous Daily Low (PDL)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            placeholder="e.g. 2320"
+                            value={sbPdl}
+                            onChange={(e) => setSbPdl(e.target.value === "" ? "" : Number(e.target.value))}
+                            className="bg-[#141626] border border-[#1E2235] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#6366F1]"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Open / Close */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Daily Open (Optional)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            placeholder="e.g. 2325"
+                            value={sbOpen}
+                            onChange={(e) => setSbOpen(e.target.value === "" ? "" : Number(e.target.value))}
+                            className="bg-[#141626] border border-[#1E2235] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#6366F1]"
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Daily Close (Optional)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            placeholder="e.g. 2330"
+                            value={sbClose}
+                            onChange={(e) => setSbClose(e.target.value === "" ? "" : Number(e.target.value))}
+                            className="bg-[#141626] border border-[#1E2235] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#6366F1]"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Current Price */}
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider font-mono">Current Price (Optional)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          placeholder="e.g. 2323"
+                          value={sbCurrentPrice}
+                          onChange={(e) => setSbCurrentPrice(e.target.value === "" ? "" : Number(e.target.value))}
+                          className="bg-[#141626] border border-[#1E2235] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#6366F1]"
+                        />
+                      </div>
+
+                      {/* Strategy Rules Checkboxes */}
+                      <div className="flex flex-col gap-2.5 mt-2 bg-[#141626]/40 p-4 rounded-xl border border-[#1E2235]">
+                        <span className="text-[10px] font-bold text-[#8B5CF6] uppercase tracking-wider">Session & Sweep Conditions</span>
+                        
+                        <label className="flex items-center gap-3 cursor-pointer select-none py-1">
+                          <input
+                            type="checkbox"
+                            checked={sbAsianSweep}
+                            onChange={(e) => setSbAsianSweep(e.target.checked)}
+                            className="w-4 h-4 rounded text-indigo-600 bg-[#141626] border-[#1E2235] focus:ring-indigo-500"
+                          />
+                          <div className="flex flex-col">
+                            <span className="text-xs font-semibold text-white">Asian Session Swept PDL</span>
+                            <span className="text-[9px] text-gray-500">Retail sell-side liquidity swept before London</span>
+                          </div>
+                        </label>
+
+                        <label className="flex items-center gap-3 cursor-pointer select-none py-1 border-t border-[#1E2235]/40 mt-1 pt-2">
+                          <input
+                            type="checkbox"
+                            checked={sbDemandMitigation}
+                            onChange={(e) => setSbDemandMitigation(e.target.checked)}
+                            className="w-4 h-4 rounded text-indigo-600 bg-[#141626] border-[#1E2235] focus:ring-indigo-500"
+                          />
+                          <div className="flex flex-col">
+                            <span className="text-xs font-semibold text-white">Mitigated HTF Demand Zone (15m/5m)</span>
+                            <span className="text-[9px] text-gray-500">Tapped into institutional buy orders</span>
+                          </div>
+                        </label>
+
+                        <label className="flex items-center gap-3 cursor-pointer select-none py-1 border-t border-[#1E2235]/40 mt-1 pt-2">
+                          <input
+                            type="checkbox"
+                            checked={sbLtfShift}
+                            onChange={(e) => setSbLtfShift(e.target.checked)}
+                            className="w-4 h-4 rounded text-indigo-600 bg-[#141626] border-[#1E2235] focus:ring-indigo-500"
+                          />
+                          <div className="flex flex-col">
+                            <span className="text-xs font-semibold text-white">London Session LTF Shift (CHoCH/MSS)</span>
+                            <span className="text-[9px] text-gray-500">Aggressive momentum displacement out of zone</span>
+                          </div>
+                        </label>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider font-mono">Market Scenario / Notes</label>
+                      <textarea
+                        placeholder="Paste or write your market observations here... (e.g. HTF trend is bullish. Pullback of 3 days. Yesterday PDH 2350, PDL 2320. Asian session swept PDL and hit demand at 2318. Now we saw structure shift...)"
+                        value={sbScenarioText}
+                        onChange={(e) => setSbScenarioText(e.target.value)}
+                        className="bg-[#141626] border border-[#1E2235] rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-[#6366F1] h-64 font-mono leading-relaxed"
+                      />
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={sbLoading}
+                    className="mt-2 bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] hover:from-[#5053df] hover:to-[#7c4ee5] text-white text-xs font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-2 disabled:opacity-55 cursor-pointer"
+                  >
+                    {sbLoading ? (
+                      <>
+                        <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                        Evaluating setup...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 002-2" />
+                        </svg>
+                        Analyze Strategy Setup
+                      </>
+                    )}
+                  </button>
+                </form>
+              </div>
+
+              {/* OUTPUT PANEL */}
+              <div className="lg:col-span-7 bg-[#11131F]/90 border border-[#1E2235] rounded-2xl p-6 shadow-xl flex flex-col gap-6 min-h-[500px]">
+                {!sbResult && !sbLoading && (
+                  <div className="flex-1 flex flex-col items-center justify-center text-center p-10 gap-4">
+                    <div className="w-16 h-16 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+                      <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                    <h4 className="text-sm font-semibold text-white">Awaiting Strategy Inputs</h4>
+                    <p className="text-xs text-gray-500 max-w-sm">Use the Form Builder or Raw Scenario tab to configure the current market scenario, then click Analyze.</p>
+                  </div>
+                )}
+
+                {sbLoading && (
+                  <div className="flex-1 flex flex-col items-center justify-center text-center p-10 gap-4">
+                    <div className="relative w-16 h-16">
+                      <div className="absolute inset-0 border-4 border-indigo-500/10 rounded-full"></div>
+                      <div className="absolute inset-0 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                    </div>
+                    <h4 className="text-sm font-semibold text-indigo-400 animate-pulse">Running Technical Rules Analysis...</h4>
+                    <p className="text-xs text-gray-500 max-w-sm">Gemini is checking the daily bias conditions, identifying the sweep of PDL, and verifying demand mitigation zones.</p>
+                  </div>
+                )}
+
+                {sbResult && (
+                  <div className="flex flex-col gap-6">
+                    {!sbResult.is_valid ? (
+                      <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-5 flex items-start gap-3 shadow-[0_0_15px_rgba(245,158,11,0.05)]">
+                        <svg className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                        <div className="flex flex-col gap-1">
+                          <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider">Incomplete Information Warning</h4>
+                          <p className="text-xs text-gray-300 font-mono leading-relaxed mt-1">{sbResult.status_message}</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        {/* Bias Header Banner */}
+                        <div className="bg-[#141626]/60 border border-[#1E2235] p-5 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative overflow-hidden">
+                          <div className="absolute right-0 top-0 w-32 h-32 bg-[#6366F1]/5 rounded-full blur-3xl pointer-events-none"></div>
+                          <div className="flex flex-col gap-1">
+                            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider font-mono">Daily bias report</span>
+                            <div className="flex items-baseline gap-2">
+                              <h3 className="text-xl font-bold text-white">{sbSymbol}</h3>
+                              <span className="text-[10px] text-gray-400 font-semibold font-mono">London Session Bias</span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-400 font-medium">Session Bias:</span>
+                            <div className={`px-4 py-2 rounded-xl text-xs font-extrabold tracking-wider border ${
+                              sbResult.daily_bias === "BULLISH" 
+                                ? "text-emerald-400 border-emerald-500/20 bg-emerald-500/5 shadow-[0_0_15px_rgba(16,185,129,0.1)]" 
+                                : "text-amber-400 border-amber-500/20 bg-amber-500/5"
+                            }`}>
+                              {sbResult.daily_bias}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Trade Parameters Table */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="bg-[#141626]/40 border border-[#1E2235]/60 rounded-xl p-4 flex flex-col gap-2.5 md:col-span-2">
+                            <h4 className="text-[10px] font-bold text-gray-500 uppercase tracking-wider font-mono">Market Structure Status</h4>
+                            <div className="text-xs font-semibold text-white leading-relaxed font-sans">
+                              {(() => {
+                                const parsed = parseTextWithTranslation(sbResult.market_structure_status || "");
+                                return (
+                                  <div className="flex flex-col gap-2">
+                                    <div className="whitespace-pre-wrap">{parsed.english}</div>
+                                    {parsed.sinhala && (
+                                      <div className="mt-1.5 pt-2 border-t border-[#1E2235]/40 flex flex-col gap-1.5 transition-all">
+                                        <span className="text-[9px] font-bold text-indigo-400 tracking-wider uppercase font-sans">සිංහල පරිවර්තනය • Sinhala Translation</span>
+                                        <div className="text-gray-300 font-sans text-[11px] whitespace-pre-wrap bg-[#0E101A]/40 p-2.5 rounded-lg border border-[#1E2235]/40">{parsed.sinhala}</div>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })()}
+                            </div>
+                          </div>
+
+                          <div className="bg-[#141626]/40 border border-[#1E2235]/60 rounded-xl p-4 flex flex-col gap-2.5">
+                            <h4 className="text-[10px] font-bold text-gray-500 uppercase tracking-wider font-mono">Liquidity Target (PDH)</h4>
+                            <span className="text-xs font-semibold text-emerald-400 font-mono flex items-center gap-1.5">
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+                              </svg>
+                              {sbResult.liquidity_target || "N/A"}
+                            </span>
+                          </div>
+
+                          <div className="bg-[#141626]/40 border border-[#1E2235]/60 rounded-xl p-4 flex flex-col gap-2.5">
+                            <h4 className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider font-mono">Entry Price Area</h4>
+                            <span className="text-xs font-semibold text-white font-mono">{sbResult.entry_price_area || "N/A"}</span>
+                          </div>
+
+                          <div className="bg-[#141626]/40 border border-[#1E2235]/60 rounded-xl p-4 flex flex-col gap-2.5">
+                            <h4 className="text-[10px] font-bold text-rose-400 uppercase tracking-wider font-mono">Stop-Loss Level</h4>
+                            <span className="text-xs font-semibold text-rose-400 font-mono flex items-center gap-1.5">
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                              </svg>
+                              {sbResult.stop_loss_level || "N/A"}
+                            </span>
+                          </div>
+
+                          <div className="bg-[#141626]/40 border border-[#1E2235]/60 rounded-xl p-4 flex flex-col gap-2.5 md:col-span-2">
+                            <h4 className="text-[10px] font-bold text-[#8B5CF6] uppercase tracking-wider font-mono">Target Reward Ratio</h4>
+                            <span className="text-xs font-semibold text-[#8B5CF6] font-mono">{sbResult.target_reward_ratio || "1:3 Minimum"}</span>
+                          </div>
+                        </div>
+
+                        {/* Interactive SVG Diagram Visualizer */}
+                        {sbResult.daily_bias === "BULLISH" && sbResult.liquidity_target && (
+                          <div className="bg-black/20 border border-[#1E2235]/60 rounded-xl p-4 flex flex-col gap-2">
+                            <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wider font-mono">Liquidity Flow Diagram (Candlestick Visualizer)</span>
+                            <div className="w-full h-48 bg-[#07080E] rounded-lg relative overflow-hidden border border-[#1E2235]/40 flex items-center justify-center">
+                              {(() => {
+                                const entryPriceVal = (() => {
+                                  if (!sbResult.entry_price_area) return "N/A";
+                                  const matches = sbResult.entry_price_area.match(/\d+(?:\.\d+)?/g);
+                                  if (!matches) return "N/A";
+                                  const pdlVal = Number(sbPdl);
+                                  if (!isNaN(pdlVal) && pdlVal > 50) {
+                                    const priceMatch = matches.find(m => Number(m) > 50);
+                                    if (priceMatch) return priceMatch;
+                                  }
+                                  return matches[matches.length - 1];
+                                })();
+                                const stopLossVal = sbResult.stop_loss_level || "2313.5";
+                                const candles = [
+                                  // 1. Pullback trend (Bearish)
+                                  { x: 30, open: 70, close: 90, high: 60, low: 100, isBullish: false },
+                                  { x: 60, open: 85, close: 100, high: 80, low: 110, isBullish: false },
+                                  { x: 90, open: 95, close: 113, high: 90, low: 120, isBullish: false },
+                                  
+                                  // 2. Consolidation & Asian Sweep
+                                  { x: 120, open: 110, close: 105, high: 100, low: 118, isBullish: true },
+                                  { x: 150, open: 108, close: 122, high: 105, low: 145, isBullish: false, isSweep: true }, // Wick sweeps to 145 (below PDL 120)
+                                  
+                                  // 3. Reversal & MSS
+                                  { x: 180, open: 118, close: 110, high: 105, low: 122, isBullish: true },
+                                  { x: 210, open: 110, close: 80, high: 75, low: 115, isBullish: true, isMSS: true }, // Strong bullish candle
+                                  
+                                  // 4. Retest / Entry
+                                  { x: 240, open: 85, close: 105, high: 80, low: 108, isBullish: false, isEntry: true }, // Retests entry limit at 105
+                                  
+                                  // 5. Expansion to Target
+                                  { x: 270, open: 85, close: 60, high: 55, low: 90, isBullish: true },
+                                  { x: 300, open: 60, close: 40, high: 35, low: 65, isBullish: true },
+                                  { x: 330, open: 40, close: 25, high: 20, low: 45, isBullish: true }
+                                ];
+                                
+                                return (
+                                  <svg className="w-full h-full p-2" viewBox="0 0 400 180" xmlns="http://www.w3.org/2000/svg">
+                                    {/* PDH Line */}
+                                    <line x1="10" y1="30" x2="390" y2="30" stroke="#10B981" strokeWidth="1" strokeDasharray="3,3" />
+                                    <text x="15" y="25" fill="#10B981" fontSize="9" fontFamily="monospace">PDH (Target): {sbResult.liquidity_target}</text>
+
+                                    {/* PDL Line */}
+                                    <line x1="10" y1="120" x2="390" y2="120" stroke="#EF4444" strokeWidth="1" strokeDasharray="3,3" />
+                                    <text x="15" y="115" fill="#EF4444" fontSize="9" fontFamily="monospace">PDL (Sweep): {sbPdl || "2320"}</text>
+
+                                    {/* Demand Zone */}
+                                    <rect x="130" y="125" width="80" height="25" fill="#8B5CF6" fillOpacity="0.1" stroke="#8B5CF6" strokeWidth="1" strokeDasharray="2,2" />
+                                    <text x="135" y="140" fill="#8B5CF6" fontSize="8" fontFamily="sans-serif" fontWeight="bold">15m/5m Demand</text>
+
+                                    {/* Entry Line */}
+                                    <line x1="10" y1="105" x2="390" y2="105" stroke="#10B981" strokeWidth="0.75" strokeDasharray="4,4" />
+                                    <text x="280" y="101" fill="#10B981" fontSize="8" fontFamily="monospace" fontWeight="bold">Entry Limit: {entryPriceVal}</text>
+
+                                    {/* Stop Loss Line */}
+                                    <line x1="10" y1="145" x2="390" y2="145" stroke="#EF4444" strokeWidth="0.75" strokeDasharray="4,4" />
+                                    <text x="275" y="154" fill="#EF4444" fontSize="8" fontFamily="monospace" fontWeight="bold">Stop Loss: {stopLossVal}</text>
+
+                                    {/* Render Candlesticks */}
+                                    {candles.map((c, i) => {
+                                      const color = c.isBullish ? "#10B981" : "#EF4444";
+                                      const bodyY = c.isBullish ? c.close : c.open;
+                                      const bodyHeight = Math.abs(c.close - c.open);
+                                      return (
+                                        <g key={i}>
+                                          {/* Wick */}
+                                          <line
+                                            x1={c.x + 5}
+                                            y1={c.high}
+                                            x2={c.x + 5}
+                                            y2={c.low}
+                                            stroke={color}
+                                            strokeWidth="1.5"
+                                          />
+                                          {/* Body */}
+                                          <rect
+                                            x={c.x}
+                                            y={bodyY}
+                                            width="10"
+                                            height={bodyHeight || 1}
+                                            fill={c.isBullish ? "#10B981" : "#EF4444"}
+                                            stroke={color}
+                                            strokeWidth="1"
+                                          />
+                                          {c.isSweep && (
+                                            <circle cx={c.x + 5} cy="145" r="3" fill="#EF4444" />
+                                          )}
+                                          {c.isMSS && (
+                                            <g>
+                                              <path d="M 215 75 L 215 62 L 200 62" fill="none" stroke="#E5E7EB" strokeWidth="1" />
+                                              <text x="200" y="55" fill="#E5E7EB" fontSize="8" fontFamily="monospace" fontWeight="bold">MSS / CHoCH</text>
+                                            </g>
+                                          )}
+                                          {c.isEntry && (
+                                            <circle cx={c.x + 5} cy="105" r="3.5" fill="#10B981" stroke="#FFFFFF" strokeWidth="0.75" />
+                                          )}
+                                        </g>
+                                      );
+                                    })}
+                                  </svg>
+                                );
+                              })()}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Reasoning tabs */}
+                        <div className="flex flex-col gap-4">
+                          <div className="border-t border-[#1E2235] pt-5">
+                            <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5 mb-2">
+                              <svg className="w-4 h-4 text-[#10B981]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                              </svg>
+                              Technical Reasoning
+                            </h4>
+                            <div className="bg-[#141626]/50 p-4 rounded-xl border border-[#1E2235] text-xs leading-relaxed text-gray-300 font-mono">
+                              {(() => {
+                                const parsed = parseTextWithTranslation(sbResult.reasoning || "");
+                                return (
+                                  <div className="flex flex-col gap-3">
+                                    <div className="whitespace-pre-wrap">{parsed.english}</div>
+                                    {parsed.sinhala && (
+                                      <div className="mt-2 pt-3 border-t border-[#1E2235]/60 flex flex-col gap-2">
+                                        <span className="text-[9px] font-bold text-indigo-400 tracking-wider uppercase bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20 font-sans self-start">
+                                          සිංහල පරිවර්තනය • Sinhala Translation
+                                        </span>
+                                        <div className="text-gray-300 leading-relaxed font-sans text-[12px] bg-[#0E101A]/60 p-3 rounded-lg border border-[#1E2235]/80">
+                                          <div className="whitespace-pre-wrap font-normal leading-relaxed">{parsed.sinhala}</div>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })()}
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <h4 className="text-xs font-bold text-rose-400 uppercase tracking-wider flex items-center gap-1.5 mb-2">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                Setup Invalidation
+                              </h4>
+                              <div className="bg-[#141626]/30 p-3.5 rounded-xl border border-[#1E2235]/40 text-[11px] leading-relaxed text-gray-400 font-mono">
+                                {(() => {
+                                  const parsed = parseTextWithTranslation(sbResult.invalidation || "");
+                                  return (
+                                    <div className="flex flex-col gap-3.5">
+                                      <div className="whitespace-pre-wrap">{parsed.english}</div>
+                                      {parsed.sinhala && (
+                                        <div className="mt-1 pt-2 border-t border-[#1E2235]/40 flex flex-col gap-1.5">
+                                          <span className="text-[8px] font-bold text-indigo-400 tracking-wider uppercase font-sans">සිංහල</span>
+                                          <div className="text-gray-400 font-sans text-[11px] whitespace-pre-wrap bg-[#0E101A]/40 p-2.5 rounded-lg border border-[#1E2235]/40">{parsed.sinhala}</div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })()}
+                              </div>
+                            </div>
+
+                            <div>
+                              <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5 mb-2">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                </svg>
+                                Risk Mitigation
+                              </h4>
+                              <div className="bg-[#141626]/30 p-3.5 rounded-xl border border-[#1E2235]/40 text-[11px] leading-relaxed text-gray-400 font-mono">
+                                {(() => {
+                                  const parsed = parseTextWithTranslation(sbResult.risk_notes || "");
+                                  return (
+                                    <div className="flex flex-col gap-3.5">
+                                      <div className="whitespace-pre-wrap">{parsed.english}</div>
+                                      {parsed.sinhala && (
+                                        <div className="mt-1 pt-2 border-t border-[#1E2235]/40 flex flex-col gap-1.5">
+                                          <span className="text-[8px] font-bold text-indigo-400 tracking-wider uppercase font-sans">සිංහල</span>
+                                          <div className="text-gray-400 font-sans text-[11px] whitespace-pre-wrap bg-[#0E101A]/40 p-2.5 rounded-lg border border-[#1E2235]/40">{parsed.sinhala}</div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })()}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
           </section>
         ) : (
           <>
@@ -833,8 +1615,8 @@ export default function Dashboard() {
                   </svg>
                   Technical Reasoning & Structure Analysis
                 </h3>
-                <div className="text-sm leading-relaxed text-gray-300 font-mono whitespace-pre-wrap bg-[#141626]/50 p-4 rounded-xl border border-[#1E2235]">
-                  {currentAnalysis.reasoning}
+                <div className="text-sm leading-relaxed text-gray-300 font-mono bg-[#141626]/50 p-4 rounded-xl border border-[#1E2235]">
+                  {renderFieldText(currentAnalysis.reasoning, "reasoning")}
                 </div>
               </div>
 
@@ -848,9 +1630,9 @@ export default function Dashboard() {
                     </svg>
                     Setup Invalidation Conditions
                   </h4>
-                  <p className="text-xs leading-relaxed text-gray-400 font-mono">
-                    {currentAnalysis.invalidation}
-                  </p>
+                  <div className="text-xs leading-relaxed text-gray-400 font-mono bg-[#141626]/30 p-3.5 rounded-xl border border-[#1E2235]/40 mt-1">
+                    {renderFieldText(currentAnalysis.invalidation, "invalidation")}
+                  </div>
                 </div>
 
                 {/* Risk Warning & Management */}
@@ -861,9 +1643,9 @@ export default function Dashboard() {
                     </svg>
                     Risk Mitigation Guidelines
                   </h4>
-                  <p className="text-xs leading-relaxed text-gray-400 font-mono">
-                    {currentAnalysis.risk_notes}
-                  </p>
+                  <div className="text-xs leading-relaxed text-gray-400 font-mono bg-[#141626]/30 p-3.5 rounded-xl border border-[#1E2235]/40 mt-1">
+                    {renderFieldText(currentAnalysis.risk_notes, "risk_notes")}
+                  </div>
                 </div>
               </div>
             </div>

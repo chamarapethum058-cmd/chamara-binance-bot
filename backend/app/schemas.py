@@ -63,3 +63,39 @@ class ChatRequest(BaseModel):
     analysis_id: Optional[int] = None
     history: Optional[List[dict]] = None
 
+
+# Translation schemas
+class TranslateRequest(BaseModel):
+    text: str
+
+
+# Silver Bullet analysis schemas
+class SilverBulletRequest(BaseModel):
+    symbol: Optional[str] = None
+    scenario_text: Optional[str] = None
+    htf_trend: Optional[str] = None
+    pullback_days: Optional[int] = None
+    pdh: Optional[float] = None
+    pdl: Optional[float] = None
+    daily_open: Optional[float] = None
+    daily_close: Optional[float] = None
+    asian_sweep: Optional[bool] = None
+    demand_mitigation: Optional[bool] = None
+    ltf_shift: Optional[bool] = None
+    current_price: Optional[float] = None
+
+class SilverBulletResponse(BaseModel):
+    is_valid: bool
+    status_message: str
+    market_structure_status: Optional[str] = None
+    daily_bias: Optional[str] = None
+    liquidity_target: Optional[float] = None
+    entry_price_area: Optional[str] = None
+    stop_loss_level: Optional[float] = None
+    target_reward_ratio: Optional[str] = None
+    reasoning: Optional[str] = None
+    invalidation: Optional[str] = None
+    risk_notes: Optional[str] = None
+
+
+

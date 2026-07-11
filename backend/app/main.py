@@ -10,7 +10,8 @@ from .schemas import (
     StrategyCreate, StrategyResponse, 
     AnalysisRequest, AnalysisResponse,
     PreferenceCreate, PreferenceResponse,
-    ChatRequest
+    ChatRequest, TranslateRequest,
+    SilverBulletRequest, SilverBulletResponse
 )
 from .services import BinanceService, AIService, NewsService
 from .config import settings
@@ -33,8 +34,10 @@ app.add_middleware(
 @app.on_event("startup")
 def startup_populate():
     db = next(get_db())
-    # Check if we have any strategies
-    if db.query(StrategyModel).count() == 0:
+    
+    # Check if SMC exists, if not seed it
+    smc_exists = db.query(StrategyModel).filter(StrategyModel.name == "SMC (Smart Money Concepts)").first()
+    if not smc_exists:
         default_smc = StrategyModel(
             name="SMC (Smart Money Concepts)",
             description="Smart Money Concepts strategy analyzing BOS, CHOCH, FVG, and Order Blocks.",
@@ -67,8 +70,43 @@ def startup_populate():
         )
         db.add(default_smc)
         db.commit()
-        db.refresh(default_smc)
         print("Default SMC strategy populated.")
+        
+    # Check if ICT Silver Bullet exists, if not seed it
+    sb_exists = db.query(StrategyModel).filter(StrategyModel.name == "ICT Silver Bullet").first()
+    if not sb_exists:
+        # Deactivate other strategies to make this one the primary active strategy
+        db.query(StrategyModel).update({StrategyModel.is_active: False})
+        default_sb = StrategyModel(
+            name="ICT Silver Bullet",
+            description="Specialized GOLD/XAUUSD strategy analyzing Daily Bias, PDH/PDL liquidity sweeps, and lower timeframe execution.",
+            content="""# ICT Silver Bullet & Liquidity Flow Strategy (GOLD/XAUUSD)
+
+## 1. General Framework & Core Logic
+- Asset: GOLD (XAUUSD)
+- Core Concepts: Market Structure & Liquidity Flow (SMC / ICT Principles).
+- Primary Focus: Identifying Daily Bias using multi-timeframe analysis (Daily Timeframe down to 15m/5m execution).
+
+## 2. Technical Analysis Logic
+- **Step A: Higher Timeframe (HTF) Trend Analysis (Daily Chart)**
+  Check the Daily Market Structure. Bullish if making HH/HL. Pullback is identified by a 3+ day bearish correction into a key institutional demand zone, turning fractal order flow bullish.
+- **Step B: Key Level Mapping (Daily to 15-Minute)**
+  Map previous day's levels: PDH (Previous Daily High - major target), PDL (Previous Daily Low - sweep target), Daily Open, Daily Close.
+- **Step C: Liquidity Sweep Logic (Daily Bias confirmation)**
+  Asian Session sweeps PDL and mitigates HTF 15m/5m Demand Zone. The Daily Bias then becomes strictly Bullish, targeting PDH.
+
+## 3. Execution & Trade Management
+- Session: London Session Execution.
+- Entry Trigger: Lower Timeframe (LTF) Shift in Market Structure (MSS/CHoCH) or aggressive bullish displacement out of the demand zone after the PDL sweep.
+- Entry Point: Limit order at 15m/5m Demand Range / Order Block.
+- Stop-Loss: Placed below sweep low.
+- Take-Profit: Option 1: 1:3 to 1:3.3 RR. Option 2: Target PDH or previous session high.
+""",
+            is_active=True
+        )
+        db.add(default_sb)
+        db.commit()
+        print("Default ICT Silver Bullet strategy populated.")
     
     # Seed default Gemini API Key from settings if not set in DB
     pref = db.query(PreferenceModel).filter(PreferenceModel.key == "gemini_api_key").first()
@@ -166,6 +204,15 @@ def set_preference(pref: PreferenceCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(db_pref)
     return db_pref
+
+# TRANSLATION ENDPOINTS
+@app.post("/api/translate")
+async def translate_text_endpoint(req: TranslateRequest, db: Session = Depends(get_db)):
+    pref = db.query(PreferenceModel).filter(PreferenceModel.key == "gemini_api_key").first()
+    api_key = pref.value if pref else None
+    
+    translated = await AIService.translate_text(req.text, api_key=api_key)
+    return {"translated": translated}
 
 # NEWS ENDPOINTS
 @app.get("/api/news")
@@ -268,4 +315,139 @@ async def chat_with_ai(req: ChatRequest, db: Session = Depends(get_db)):
     )
     
     return {"response": response_text}
+
+
+@app.post("/api/silverbullet/analyze", response_model=SilverBulletResponse)
+async def silverbullet_analyze(req: SilverBulletRequest, db: Session = Depends(get_db)):
+    # Retrieve Gemini API Key from DB
+    pref = db.query(PreferenceModel).filter(PreferenceModel.key == "gemini_api_key").first()
+    api_key = pref.value if pref else None
+    
+    # Run analysis
+    result = await AIService.analyze_silver_bullet(req.dict(), api_key=api_key)
+    
+    # Ensure correct format in response
+    return SilverBulletResponse(
+        is_valid=result.get("is_valid", False),
+        status_message=result.get("status_message") or "Success",
+        market_structure_status=result.get("market_structure_status"),
+        daily_bias=result.get("daily_bias"),
+        liquidity_target=result.get("liquidity_target"),
+        entry_price_area=result.get("entry_price_area"),
+        stop_loss_level=result.get("stop_loss_level"),
+        target_reward_ratio=result.get("target_reward_ratio"),
+        reasoning=result.get("reasoning"),
+        invalidation=result.get("invalidation"),
+        risk_notes=result.get("risk_notes")
+    )
+
+
+import httpx
+
+SYMBOL_MAP = {
+    "GOLD": "GC=F",
+    "XAUUSD": "GC=F",
+    "XAU/USD": "GC=F",
+    "EURUSD": "EURUSD=X",
+    "EUR/USD": "EURUSD=X",
+    "GBPUSD": "GBPUSD=X",
+    "AUDUSD": "AUDUSD=X",
+    "USDJPY": "JPY=X",
+}
+
+async def fetch_yahoo_finance(yahoo_symbol: str):
+    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{yahoo_symbol}?interval=1d&range=2d"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    }
+    async with httpx.AsyncClient() as client:
+        res = await client.get(url, headers=headers, timeout=5.0)
+        if res.status_code != 200:
+            raise Exception(f"Yahoo Finance returned status {res.status_code}")
+        data = res.json()
+        result = data.get("chart", {}).get("result", [])
+        if not result:
+            raise Exception("No Yahoo Finance chart result found")
+            
+        quote = result[0].get("indicators", {}).get("quote", [{}])[0]
+        meta = result[0].get("meta", {})
+        
+        opens = quote.get("open", [])
+        highs = quote.get("high", [])
+        lows = quote.get("low", [])
+        closes = quote.get("close", [])
+        
+        if not highs or not lows:
+            raise Exception("Incomplete quote data from Yahoo Finance")
+            
+        if len(highs) == 1:
+            pdh = float(highs[0]) if highs[0] is not None else 0.0
+            pdl = float(lows[0]) if lows[0] is not None else 0.0
+            open_val = float(opens[0]) if opens[0] is not None else 0.0
+            close_val = float(closes[0]) if closes[0] is not None else 0.0
+            curr_price = float(meta.get("regularMarketPrice", close_val))
+        else:
+            pdh = float(highs[0]) if highs[0] is not None else 0.0
+            pdl = float(lows[0]) if lows[0] is not None else 0.0
+            open_val = float(opens[0]) if opens[0] is not None else 0.0
+            close_val = float(closes[0]) if closes[0] is not None else 0.0
+            curr_price = float(meta.get("regularMarketPrice") or closes[1] or close_val)
+            
+        return {
+            "symbol": yahoo_symbol,
+            "pdh": pdh,
+            "pdl": pdl,
+            "open": open_val,
+            "close": close_val,
+            "current_price": curr_price
+        }
+
+@app.get("/api/market/price")
+async def get_market_price(symbol: str):
+    symbol_upper = symbol.strip().upper()
+    if not symbol_upper:
+        raise HTTPException(status_code=400, detail="Symbol parameter is required")
+        
+    # 1. Try Yahoo Finance mapping
+    yahoo_symbol = SYMBOL_MAP.get(symbol_upper)
+    if yahoo_symbol:
+        try:
+            return await fetch_yahoo_finance(yahoo_symbol)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Failed to fetch Yahoo Finance: {str(e)}")
+            
+    # 2. Try Binance (assuming crypto)
+    binance_symbol = symbol_upper
+    if not binance_symbol.endswith("USDT") and len(binance_symbol) <= 5:
+        binance_symbol = f"{binance_symbol}USDT"
+        
+    async with httpx.AsyncClient() as client:
+        try:
+            url = f"https://api.binance.com/api/v3/klines?symbol={binance_symbol}&interval=1d&limit=2"
+            res = await client.get(url, timeout=5.0)
+            if res.status_code == 200:
+                data = res.json()
+                if len(data) >= 2:
+                    prev_candle = data[0]
+                    curr_candle = data[1]
+                    return {
+                        "symbol": symbol_upper,
+                        "pdh": float(prev_candle[2]),
+                        "pdl": float(prev_candle[3]),
+                        "open": float(prev_candle[1]),
+                        "close": float(prev_candle[4]),
+                        "current_price": float(curr_candle[4])
+                    }
+        except Exception:
+            pass
+            
+        # 3. Fallback: try Yahoo Finance as {symbol}-USD
+        try:
+            return await fetch_yahoo_finance(f"{symbol_upper}-USD")
+        except Exception:
+            try:
+                return await fetch_yahoo_finance(symbol_upper)
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"Failed to fetch market data for {symbol}: {str(e)}")
+
 
