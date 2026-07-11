@@ -80,6 +80,16 @@ export default function Dashboard() {
   const [sbLtfShift, setSbLtfShift] = useState(true);
   const [sbCurrentPrice, setSbCurrentPrice] = useState<number | "">(2323);
   
+  // Advanced Strategy States
+  const [sbDealingRangeHigh, setSbDealingRangeHigh] = useState<number | "">(2360);
+  const [sbDealingRangeLow, setSbDealingRangeLow] = useState<number | "">(2310);
+  const [sbKillzone, setSbKillzone] = useState("LONDON");
+  const [sbDiscountPdArray, setSbDiscountPdArray] = useState(true);
+  const [sbPremiumPdArray, setSbPremiumPdArray] = useState(false);
+  const [sbLtfTrigger, setSbLtfTrigger] = useState("MSS");
+  const [sbHasFreshFvg, setSbHasFreshFvg] = useState(true);
+  const [sbHighImpactNews, setSbHighImpactNews] = useState(false);
+  
   const [sbResult, setSbResult] = useState<any | null>(null);
   const [sbLoading, setSbLoading] = useState(false);
   const [sbSearchLoading, setSbSearchLoading] = useState(false);
@@ -95,8 +105,14 @@ export default function Dashboard() {
       const res = await fetch(`${API_BASE}/market/price?symbol=${encodeURIComponent(sbSymbol.trim())}`);
       if (res.ok) {
         const data = await res.json();
-        if (data.pdh !== undefined) setSbPdh(Number(data.pdh));
-        if (data.pdl !== undefined) setSbPdl(Number(data.pdl));
+        if (data.pdh !== undefined) {
+          setSbPdh(Number(data.pdh));
+          setSbDealingRangeHigh(Number(data.pdh));
+        }
+        if (data.pdl !== undefined) {
+          setSbPdl(Number(data.pdl));
+          setSbDealingRangeLow(Number(data.pdl));
+        }
         if (data.open !== undefined) setSbOpen(Number(data.open));
         if (data.close !== undefined) setSbClose(Number(data.close));
         if (data.current_price !== undefined) setSbCurrentPrice(Number(data.current_price));
@@ -130,6 +146,16 @@ export default function Dashboard() {
         demand_mitigation: sbInputMode === "form" ? sbDemandMitigation : null,
         ltf_shift: sbInputMode === "form" ? sbLtfShift : null,
         current_price: sbInputMode === "form" && sbCurrentPrice !== "" ? Number(sbCurrentPrice) : null,
+        
+        // Advanced strategy parameters
+        dealing_range_high: sbInputMode === "form" && sbDealingRangeHigh !== "" ? Number(sbDealingRangeHigh) : null,
+        dealing_range_low: sbInputMode === "form" && sbDealingRangeLow !== "" ? Number(sbDealingRangeLow) : null,
+        killzone: sbInputMode === "form" ? sbKillzone : null,
+        discount_pd_array: sbInputMode === "form" ? sbDiscountPdArray : null,
+        premium_pd_array: sbInputMode === "form" ? sbPremiumPdArray : null,
+        ltf_trigger: sbInputMode === "form" ? sbLtfTrigger : null,
+        has_fresh_fvg: sbInputMode === "form" ? sbHasFreshFvg : null,
+        high_impact_news: sbInputMode === "form" ? sbHighImpactNews : null,
       };
 
       const res = await fetch(`${API_BASE}/silverbullet/analyze`, {
@@ -885,18 +911,56 @@ export default function Dashboard() {
                           />
                         </div>
                       </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider font-mono">Dealing Range High</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            placeholder="e.g. 2360"
+                            value={sbDealingRangeHigh}
+                            onChange={(e) => setSbDealingRangeHigh(e.target.value === "" ? "" : Number(e.target.value))}
+                            className="bg-[#141626] border border-[#1E2235] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#6366F1]"
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider font-mono">Dealing Range Low</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            placeholder="e.g. 2310"
+                            value={sbDealingRangeLow}
+                            onChange={(e) => setSbDealingRangeLow(e.target.value === "" ? "" : Number(e.target.value))}
+                            className="bg-[#141626] border border-[#1E2235] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#6366F1]"
+                          />
+                        </div>
+                      </div>
 
-                      {/* Current Price */}
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider font-mono">Current Price (Optional)</label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          placeholder="e.g. 2323"
-                          value={sbCurrentPrice}
-                          onChange={(e) => setSbCurrentPrice(e.target.value === "" ? "" : Number(e.target.value))}
-                          className="bg-[#141626] border border-[#1E2235] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#6366F1]"
-                        />
+                      {/* Current Price & Killzone Session */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider font-mono">Current Price</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            placeholder="e.g. 2323"
+                            value={sbCurrentPrice}
+                            onChange={(e) => setSbCurrentPrice(e.target.value === "" ? "" : Number(e.target.value))}
+                            className="bg-[#141626] border border-[#1E2235] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#6366F1]"
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider font-mono">Killzone Session</label>
+                          <select
+                            value={sbKillzone}
+                            onChange={(e) => setSbKillzone(e.target.value)}
+                            className="bg-[#141626] border border-[#1E2235] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#6366F1]"
+                          >
+                            <option value="LONDON">London (2AM - 5AM NY)</option>
+                            <option value="NY_AM">New York AM (7AM - 10AM NY)</option>
+                            <option value="NONE">Outside Killzones</option>
+                          </select>
+                        </div>
                       </div>
 
                       {/* Strategy Rules Checkboxes */}
@@ -907,7 +971,9 @@ export default function Dashboard() {
                           <input
                             type="checkbox"
                             checked={sbAsianSweep}
-                            onChange={(e) => setSbAsianSweep(e.target.checked)}
+                            onChange={(e) => {
+                              setSbAsianSweep(e.target.checked);
+                            }}
                             className="w-4 h-4 rounded text-indigo-600 bg-[#141626] border-[#1E2235] focus:ring-indigo-500"
                           />
                           <div className="flex flex-col">
@@ -919,26 +985,72 @@ export default function Dashboard() {
                         <label className="flex items-center gap-3 cursor-pointer select-none py-1 border-t border-[#1E2235]/40 mt-1 pt-2">
                           <input
                             type="checkbox"
-                            checked={sbDemandMitigation}
-                            onChange={(e) => setSbDemandMitigation(e.target.checked)}
+                            checked={sbDiscountPdArray}
+                            onChange={(e) => {
+                              setSbDiscountPdArray(e.target.checked);
+                              setSbDemandMitigation(e.target.checked);
+                            }}
                             className="w-4 h-4 rounded text-indigo-600 bg-[#141626] border-[#1E2235] focus:ring-indigo-500"
                           />
                           <div className="flex flex-col">
-                            <span className="text-xs font-semibold text-white">Mitigated HTF Demand Zone (15m/5m)</span>
-                            <span className="text-[9px] text-gray-500">Tapped into institutional buy orders</span>
+                            <span className="text-xs font-semibold text-white">Tapped Discount PD Array (OB/FVG)</span>
+                            <span className="text-[9px] text-gray-500">Mitigated institutional buy zone under 50% Equilibrium</span>
                           </div>
                         </label>
 
                         <label className="flex items-center gap-3 cursor-pointer select-none py-1 border-t border-[#1E2235]/40 mt-1 pt-2">
                           <input
                             type="checkbox"
-                            checked={sbLtfShift}
-                            onChange={(e) => setSbLtfShift(e.target.checked)}
+                            checked={sbPremiumPdArray}
+                            onChange={(e) => setSbPremiumPdArray(e.target.checked)}
                             className="w-4 h-4 rounded text-indigo-600 bg-[#141626] border-[#1E2235] focus:ring-indigo-500"
                           />
                           <div className="flex flex-col">
-                            <span className="text-xs font-semibold text-white">London Session LTF Shift (CHoCH/MSS)</span>
-                            <span className="text-[9px] text-gray-500">Aggressive momentum displacement out of zone</span>
+                            <span className="text-xs font-semibold text-white">Tapped Premium PD Array (OB/FVG)</span>
+                            <span className="text-[9px] text-gray-500">Mitigated institutional sell zone above 50% Equilibrium</span>
+                          </div>
+                        </label>
+
+                        {/* LTF Shift Type Dropdown inside Checkbox section */}
+                        <div className="flex flex-col gap-1 border-t border-[#1E2235]/40 mt-1 pt-2 pb-1">
+                          <span className="text-xs font-semibold text-white">LTF Structural Shift (M15/M5)</span>
+                          <select
+                            value={sbLtfTrigger}
+                            onChange={(e) => {
+                              setSbLtfTrigger(e.target.value);
+                              setSbLtfShift(e.target.value !== "NONE");
+                            }}
+                            className="bg-[#141626] border border-[#1E2235] rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-[#6366F1] mt-1"
+                          >
+                            <option value="MSS">MSS (Market Structure Shift)</option>
+                            <option value="CISD">CISD (Change in State of Delivery)</option>
+                            <option value="NONE">None / No Shift</option>
+                          </select>
+                        </div>
+
+                        <label className="flex items-center gap-3 cursor-pointer select-none py-1 border-t border-[#1E2235]/40 mt-1 pt-2">
+                          <input
+                            type="checkbox"
+                            checked={sbHasFreshFvg}
+                            onChange={(e) => setSbHasFreshFvg(e.target.checked)}
+                            className="w-4 h-4 rounded text-indigo-600 bg-[#141626] border-[#1E2235] focus:ring-indigo-500"
+                          />
+                          <div className="flex flex-col">
+                            <span className="text-xs font-semibold text-white">Fresh FVG Formed at Shift Point</span>
+                            <span className="text-[9px] text-gray-500">Validates institutional momentum displacement</span>
+                          </div>
+                        </label>
+
+                        <label className="flex items-center gap-3 cursor-pointer select-none py-1 border-t border-[#1E2235]/40 mt-1 pt-2">
+                          <input
+                            type="checkbox"
+                            checked={sbHighImpactNews}
+                            onChange={(e) => setSbHighImpactNews(e.target.checked)}
+                            className="w-4 h-4 rounded text-indigo-600 bg-[#141626] border-[#1E2235] focus:ring-indigo-500"
+                          />
+                          <div className="flex flex-col">
+                            <span className="text-xs font-semibold text-rose-400">High-Impact News Release (NFP/CPI/FOMC)</span>
+                            <span className="text-[9px] text-gray-500">Enable to test safety lockout filters</span>
                           </div>
                         </label>
                       </div>
@@ -1039,6 +1151,66 @@ export default function Dashboard() {
                           </div>
                         </div>
 
+                        {/* Advanced Computed Banners */}
+                        <div className="flex flex-col gap-4">
+                          {sbResult.counter_trend_locked && (
+                            <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-5 flex items-start gap-3 shadow-[0_0_15px_rgba(244,63,94,0.05)]">
+                              <svg className="w-5 h-5 text-rose-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              <div className="flex flex-col gap-1">
+                                <h4 className="text-xs font-bold text-rose-400 uppercase tracking-wider">⚠️ Strategy Rule Lockout</h4>
+                                <p className="text-xs text-gray-300 leading-relaxed font-sans mt-1">
+                                  Silver Bullet execution has locked this setup. Reasons: Buys are strictly locked in the Premium Zone (&gt; 50% Equilibrium), above the Daily Open, or high-impact news release is active.
+                                </p>
+                                <span className="text-[10px] text-rose-300/85 font-sans mt-0.5">
+                                  සිංහල: Premium Zone එක තුළ මිලදී ගැනීම් (Buys) සිදු කිරීම සපුරා තහනම් බැවින් හෝ පුවත් විකාශනයක් නිසා setup එක අවහිර කර ඇත.
+                                </span>
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {/* Equilibrium Zone Card */}
+                            {sbResult.equilibrium_price && (
+                              <div className="bg-[#141626]/40 border border-[#1E2235]/60 rounded-xl p-4 flex flex-col gap-1.5">
+                                <h4 className="text-[10px] font-bold text-gray-500 uppercase tracking-wider font-mono">50% Fibonacci Equilibrium</h4>
+                                <div className="flex items-center justify-between mt-1">
+                                  <span className="text-sm font-bold text-white font-mono">{Number(sbResult.equilibrium_price).toFixed(2)}</span>
+                                  <span className={`text-[9px] font-extrabold tracking-wider px-2 py-1 rounded-lg border ${
+                                    sbResult.zone_type === "DISCOUNT" 
+                                      ? "text-emerald-400 border-emerald-500/20 bg-emerald-500/5"
+                                      : sbResult.zone_type === "PREMIUM"
+                                        ? "text-rose-400 border-rose-500/20 bg-rose-500/5"
+                                        : "text-gray-400 border-gray-500/20 bg-gray-500/5"
+                                  }`}>
+                                    {sbResult.zone_type} ZONE
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Daily Open Relation Card */}
+                            {sbResult.daily_open_relation && (
+                              <div className="bg-[#141626]/40 border border-[#1E2235]/60 rounded-xl p-4 flex flex-col gap-1.5">
+                                <h4 className="text-[10px] font-bold text-gray-500 uppercase tracking-wider font-mono">Daily Open Reference</h4>
+                                <div className="flex items-center justify-between mt-1">
+                                  <span className="text-xs font-bold text-gray-300 font-mono">Open: {sbOpen !== "" ? Number(sbOpen).toFixed(2) : "N/A"}</span>
+                                  <span className={`text-[9px] font-extrabold tracking-wider px-2 py-1 rounded-lg border ${
+                                    sbResult.daily_open_relation === "BELOW_OPEN" 
+                                      ? "text-emerald-400 border-emerald-500/20 bg-emerald-500/5"
+                                      : sbResult.daily_open_relation === "ABOVE_OPEN"
+                                        ? "text-rose-400 border-rose-500/20 bg-rose-500/5"
+                                        : "text-gray-400 border-gray-500/20 bg-gray-500/5"
+                                  }`}>
+                                    {sbResult.daily_open_relation === "BELOW_OPEN" ? "BELOW OPEN (Discount)" : sbResult.daily_open_relation === "ABOVE_OPEN" ? "ABOVE OPEN (Premium)" : "N/A"}
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
                         {/* Trade Parameters Table */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div className="bg-[#141626]/40 border border-[#1E2235]/60 rounded-xl p-4 flex flex-col gap-2.5 md:col-span-2">
@@ -1093,67 +1265,229 @@ export default function Dashboard() {
                         </div>
 
                         {/* Interactive SVG Diagram Visualizer */}
-                        {sbResult.daily_bias === "BULLISH" && sbResult.liquidity_target && (
+                        {sbResult && (
                           <div className="bg-black/20 border border-[#1E2235]/60 rounded-xl p-4 flex flex-col gap-2">
-                            <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wider font-mono">Liquidity Flow Diagram (Candlestick Visualizer)</span>
-                            <div className="w-full h-48 bg-[#07080E] rounded-lg relative overflow-hidden border border-[#1E2235]/40 flex items-center justify-center">
+                            <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wider font-mono">Dynamic Price Level Visualizer (Actual {sbSymbol || "SOL"} Levels)</span>
+                            <div className="w-full h-80 bg-[#07080E] rounded-xl relative overflow-hidden border border-[#1E2235]/40 flex items-center justify-center">
                               {(() => {
                                 const entryPriceVal = (() => {
-                                  if (!sbResult.entry_price_area) return "N/A";
+                                  if (!sbResult.entry_price_area) return null;
                                   const matches = sbResult.entry_price_area.match(/\d+(?:\.\d+)?/g);
-                                  if (!matches) return "N/A";
+                                  if (!matches) return null;
                                   const pdlVal = Number(sbPdl);
                                   if (!isNaN(pdlVal) && pdlVal > 50) {
                                     const priceMatch = matches.find(m => Number(m) > 50);
-                                    if (priceMatch) return priceMatch;
+                                    if (priceMatch) return Number(priceMatch);
                                   }
-                                  return matches[matches.length - 1];
+                                  return Number(matches[matches.length - 1]);
                                 })();
-                                const stopLossVal = sbResult.stop_loss_level || "2313.5";
-                                const candles = [
-                                  // 1. Pullback trend (Bearish)
-                                  { x: 30, open: 70, close: 90, high: 60, low: 100, isBullish: false },
-                                  { x: 60, open: 85, close: 100, high: 80, low: 110, isBullish: false },
-                                  { x: 90, open: 95, close: 113, high: 90, low: 120, isBullish: false },
+
+                                const pdhVal = Number(sbPdh) || 2350;
+                                const pdlVal = Number(sbPdl) || 2320;
+                                const openVal = Number(sbOpen) || ((pdhVal + pdlVal) / 2);
+                                const currentPriceVal = Number(sbCurrentPrice) || openVal;
+                                const eqPriceVal = sbResult.equilibrium_price ? Number(sbResult.equilibrium_price) : ((pdhVal + pdlVal) / 2);
+                                const stopLossVal = sbResult.stop_loss_level ? Number(sbResult.stop_loss_level) : (pdlVal - (pdhVal - pdlVal) * 0.15);
+                                const rangeP = pdhVal - pdlVal || 10;
+
+                                // Margins for SVG y coordinates (60 to 250) - spreads the chart vertically
+                                const svgMinY = 60;
+                                const svgMaxY = 250;
+                                const getSvgY = (price: number) => {
+                                  if (isNaN(price)) return 155;
+                                  return svgMaxY - ((price - pdlVal) / rangeP) * (svgMaxY - svgMinY);
+                                };
+
+                                const eqY = getSvgY(eqPriceVal);
+                                const openY = getSvgY                                // Detect if setup is BEARISH to dynamically invert the candles and labels for Sells
+                                const isBearishSetup = sbResult.daily_bias === "BEARISH";
+
+                                // Map 11 candle columns with wide spacing (60px step) for maximum TradingView look
+                                const candles = isBearishSetup ? [
+                                  // Bearish/Short Scenario (Inverted structure)
+                                  // 1. Pullback Leg (Bullish candles ascending from PDL to PDH)
+                                  { x: 40, open: getSvgY(pdlVal + rangeP * 0.05), close: getSvgY(pdlVal + rangeP * 0.3), high: getSvgY(pdlVal - rangeP * 0.05), low: getSvgY(pdlVal + rangeP * 0.35), isBullish: true },
+                                  { x: 100, open: getSvgY(pdlVal + rangeP * 0.25), close: getSvgY(pdlVal + rangeP * 0.55), high: getSvgY(pdlVal + rangeP * 0.2), low: getSvgY(pdlVal + rangeP * 0.6), isBullish: true },
+                                  { x: 160, open: getSvgY(pdlVal + rangeP * 0.5), close: getSvgY(pdlVal + rangeP * 0.8), high: getSvgY(pdlVal + rangeP * 0.45), low: getSvgY(pdlVal + rangeP * 0.85), isBullish: true },
                                   
-                                  // 2. Consolidation & Asian Sweep
-                                  { x: 120, open: 110, close: 105, high: 100, low: 118, isBullish: true },
-                                  { x: 150, open: 108, close: 122, high: 105, low: 145, isBullish: false, isSweep: true }, // Wick sweeps to 145 (below PDL 120)
+                                  // 2. Consolidation before sweep
+                                  { x: 220, open: getSvgY(pdhVal - rangeP * 0.2), close: getSvgY(pdhVal - rangeP * 0.1), high: getSvgY(pdhVal - rangeP * 0.25), low: getSvgY(pdhVal - rangeP * 0.05), isBullish: true },
+                                  { x: 280, open: getSvgY(pdhVal - rangeP * 0.1), close: getSvgY(pdhVal - rangeP * 0.25), high: getSvgY(pdhVal - rangeP * 0.3), low: getSvgY(pdhVal - rangeP * 0.08), isBullish: false },
                                   
-                                  // 3. Reversal & MSS
-                                  { x: 180, open: 118, close: 110, high: 105, low: 122, isBullish: true },
-                                  { x: 210, open: 110, close: 80, high: 75, low: 115, isBullish: true, isMSS: true }, // Strong bullish candle
+                                  // 3. PDH Liquidity Sweep (Sweeps above PDH high)
+                                  { x: 340, open: getSvgY(pdhVal - rangeP * 0.12), close: getSvgY(pdhVal + rangeP * 0.05), high: getSvgY(pdhVal + rangeP * 0.25), low: getSvgY(pdhVal - rangeP * 0.2), isBullish: true, isSweep: true },
                                   
-                                  // 4. Retest / Entry
-                                  { x: 240, open: 85, close: 105, high: 80, low: 108, isBullish: false, isEntry: true }, // Retests entry limit at 105
+                                  // 4. MSS Breakout Leg Downward (Bearish candles breaking structure low)
+                                  { x: 400, open: getSvgY(pdhVal + rangeP * 0.05), close: getSvgY(pdhVal - rangeP * 0.3), high: getSvgY(pdhVal + rangeP * 0.08), low: getSvgY(pdhVal - rangeP * 0.35), isBullish: false },
+                                  { x: 460, open: getSvgY(pdhVal - rangeP * 0.25), close: getSvgY(pdhVal - rangeP * 0.65), high: getSvgY(pdhVal - rangeP * 0.2), low: getSvgY(pdhVal - rangeP * 0.7), isBullish: false, isMSS: true },
                                   
-                                  // 5. Expansion to Target
-                                  { x: 270, open: 85, close: 60, high: 55, low: 90, isBullish: true },
-                                  { x: 300, open: 60, close: 40, high: 35, low: 65, isBullish: true },
-                                  { x: 330, open: 40, close: 25, high: 20, low: 45, isBullish: true }
+                                  // 5. Limit Entry Retest (Bullish candle tapping Premium Supply zone / FVG)
+                                  { x: 520, open: getSvgY(pdhVal - rangeP * 0.65), close: getSvgY(pdhVal - rangeP * 0.38), high: getSvgY(pdhVal - rangeP * 0.68), low: getSvgY(pdhVal - rangeP * 0.35), isBullish: true, isEntry: true },
+                                  
+                                  // 6. Expansion down to PDL Target (Bearish expansion)
+                                  { x: 580, open: getSvgY(pdhVal - rangeP * 0.45), close: getSvgY(pdlVal + rangeP * 0.15), high: getSvgY(pdhVal - rangeP * 0.4), low: getSvgY(pdlVal + rangeP * 0.15), isBullish: false },
+                                  { x: 640, open: getSvgY(pdlVal + rangeP * 0.2), close: getSvgY(pdlVal - rangeP * 0.05), high: getSvgY(pdlVal + rangeP * 0.25), low: getSvgY(pdlVal - rangeP * 0.1), isBullish: false }
+                                ] : [
+                                  // Bullish/Long Scenario
+                                  // 1. Pullback Leg (Bearish candles descending from PDH)
+                                  { x: 40, open: getSvgY(pdhVal - rangeP * 0.05), close: getSvgY(pdhVal - rangeP * 0.3), high: getSvgY(pdhVal + rangeP * 0.05), low: getSvgY(pdhVal - rangeP * 0.35), isBullish: false },
+                                  { x: 100, open: getSvgY(pdhVal - rangeP * 0.25), close: getSvgY(pdhVal - rangeP * 0.55), high: getSvgY(pdhVal - rangeP * 0.2), low: getSvgY(pdhVal - rangeP * 0.6), isBullish: false },
+                                  { x: 160, open: getSvgY(pdhVal - rangeP * 0.5), close: getSvgY(pdhVal - rangeP * 0.8), high: getSvgY(pdhVal - rangeP * 0.45), low: getSvgY(pdhVal - rangeP * 0.85), isBullish: false },
+                                  
+                                  // 2. Consolidation before sweep
+                                  { x: 220, open: getSvgY(pdlVal + rangeP * 0.2), close: getSvgY(pdlVal + rangeP * 0.1), high: getSvgY(pdlVal + rangeP * 0.25), low: getSvgY(pdlVal + rangeP * 0.05), isBullish: false },
+                                  { x: 280, open: getSvgY(pdlVal + rangeP * 0.1), close: getSvgY(pdlVal + rangeP * 0.25), high: getSvgY(pdlVal + rangeP * 0.3), low: getSvgY(pdlVal + rangeP * 0.08), isBullish: true },
+                                  
+                                  // 3. Asian Sweep (Bearish candle sweeping low below PDL)
+                                  { x: 340, open: getSvgY(pdlVal + rangeP * 0.12), close: getSvgY(pdlVal - rangeP * 0.05), high: getSvgY(pdlVal + rangeP * 0.2), low: getSvgY(pdlVal - rangeP * 0.25), isBullish: false, isSweep: true },
+                                  
+                                  // 4. MSS Breakout Leg (Bullish candles breaking structure)
+                                  { x: 400, open: getSvgY(pdlVal - rangeP * 0.05), close: getSvgY(pdlVal + rangeP * 0.3), high: getSvgY(pdlVal - rangeP * 0.08), low: getSvgY(pdlVal + rangeP * 0.35), isBullish: true },
+                                  { x: 460, open: getSvgY(pdlVal + rangeP * 0.25), close: getSvgY(pdlVal + rangeP * 0.65), high: getSvgY(pdlVal + rangeP * 0.2), low: getSvgY(pdlVal + rangeP * 0.7), isBullish: true, isMSS: true },
+                                  
+                                  // 5. Limit Entry Retest (Bearish candle tapping FVG/Discount)
+                                  { x: 520, open: getSvgY(pdlVal + rangeP * 0.65), close: getSvgY(pdlVal + rangeP * 0.38), high: getSvgY(pdlVal + rangeP * 0.68), low: getSvgY(pdlVal + rangeP * 0.35), isBullish: false, isEntry: true },
+                                  
+                                  // 6. Expansion to PDH Target (Bullish expansion)
+                                  { x: 580, open: getSvgY(pdlVal + rangeP * 0.45), close: getSvgY(pdhVal - rangeP * 0.15), high: getSvgY(pdlVal + rangeP * 0.4), low: getSvgY(pdhVal - rangeP * 0.15), isBullish: true },
+                                  { x: 640, open: getSvgY(pdhVal - rangeP * 0.2), close: getSvgY(pdhVal + rangeP * 0.05), high: getSvgY(pdhVal - rangeP * 0.25), low: getSvgY(pdhVal + rangeP * 0.1), isBullish: true }
                                 ];
-                                
+
+                                const mssLineY = isBearishSetup ? getSvgY(pdhVal - rangeP * 0.3) : getSvgY(pdlVal + rangeP * 0.3);
+
                                 return (
-                                  <svg className="w-full h-full p-2" viewBox="0 0 400 180" xmlns="http://www.w3.org/2000/svg">
-                                    {/* PDH Line */}
-                                    <line x1="10" y1="30" x2="390" y2="30" stroke="#10B981" strokeWidth="1" strokeDasharray="3,3" />
-                                    <text x="15" y="25" fill="#10B981" fontSize="9" fontFamily="monospace">PDH (Target): {sbResult.liquidity_target}</text>
+                                  <svg className="w-full h-full p-2 bg-[#07080E]" viewBox="0 0 800 320" xmlns="http://www.w3.org/2000/svg">
+                                    <defs>
+                                      <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                                        <path d="M 0 0 L 10 5 L 0 10 z" fill="#10B981" />
+                                      </marker>
+                                      <marker id="arrow-bearish" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                                        <path d="M 0 0 L 10 5 L 0 10 z" fill="#EF4444" />
+                                      </marker>
+                                    </defs>
 
-                                    {/* PDL Line */}
-                                    <line x1="10" y1="120" x2="390" y2="120" stroke="#EF4444" strokeWidth="1" strokeDasharray="3,3" />
-                                    <text x="15" y="115" fill="#EF4444" fontSize="9" fontFamily="monospace">PDL (Sweep): {sbPdl || "2320"}</text>
+                                    {/* Subtle Background Grid (Horizontal & Vertical) */}
+                                    {Array.from({ length: 21 }).map((_, idx) => (
+                                      <line key={`v-${idx}`} x1={33 * idx + 20} y1="10" x2={33 * idx + 20} y2="310" stroke="#1E2235" strokeOpacity="0.25" strokeWidth="0.5" />
+                                    ))}
+                                    {Array.from({ length: 11 }).map((_, idx) => (
+                                      <line key={`h-${idx}`} x1="10" y1={25 + 26 * idx} x2="790" y2={25 + 26 * idx} stroke="#1E2235" strokeOpacity="0.25" strokeWidth="0.5" />
+                                    ))}
 
-                                    {/* Demand Zone */}
-                                    <rect x="130" y="125" width="80" height="25" fill="#8B5CF6" fillOpacity="0.1" stroke="#8B5CF6" strokeWidth="1" strokeDasharray="2,2" />
-                                    <text x="135" y="140" fill="#8B5CF6" fontSize="8" fontFamily="sans-serif" fontWeight="bold">15m/5m Demand</text>
+                                    {/* Shaded Premium and Discount Zones */}
+                                    <rect x="10" y={svgMinY} width="665" height={Math.max(0, eqY - svgMinY)} fill="#EF4444" fillOpacity="0.025" rx="2" />
+                                    <rect x="10" y={eqY} width="665" height={Math.max(0, svgMaxY - eqY)} fill="#10B981" fillOpacity="0.025" rx="2" />
 
-                                    {/* Entry Line */}
-                                    <line x1="10" y1="105" x2="390" y2="105" stroke="#10B981" strokeWidth="0.75" strokeDasharray="4,4" />
-                                    <text x="280" y="101" fill="#10B981" fontSize="8" fontFamily="monospace" fontWeight="bold">Entry Limit: {entryPriceVal}</text>
+                                    {/* Center Chart Title */}
+                                    <text x="338" y="28" textAnchor="middle" fill="#FFFFFF" fontSize="16" fontWeight="extrabold" fontFamily="sans-serif" letterSpacing="1.5">ICT Silver Bullet</text>
+
+                                    {/* Killzone Shading */}
+                                    <rect x="210" y="42" width="280" height="248" fill="#6366F1" fillOpacity="0.035" rx="6" />
+                                    <text x="220" y="58" fill="#6366F1" fillOpacity="0.65" fontSize="9" fontFamily="monospace" fontWeight="bold">KILLZONE ({sbKillzone})</text>
+
+                                    {/* Price Target and Level dashed lines */}
+                                    <line x1="10" y1={pdhY} x2="675" y2={pdhY} stroke={isBearishSetup ? "#EF4444" : "#10B981"} strokeWidth="1" strokeDasharray="3,3" />
+                                    <line x1="10" y1={eqY} x2="675" y2={eqY} stroke="#F59E0B" strokeWidth="0.75" strokeDasharray="3,3" />
+                                    <line x1="10" y1={openY} x2="675" y2={openY} stroke="#6366F1" strokeWidth="0.75" strokeDasharray="2,2" />
+                                    <line x1="10" y1={currY} x2="675" y2={currY} stroke="#E0E7FF" strokeWidth="1" strokeOpacity="0.6" />
+                                    <line x1="10" y1={pdlY} x2="675" y2={pdlY} stroke={isBearishSetup ? "#10B981" : "#EF4444"} strokeWidth="1" strokeDasharray="3,3" />
+
+                                    {/* Left Margin Helper Labels (Keeps chart center clean) */}
+                                    <text x="20" y={pdhY - 6} fill={isBearishSetup ? "#EF4444" : "#10B981"} fontSize="9" fontWeight="bold" fontFamily="sans-serif">
+                                      {isBearishSetup ? "PDH (Sweep Target)" : "PDH (Target)"}
+                                    </text>
+                                    <text x="20" y={pdlY + 12} fill={isBearishSetup ? "#10B981" : "#EF4444"} fontSize="9" fontWeight="bold" fontFamily="sans-serif">
+                                      {isBearishSetup ? "PDL (Target)" : "PDL (Previous Daily Low)"}
+                                    </text>
+
+                                    {/* MSS / CHoCH Horizontal Breakout Line */}
+                                    <line x1="300" y1={mssLineY} x2="430" y2={mssLineY} stroke="#FFFFFF" strokeWidth="1.5" />
+                                    <text x="365" y={mssLineY - 6} textAnchor="middle" fill="#FFFFFF" fontSize="8" fontWeight="bold" fontFamily="sans-serif" letterSpacing="0.5">MSS / CHoCH</text>
+
+                                    {/* Supply Zone / Demand Zone Box */}
+                                    {isBearishSetup ? (
+                                      <g>
+                                        <rect x="210" y={pdhY - 2} width="160" height="28" fill="#8B5CF6" fillOpacity="0.08" stroke="#8B5CF6" strokeWidth="0.75" strokeDasharray="2,2" rx="3" />
+                                        <text x="220" y={pdhY + 15} fill="#C084FC" fontSize="8" fontWeight="bold" fontFamily="sans-serif">Supply Zone</text>
+                                      </g>
+                                    ) : (
+                                      <g>
+                                        <rect x="210" y={pdlY} width="160" height="28" fill="#8B5CF6" fillOpacity="0.08" stroke="#8B5CF6" strokeWidth="0.75" strokeDasharray="2,2" rx="3" />
+                                        <text x="220" y={pdlY + 17} fill="#C084FC" fontSize="8" fontWeight="bold" fontFamily="sans-serif">Demand Zone</text>
+                                      </g>
+                                    )}
+
+                                    {/* Limit Entry Pointer Arrow */}
+                                    {entryY !== null && (
+                                      <g>
+                                        {isBearishSetup ? (
+                                          <>
+                                            <path d={`M 570 ${entryY - 35} L 535 ${entryY - 6}`} fill="none" stroke="#EF4444" strokeWidth="1.5" markerEnd="url(#arrow-bearish)" />
+                                            <text x="575" y={entryY - 32} fill="#EF4444" fontSize="10" fontWeight="bold" fontFamily="sans-serif">Limit Entry (Sell)</text>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <path d={`M 570 ${entryY + 35} L 535 ${entryY + 6}`} fill="none" stroke="#10B981" strokeWidth="1.5" markerEnd="url(#arrow)" />
+                                            <text x="575" y={entryY + 38} fill="#10B981" fontSize="10" fontWeight="bold" fontFamily="sans-serif">Limit Entry (Buy)</text>
+                                          </>
+                                        )}
+                                      </g>
+                                    )}
 
                                     {/* Stop Loss Line */}
-                                    <line x1="10" y1="145" x2="390" y2="145" stroke="#EF4444" strokeWidth="0.75" strokeDasharray="4,4" />
-                                    <text x="275" y="154" fill="#EF4444" fontSize="8" fontFamily="monospace" fontWeight="bold">Stop Loss: {stopLossVal}</text>
+                                    {(sbResult.daily_bias === "BULLISH" || sbResult.daily_bias === "BEARISH") && (
+                                      <>
+                                        <line x1="10" y1={slY} x2="675" y2={slY} stroke="#EF4444" strokeWidth="0.75" strokeDasharray="4,4" />
+                                        <text x="20" y={isBearishSetup ? slY - 6 : slY + 12} fill="#EF4444" fontSize="8" fontWeight="bold" fontFamily="monospace">Stop Loss</text>
+                                      </>
+                                    )}
+
+                                    {/* RIGHT SIDE PRICE SCALE ACTIVE PANEL (Exactly like TradingView) */}
+                                    <line x1="680" y1="15" x2="680" y2="305" stroke="#1E2235" strokeWidth="1.5" />
+                                    
+                                    {/* PDH Price Tick */}
+                                    <line x1="680" y1={pdhY} x2="685" y2={pdhY} stroke={isBearishSetup ? "#EF4444" : "#10B981"} strokeWidth="1" />
+                                    <text x="690" y={pdhY + 3} fill={isBearishSetup ? "#EF4444" : "#10B981"} fontSize="8" fontWeight="bold" fontFamily="monospace">PDH: {pdhVal.toFixed(2)}</text>
+
+                                    {/* Equilibrium Price Tick */}
+                                    <line x1="680" y1={eqY} x2="685" y2={eqY} stroke="#F59E0B" strokeWidth="1" />
+                                    <text x="690" y={eqY + 3} fill="#F59E0B" fontSize="8" fontWeight="bold" fontFamily="monospace">EQ: {eqPriceVal.toFixed(2)}</text>
+
+                                    {/* Daily Open Price Tick */}
+                                    <line x1="680" y1={openY} x2="685" y2={openY} stroke="#818CF8" strokeWidth="1" />
+                                    <text x="690" y={openY + 3} fill="#818CF8" fontSize="8" fontWeight="bold" fontFamily="monospace">OPEN: {openVal.toFixed(2)}</text>
+
+                                    {/* Current Price Active Badge */}
+                                    <g transform={`translate(680, ${currY - 8})`}>
+                                      <polygon points="0,8 6,2 45,2 45,14 6,14" fill="#6366F1" />
+                                      <rect x="45" y="2" width="75" height="12" fill="#6366F1" rx="1" />
+                                      <text x="8" y="11" fill="#FFFFFF" fontSize="8" fontWeight="bold" fontFamily="monospace">
+                                        {currentPriceVal.toFixed(2)}
+                                      </text>
+                                      <text x="58" y="11" fill="#E0E7FF" fontSize="7" fontWeight="bold" fontFamily="sans-serif">
+                                        {currentPriceVal > openVal ? "PREMIUM" : "DISCOUNT"}
+                                      </text>
+                                    </g>
+
+                                    {/* PDL Price Tick */}
+                                    <line x1="680" y1={pdlY} x2="685" y2={pdlY} stroke={isBearishSetup ? "#10B981" : "#EF4444"} strokeWidth="1" />
+                                    <text x="690" y={pdlY + 3} fill={isBearishSetup ? "#10B981" : "#EF4444"} fontSize="8" fontWeight="bold" fontFamily="monospace">PDL: {pdlVal.toFixed(2)}</text>
+
+                                    {/* Entry price tick */}
+                                    {entryY !== null && (
+                                      <>
+                                        <line x1="680" y1={entryY} x2="685" y2={entryY} stroke={isBearishSetup ? "#EF4444" : "#10B981"} strokeWidth="1" />
+                                        <text x="690" y={entryY + 3} fill={isBearishSetup ? "#EF4444" : "#10B981"} fontSize="8" fontWeight="bold" fontFamily="monospace">ENTRY: {entryPriceVal?.toFixed(2)}</text>
+                                      </>
+                                    )}
+
+                                    {/* Stop Loss price tick */}
+                                    {(sbResult.daily_bias === "BULLISH" || sbResult.daily_bias === "BEARISH") && (
+                                      <>
+                                        <line x1="680" y1={slY} x2="685" y2={slY} stroke="#EF4444" strokeWidth="1" />
+                                        <text x="690" y={slY + 3} fill="#EF4444" fontSize="8" fontWeight="bold" fontFamily="monospace">SL: {stopLossVal.toFixed(2)}</text>
+                                      </>
+                                    )}
 
                                     {/* Render Candlesticks */}
                                     {candles.map((c, i) => {
@@ -1164,34 +1498,28 @@ export default function Dashboard() {
                                         <g key={i}>
                                           {/* Wick */}
                                           <line
-                                            x1={c.x + 5}
+                                            x1={c.x + 8}
                                             y1={c.high}
-                                            x2={c.x + 5}
+                                            x2={c.x + 8}
                                             y2={c.low}
                                             stroke={color}
-                                            strokeWidth="1.5"
+                                            strokeWidth="2"
                                           />
                                           {/* Body */}
                                           <rect
                                             x={c.x}
                                             y={bodyY}
-                                            width="10"
+                                            width="16"
                                             height={bodyHeight || 1}
                                             fill={c.isBullish ? "#10B981" : "#EF4444"}
                                             stroke={color}
-                                            strokeWidth="1"
+                                            strokeWidth="1.25"
                                           />
                                           {c.isSweep && (
-                                            <circle cx={c.x + 5} cy="145" r="3" fill="#EF4444" />
+                                            <circle cx={c.x + 8} cy={pdlY} r="4" fill="#EF4444" />
                                           )}
-                                          {c.isMSS && (
-                                            <g>
-                                              <path d="M 215 75 L 215 62 L 200 62" fill="none" stroke="#E5E7EB" strokeWidth="1" />
-                                              <text x="200" y="55" fill="#E5E7EB" fontSize="8" fontFamily="monospace" fontWeight="bold">MSS / CHoCH</text>
-                                            </g>
-                                          )}
-                                          {c.isEntry && (
-                                            <circle cx={c.x + 5} cy="105" r="3.5" fill="#10B981" stroke="#FFFFFF" strokeWidth="0.75" />
+                                          {c.isEntry && entryY !== null && (
+                                            <circle cx={c.x + 8} cy={entryY} r="4.5" fill="#10B981" stroke="#FFFFFF" strokeWidth="1" />
                                           )}
                                         </g>
                                       );

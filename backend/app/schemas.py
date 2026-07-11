@@ -83,6 +83,16 @@ class SilverBulletRequest(BaseModel):
     demand_mitigation: Optional[bool] = None
     ltf_shift: Optional[bool] = None
     current_price: Optional[float] = None
+    
+    # Advanced strategy parameters
+    dealing_range_high: Optional[float] = None
+    dealing_range_low: Optional[float] = None
+    killzone: Optional[str] = None # "LONDON", "NY_AM", "NONE"
+    discount_pd_array: Optional[bool] = None
+    premium_pd_array: Optional[bool] = None
+    ltf_trigger: Optional[str] = None # "MSS", "CISD", "NONE"
+    has_fresh_fvg: Optional[bool] = None
+    high_impact_news: Optional[bool] = None
 
 class SilverBulletResponse(BaseModel):
     is_valid: bool
@@ -96,6 +106,13 @@ class SilverBulletResponse(BaseModel):
     reasoning: Optional[str] = None
     invalidation: Optional[str] = None
     risk_notes: Optional[str] = None
+    
+    # Advanced computed parameters
+    equilibrium_price: Optional[float] = None
+    zone_type: Optional[str] = None # "DISCOUNT", "PREMIUM", "EQUILIBRIUM"
+    daily_open_relation: Optional[str] = None # "ABOVE_OPEN", "BELOW_OPEN", "N/A"
+    killzone_valid: Optional[bool] = None
+    counter_trend_locked: Optional[bool] = None
 
 
 

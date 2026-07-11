@@ -310,6 +310,16 @@ USER'S TRADING STRATEGY RULES:
         demand_mitigation = req.get("demand_mitigation")
         ltf_shift = req.get("ltf_shift")
         current_price = req.get("current_price")
+        
+        # Advanced strategy inputs
+        dealing_range_high = req.get("dealing_range_high")
+        dealing_range_low = req.get("dealing_range_low")
+        killzone = req.get("killzone") or "NONE"
+        discount_pd_array = req.get("discount_pd_array")
+        premium_pd_array = req.get("premium_pd_array")
+        ltf_trigger = req.get("ltf_trigger") or "NONE"
+        has_fresh_fvg = req.get("has_fresh_fvg")
+        high_impact_news = req.get("high_impact_news")
 
         # Programmatic sanity check for incomplete details
         if not scenario_text and (pdh is None or pdl is None):
@@ -324,34 +334,40 @@ USER'S TRADING STRATEGY RULES:
                 "target_reward_ratio": None,
                 "reasoning": "Previous Daily High/Low details are missing.\n\n---\n\n**සිංහල පරිවර්තනය (Sinhala Translation):**\nපෙර දෛනික උපරිම/අවම විස්තර නොමැත.",
                 "invalidation": "Incomplete Data.\n\n---\n\n**සිංහල පරිවර්තනය (Sinhala Translation):**\nඅසම්පූර්ණ දත්ත.",
-                "risk_notes": "Incomplete Data.\n\n---\n\n**සිංහල පරිවර්තනය (Sinhala Translation):**\nඅසම්පූර්ණ දත්ත."
+                "risk_notes": "Incomplete Data.\n\n---\n\n**සිංහල පරිවර්තනය (Sinhala Translation):**\nඅසම්පූර්ණ දත්ත.",
+                "equilibrium_price": None,
+                "zone_type": "N/A",
+                "daily_open_relation": "N/A",
+                "killzone_valid": False,
+                "counter_trend_locked": False
             }
 
         prompt = f"""
 You are the AI Brain of Project Falcon, a Personal AI Trading Assistant.
-Your task is to analyze the market scenario and price data against the **ICT Silver Bullet: Daily Bias & Liquidity Flow Strategy ({symbol})**.
+Your task is to analyze the market scenario and price data against the **ICT Silver Bullet Strategy ({symbol})**.
 
 -----------------------------------------
 STRATEGY RULES:
 - Asset: {symbol}
-- Higher Timeframe (HTF) Trend: Bullish structure (making HH/HL) OR experiencing a multi-day pullback (e.g., 3 consecutive bearish days) hitting a key institutional demand zone with fractal order flow shifting bullish.
-- Key Levels: PDH (Previous Daily High), PDL (Previous Daily Low), Daily Open, Daily Close.
-- Liquidity Sweep Logic (Daily Bias confirmation):
-  1. Price opens near the previous close.
-  2. Drives downward during the Asian Session.
-  3. Sweeps the PDL (Previous Daily Low).
-  4. Mitigates a HTF 15-Minute/5-Minute Demand Zone.
-  *Once PDL is swept and lower timeframe demand is mitigated, the Daily Bias for the session is strictly BULLISH, targeting the PDH.*
-- Entry Trigger:
-  - Look for a Lower Timeframe (LTF) Shift in Market Structure (MSS/CHoCH) or aggressive bullish displacement out of the demand zone after the PDL sweep.
-  - Limit Order entry at the 15-Min/5-Min Demand Range / Order Block.
-  - Stop-Loss (SL) placed safely below the sweep low.
-  - Take-Profit (TP): Option 1: 1:3 to 1:3.3 Risk-to-Reward. Option 2: Target the PDH (Previous Daily High) or previous session high.
+- Core Logic: SMC & ICT Frameworks.
+- Hunt Liquidity: PDH/PDL sweeps and HTF array mitigation.
+- Premium vs. Discount Array Matrix:
+  - Equilibrium line is drawn at 50% of the active Dealing Range (High to Low).
+  - Premium (> 50% area): Scan ONLY for Shorts (Sells) inside Premium PD Arrays (OB, Breaker, Mitigation Block, Bearish FVG, Liquidity Void, Old Highs).
+  - Discount (< 50% area): Scan ONLY for Longs (Buys) inside Discount PD Arrays.
+  - BUYS are strictly prohibited in the Premium zone. SELLS are strictly prohibited in the Discount zone. If setup violates this, trigger Counter-Trend Lockout!
+- Daily Open Reference Check:
+  - Price above Daily Open = short-term premium. Sell setups only.
+  - Price below Daily Open = short-term discount. Buy setups only.
+- Session Killzones: London Killzone (2AM-5AM NY) or NY AM Killzone (7AM-10AM NY). Transactions outside these killzones are invalid.
+- Lower Timeframe Reconfirmation: Needs MSS (Market Structure Shift) or CISD (Change in State of Delivery) inside the Killzone on M15/M5 chart, accompanied by a fresh FVG.
+- Risk/Macro Protection: Ignore/block setups if high-impact news is active (NFP, CPI, FOMC). Lock out counter-bias setups to protect account.
 
 -----------------------------------------
 USER INPUT DATA:
 - Raw Scenario Text: {scenario_text}
 - Structured Form Data:
+  * Symbol: {symbol}
   * HTF Trend: {htf_trend}
   * Pullback Days: {pullback_days}
   * Previous Daily High (PDH): {pdh}
@@ -362,32 +378,44 @@ USER INPUT DATA:
   * Mitigated 15m/5m Demand Zone: {demand_mitigation}
   * London Session LTF Shift: {ltf_shift}
   * Current Price: {current_price}
+  * Dealing Range High: {dealing_range_high}
+  * Dealing Range Low: {dealing_range_low}
+  * Killzone Session: {killzone}
+  * Mitigated Discount PD Array: {discount_pd_array}
+  * Mitigated Premium PD Array: {premium_pd_array}
+  * LTF Trigger Type: {ltf_trigger}
+  * Fresh FVG Formed: {has_fresh_fvg}
+  * High Impact News Active: {high_impact_news}
 
 -----------------------------------------
 YOUR TASK:
-1. CHECK COMPLETENESS:
-   - Does the user input contain the Previous Daily High (PDH), Previous Daily Low (PDL), and session/structure details?
-   - If critical levels are missing, return "is_valid": false.
-
-2. VERIFY SETUP FLOW (Only if valid):
-   - Analyze trend, liquidity sweep, demand mitigation, and LTF shifts.
-   - Create detailed explanations for "market_structure_status", "reasoning", "invalidation", and "risk_notes".
-   - You MUST output all status and explanation fields ("market_structure_status", "reasoning", "invalidation", "risk_notes") in both English and Sinhala translation. First write the content in English, then add a divider line (e.g. "\\n\\n--- \\n\\n**සිංහල පරිවර්තනය (Sinhala Translation):**\\n"), followed by its complete Sinhala translation using Sinhala Unicode characters.
+1. Validate completeness. If high/low prices are missing, set is_valid=false.
+2. Calculate the 50% Fibonacci Equilibrium line: (Dealing Range High + Dealing Range Low) / 2.
+3. Compare Current Price to the Equilibrium Line. Determine if price is in PREMIUM or DISCOUNT zone.
+4. Compare Current Price to Daily Open. Determine if open relation is ABOVE_OPEN or BELOW_OPEN.
+5. Check if the Killzone is LONDON or NY_AM. Mark killzone_valid as true/false.
+6. Verify trend alignment. If Daily Bias is Bullish but the current setup violates Premium/Discount rules (e.g. trying to buy in the Premium Zone, or buying above Daily Open, or counter-bias setups), mark counter_trend_locked as true and force Daily Bias to NEUTRAL.
+7. Return bilingual explanations (English + Sinhala) for "market_structure_status", "reasoning", "invalidation", and "risk_notes".
 
 -----------------------------------------
 OUTPUT FORMAT:
 Return a JSON object with these exact keys:
-1. "is_valid": boolean (true if info is complete, false if incomplete)
-2. "status_message": string (if invalid, set to "Please provide the Previous Daily High/Low details or current session structure to determine the setup.", otherwise "Success")
-3. "market_structure_status": string (confirming Daily Trend & Fractal Order Flow)
-4. "daily_bias": string ("BULLISH" or "NEUTRAL")
-5. "liquidity_target": float or string (should be the PDH value or "PDH")
-6. "entry_price_area": string (e.g., "Limit at 15m Order Block: [value]")
-7. "stop_loss_level": float or string (below the sweep low)
-8. "target_reward_ratio": string (e.g., "1:3" or "1:3.3")
+1. "is_valid": boolean
+2. "status_message": string
+3. "market_structure_status": string (English + Sinhala translation)
+4. "daily_bias": string ("BULLISH", "BEARISH", or "NEUTRAL")
+5. "liquidity_target": float or string
+6. "entry_price_area": string
+7. "stop_loss_level": float or string
+8. "target_reward_ratio": string
 9. "reasoning": string (English + Sinhala translation)
 10. "invalidation": string (English + Sinhala translation)
 11. "risk_notes": string (English + Sinhala translation)
+12. "equilibrium_price": float (50% dealing range line)
+13. "zone_type": string ("PREMIUM", "DISCOUNT", or "EQUILIBRIUM")
+14. "daily_open_relation": string ("ABOVE_OPEN" or "BELOW_OPEN")
+15. "killzone_valid": boolean
+16. "counter_trend_locked": boolean
 
 OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formatting.
 """
@@ -427,6 +455,16 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
         demand_mitigation = req.get("demand_mitigation")
         ltf_shift = req.get("ltf_shift")
         current_price = req.get("current_price")
+        
+        # Advanced strategy inputs
+        dealing_range_high = req.get("dealing_range_high")
+        dealing_range_low = req.get("dealing_range_low")
+        killzone = req.get("killzone") or "NONE"
+        discount_pd_array = req.get("discount_pd_array")
+        premium_pd_array = req.get("premium_pd_array")
+        ltf_trigger = req.get("ltf_trigger") or "NONE"
+        has_fresh_fvg = req.get("has_fresh_fvg")
+        high_impact_news = req.get("high_impact_news")
 
         # Extract levels if text-based scenario is provided instead
         if scenario_text and not pdh and not pdl:
@@ -450,10 +488,41 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                 "target_reward_ratio": None,
                 "reasoning": "Missing critical daily price levels (PDH/PDL).\n\n---\n\n**සිංහල පරිවර්තනය (Sinhala Translation):**\nඅත්‍යවශ්‍ය දෛනික මිල මට්ටම් (PDH/PDL) නොමැත.",
                 "invalidation": "Cannot perform analysis without daily range context.\n\n---\n\n**සිංහල පරිවර්තනය (Sinhala Translation):**\nදෛනික පරාසය නොමැතිව විශ්ලේෂණය කළ නොහැක.",
-                "risk_notes": "Input data incomplete.\n\n---\n\n**සිංහල පරිවර්තනය (Sinhala Translation):**\nදත්ත අසම්පූර්ණයි."
+                "risk_notes": "Input data incomplete.\n\n---\n\n**සිංහල පරිවර්තනය (Sinhala Translation):**\nදත්ත අසම්පූර්ණයි.",
+                "equilibrium_price": None,
+                "zone_type": "N/A",
+                "daily_open_relation": "N/A",
+                "killzone_valid": False,
+                "counter_trend_locked": False
             }
 
-        # Check conditions
+        # Calculate Equilibrium line
+        high_val = dealing_range_high if dealing_range_high is not None else pdh
+        low_val = dealing_range_low if dealing_range_low is not None else pdl
+        eq_price = (high_val + low_val) / 2.0 if (high_val is not None and low_val is not None) else None
+
+        # Determine Premium/Discount zone
+        zone = "N/A"
+        if current_price is not None and eq_price is not None:
+            if current_price > eq_price:
+                zone = "PREMIUM"
+            elif current_price < eq_price:
+                zone = "DISCOUNT"
+            else:
+                zone = "EQUILIBRIUM"
+
+        # Determine Daily Open Relation
+        open_relation = "N/A"
+        if current_price is not None and daily_open is not None:
+            if current_price > daily_open:
+                open_relation = "ABOVE_OPEN"
+            elif current_price < daily_open:
+                open_relation = "BELOW_OPEN"
+
+        # Verify Killzone
+        kz_valid = killzone in ["LONDON", "NY_AM"]
+
+        # Trend & Setup validations
         is_htf_bullish = htf_trend.upper() == "BULLISH" or (pullback_days is not None and pullback_days >= 3)
         if scenario_text:
             text_lower = scenario_text.lower()
@@ -465,8 +534,33 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                 demand_mitigation = True
             if "shift" in text_lower or "choch" in text_lower or "mss" in text_lower or "displacement" in text_lower:
                 ltf_shift = True
+            if "london" in text_lower:
+                killzone = "LONDON"
+            elif "new york" in text_lower or "ny" in text_lower:
+                killzone = "NY_AM"
+            kz_valid = killzone in ["LONDON", "NY_AM"]
 
-        if is_htf_bullish and asian_sweep and demand_mitigation and ltf_shift:
+        # Check counter trend lockout rule: BUYS are strictly prohibited in Premium Zone
+        # If HTF bias is Bullish (long setups), but current_price is in Premium zone, lockout!
+        ct_locked = False
+        if is_htf_bullish and zone == "PREMIUM":
+            ct_locked = True
+
+        # If news is active, block setup as well
+        if high_impact_news:
+            ct_locked = True
+
+        # Check execution trigger criteria
+        setup_triggered = (
+            is_htf_bullish and 
+            asian_sweep and 
+            (demand_mitigation or discount_pd_array) and 
+            (ltf_shift or ltf_trigger in ["MSS", "CISD"]) and
+            not ct_locked and
+            kz_valid
+        )
+
+        if setup_triggered:
             entry_price = pdl - 1.5 if pdl else (current_price or 2320.0)
             stop_loss = entry_price - 5.0
             target = pdh if pdh else (entry_price + 20)
@@ -479,10 +573,10 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                 "is_valid": True,
                 "status_message": "Success",
                 "market_structure_status": (
-                    f"HTF structure is BULLISH. Fractal order flow aligned after hitting Institutional Demand Zone below PDL.\n\n"
+                    f"HTF structure is BULLISH. Price is in DISCOUNT matrix zone below Daily Open. Fractal order flow aligned after hitting Institutional Demand Zone below PDL.\n\n"
                     f"---\n\n"
                     f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
-                    f"ප්‍රධාන Trend එක Bullish (ඉහළට) තියෙන්නේ. මිල පහළට ගිහින් Previous Daily Low (PDL) එක sweep කරලා, Institutional Demand Zone එකට ඇතුල් වෙලා තියෙනවා."
+                    f"ප්‍රධාන Trend එක Bullish (ඉහළට) තියෙන්නේ. මිල Daily Open එකට සහ Equilibrium එකට වඩා පහළින් (Discount Zone) පවතී. Previous Daily Low (PDL) එක sweep කරලා, Institutional Demand Zone එකට ඇතුල් වෙලා තියෙනවා."
                 ),
                 "daily_bias": "BULLISH",
                 "liquidity_target": pdh,
@@ -490,16 +584,16 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                 "stop_loss_level": stop_loss,
                 "target_reward_ratio": f"1:{rr_ratio:.2f}",
                 "reasoning": (
-                    f"1. Daily structure is bullish, making higher highs. Multi-day pullback has hit discount matrix area.\n"
-                    f"2. Asian session successfully swept Previous Daily Low (PDL) at {pdl:.2f}, sweeping retail buyers.\n"
-                    f"3. HTF 15m/5m Demand Zone has been mitigated, engineering institutional buy liquidity.\n"
-                    f"4. Lower Timeframe (5m) Shift in Market Structure (MSS) confirmed in London Session, signaling bullish reversal.\n\n"
+                    f"1. Daily structure is bullish, making higher highs. Price is in the DISCOUNT zone ({zone}) below the 50% Equilibrium line ({eq_price:.2f}).\n"
+                    f"2. Price is trading BELOW the Daily Open ({open_relation}), which offers high-probability discount pricing.\n"
+                    f"3. Active session is inside the valid Killzone ({killzone}), with a successful liquidity sweep below PDL ({pdl:.2f}).\n"
+                    f"4. Lower Timeframe Shift (MSS/CISD) confirmed with a fresh FVG, signaling institutional buy program expansion.\n\n"
                     f"---\n\n"
                     f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
-                    f"1. දෛනික වෙළඳපල ව්‍යුහය (Daily Structure) Bullish වන අතර ඉහළ උපරිමයන් සාදයි. දින කිහිපයක පසුබැසීම discount matrix කලාපයට ළඟා වී ඇත.\n"
-                    f"2. ආසියානු සැසිය (Asian Session) තුළදී පෙර දෛනික අවමය (PDL) {pdl:.2f} මට්ටමේදී සාර්ථකව sweep කර ඇත.\n"
-                    f"3. 15m/5m Demand Zone එක සක්‍රීය වී ආයතනික මිලදී ගැනීමේ ද්‍රවශීලතාවය (liquidity) සකස් කර ඇත.\n"
-                    f"4. ලන්ඩන් සැසිය තුළදී 5m කාලරාමුවෙහි Market Structure Shift (MSS) එකක් සනාථ වී ඇත."
+                    f"1. දෛනික ව්‍යුහය Bullish වන අතර මිල 50% Equilibrium මට්ටමට ({eq_price:.2f}) වඩා පහළින් Discount කලාපයේ පවතී.\n"
+                    f"2. මිල Daily Open මට්ටමට වඩා පහළින් ({open_relation}) පවතින බැවින් මිලදී ගැනීම් සඳහා වැඩි සම්භාවිතාවක් ඇත.\n"
+                    f"3. ගනුදෙනුව වලංගු Killzone ({killzone}) කාල සීමාවක් තුළ සිදු වන අතර PDL ({pdl:.2f}) සාර්ථකව sweep කර ඇත.\n"
+                    f"4. 5m/15m කාලරාමුවෙහි Market Structure Shift (MSS/CISD) එකක් fresh FVG එකක් සමඟ සනාථ වී ඇත."
                 ),
                 "invalidation": (
                     f"Setup is invalidated if price breaches below the sweep low at {stop_loss:.2f} before triggering limit entry, or if structure breaks to the downside.\n\n"
@@ -508,28 +602,39 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                     f"මිල {stop_loss:.2f} sweep low මට්ටමට වඩා පහළින් ගියහොත් හෝ ව්‍යුහය පහළට බිඳ වැටුණහොත් මෙම setup එක වලංගු නොවේ."
                 ),
                 "risk_notes": (
-                    f"Risk 1% of account size maximum. Set Stop Loss strictly at {stop_loss:.2f} and target PDH at {pdh:.2f} with a reward ratio of 1:{rr_ratio:.1f}.\n\n"
+                    f"Risk 1% of account size maximum. Set Stop Loss strictly at {stop_loss:.2f} and target PDH at {pdh:.2f} with a reward ratio of 1:{rr_ratio:.1f}. News Release check: {high_impact_news}.\n\n"
                     f"---\n\n"
                     f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
-                    f"ඔබේ ගිණුමේ ප්‍රමාණයෙන් උපරිම 1% ක් පමණක් අවදානමට ලක් කරන්න. Stop Loss එක දැඩි ලෙස {stop_loss:.2f} මට්ටමේ තබා, 1:{rr_ratio:.1f} ක අවදානම්-ප්‍රතිලාභ අනුපාතයක් සමඟින් {pdh:.2f} මට්ටම ඉලක්ක කරන්න."
-                )
+                    f"ඔබේ ගිණුමේ ප්‍රමාණයෙන් උපරිම 1% ක් පමණක් අවදානමට ලක් කරන්න. Stop Loss එක දැඩි ලෙස {stop_loss:.2f} මට්ටමේ තබා, 1:{rr_ratio:.1f} ක අවදානම්-ප්‍රතිලාභ අනුපාතයක් සමඟින් {pdh:.2f} මට්ටම ඉලක්ක කරන්න. ප්‍රධාන පුවත් විකාශන තත්ත්වය: {high_impact_news}."
+                ),
+                "equilibrium_price": eq_price,
+                "zone_type": zone,
+                "daily_open_relation": open_relation,
+                "killzone_valid": kz_valid,
+                "counter_trend_locked": ct_locked
             }
         else:
             reasons = []
             if not is_htf_bullish: reasons.append("Daily structure trend is not bullish/pullback aligned")
             if not asian_sweep: reasons.append("No Asian Session PDL sweep detected")
-            if not demand_mitigation: reasons.append("HTF Demand Zone mitigation is missing")
-            if not ltf_shift: reasons.append("Lower timeframe market structure shift (MSS) not confirmed")
-
+            if not (demand_mitigation or discount_pd_array): reasons.append("HTF Demand Zone/Discount PD Array mitigation is missing")
+            if not (ltf_shift or ltf_trigger in ["MSS", "CISD"]): reasons.append("Lower timeframe structural shift (MSS/CISD) not confirmed")
+            if not kz_valid: reasons.append(f"Outside of valid London/NY Killzones (Current: {killzone})")
+            if ct_locked:
+                if zone == "PREMIUM":
+                    reasons.append("Buys/Longs are strictly locked in Premium Zone (> 50% Equilibrium)")
+                if high_impact_news:
+                    reasons.append("Locked due to high-impact news release wave")
+            
             reason_str = ", ".join(reasons)
             return {
                 "is_valid": True,
                 "status_message": "Success",
                 "market_structure_status": (
-                    "HTF structure is Bullish, but setup conditions are incomplete.\n\n"
-                    "---\n\n"
-                    "**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
-                    "ප්‍රධාන Trend එක Bullish (ඉහළට) වුවත්, setup එක සම්පූර්ණ වීමට අවශ්‍ය කොන්දේසි සපුරා නොමැත."
+                    f"HTF structure is Bullish, but setup conditions are incomplete. Setup Locked: {ct_locked}.\n\n"
+                    f"---\n\n"
+                    f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
+                    f"ප්‍රධාන Trend එක Bullish වුවත්, setup එක සම්පූර්ණ වීමට අවශ්‍ය කොන්දේසි සපුරා නොමැත. Setup අවහිර වීම: {ct_locked}."
                 ),
                 "daily_bias": "NEUTRAL",
                 "liquidity_target": pdh,
@@ -537,28 +642,31 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                 "stop_loss_level": None,
                 "target_reward_ratio": "N/A",
                 "reasoning": (
-                    f"The Daily Bias is NEUTRAL because setup conditions are incomplete: {reason_str}.\n"
-                    f"Wait for the liquidity sweep of PDL ({pdl:.2f}) and subsequent demand mitigation with a LTF CHoCH shift during the London session.\n\n"
+                    f"The Daily Bias is NEUTRAL because setup conditions are incomplete or locked: {reason_str}.\n"
+                    f"Wait for the liquidity sweep of PDL ({(pdl if pdl is not None else 0.0):.2f}) in London/NY Killzones and subsequent discount mitigation with a LTF shift (MSS/CISD).\n\n"
                     f"---\n\n"
                     f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
-                    f"පහත සඳහන් setup කොන්දේසි සම්පූර්ණ නොවීම නිසා Daily Bias එක මධ්‍යස්ථ (NEUTRAL) වේ: {reason_str}.\n"
-                    f"PDL ({pdl:.2f}) sweep වන තෙක් සහ ලන්ඩන් සැසිය තුළදී LTF CHoCH shift එකක් සමඟ demand mitigation එකක් සිදුවන තෙක් රැඳී සිටින්න."
+                    f"පහත සඳහන් setup කොන්දේසි සම්පූර්ණ නොවීම හෝ අවහිර වීම නිසා Daily Bias එක මධ්‍යස්ථ (NEUTRAL) වේ: {reason_str}.\n"
+                    f"PDL sweep වී London/NY Killzones ඇතුළත discount array mitigate වී, LTF shift (MSS/CISD) එකක් සිදුවන තෙක් රැඳී සිටින්න."
                 ),
                 "invalidation": (
                     f"No active setup to invalidate yet.\n\n"
                     f"---\n\n"
                     f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
-                    f"තවමත් වලංගු නොවන කිරීමට සක්‍රීය setup එකක් නොමැත."
+                    f"වලංගු කිරීමට සක්‍රීය setup එකක් තවමත් නොමැත."
                 ),
                 "risk_notes": (
-                    f"Do not enter trades on a neutral bias. Wait for alignment.\n\n"
+                    f"Execution locked or neutral. Do not enter trades. News Release check: {high_impact_news}.\n\n"
                     f"---\n\n"
                     f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
-                    f"මධ්‍යස්ථ bias එකක් ඇති විට ගනුදෙනු නොකරන්න. කොන්දේසි සපුරාලන තෙක් රැඳී සිටින්න."
-                )
+                    f"ගනුදෙනුව අවහිර කර හෝ මධ්‍යස්ථව ඇත. Trade එකට ඇතුල් නොවන්න. ප්‍රධාන පුවත් විකාශන තත්ත්වය: {high_impact_news}."
+                ),
+                "equilibrium_price": eq_price,
+                "zone_type": zone,
+                "daily_open_relation": open_relation,
+                "killzone_valid": kz_valid,
+                "counter_trend_locked": ct_locked
             }
-
-
 
 
 class NewsService:

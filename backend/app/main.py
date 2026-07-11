@@ -79,28 +79,59 @@ def startup_populate():
         db.query(StrategyModel).update({StrategyModel.is_active: False})
         default_sb = StrategyModel(
             name="ICT Silver Bullet",
-            description="Specialized GOLD/XAUUSD strategy analyzing Daily Bias, PDH/PDL liquidity sweeps, and lower timeframe execution.",
-            content="""# ICT Silver Bullet & Liquidity Flow Strategy (GOLD/XAUUSD)
+            description="Specialized multi-asset trading strategy using Premium/Discount Equilibrium, Daily Open relation, Killzones, and lower timeframe MSS/CISD + FVG confirmations.",
+            content="""# ICT Silver Bullet & Liquidity Flow Strategy Spec
 
-## 1. General Framework & Core Logic
-- Asset: GOLD (XAUUSD)
-- Core Concepts: Market Structure & Liquidity Flow (SMC / ICT Principles).
-- Primary Focus: Identifying Daily Bias using multi-timeframe analysis (Daily Timeframe down to 15m/5m execution).
+## 1. General System Framework
+- Target Asset: Multi-Asset Support (e.g., SOL, BTC, GOLD, Forex).
+- Core Logic: Smart Money Concepts (SMC) & Inner Circle Trader (ICT) Frameworks.
+- System Goal: Automatically identify Daily Bias, filter entries via institutional liquidity arrays, and validate mechanical execution protocols.
 
-## 2. Technical Analysis Logic
-- **Step A: Higher Timeframe (HTF) Trend Analysis (Daily Chart)**
-  Check the Daily Market Structure. Bullish if making HH/HL. Pullback is identified by a 3+ day bearish correction into a key institutional demand zone, turning fractal order flow bullish.
-- **Step B: Key Level Mapping (Daily to 15-Minute)**
-  Map previous day's levels: PDH (Previous Daily High - major target), PDL (Previous Daily Low - sweep target), Daily Open, Daily Close.
-- **Step C: Liquidity Sweep Logic (Daily Bias confirmation)**
-  Asian Session sweeps PDL and mitigates HTF 15m/5m Demand Zone. The Daily Bias then becomes strictly Bullish, targeting PDH.
+## 2. Core Theoretical Modules (The Input Logic)
 
-## 3. Execution & Trade Management
-- Session: London Session Execution.
-- Entry Trigger: Lower Timeframe (LTF) Shift in Market Structure (MSS/CHoCH) or aggressive bullish displacement out of the demand zone after the PDL sweep.
-- Entry Point: Limit order at 15m/5m Demand Range / Order Block.
-- Stop-Loss: Placed below sweep low.
-- Take-Profit: Option 1: 1:3 to 1:3.3 RR. Option 2: Target PDH or previous session high.
+### Module A: Market Nature & Drivers
+Price moves based on the 4 core pillars of price delivery:
+1. Hunt Liquidity (Seek & Destroy): Price seeks liquidity pools to trigger stops and fill institutional orders.
+2. Re-balance Inefficiencies: Price constantly mitigates unmitigated Fair Value Gaps (FVGs) and Liquidity Voids.
+3. Engineered Liquidity: Price builds Buy-Side (BSL) and Sell-Side (SSL) pools (Equal Highs/Lows, Trendline Liquidity).
+4. Rebalancing Equilibrium: Price expands/retraces between Premium and Discount matrices within designated dealing ranges.
+
+### Module B: Proximity Logic & Liquidity Magnets
+- Rule: Locate nearest major liquidity pools (PDH/PDL, PWH/PWL, or Major Equal Highs/Lows).
+- Condition: If price is closer to BSL, active bias remains Bullish until taken. If closer to SSL, active bias remains Bearish until cleared.
+
+### Module C: Premium vs. Discount Array Matrix
+- Rule: Map active dealing range using outermost swing high/low. Draw 50% Equilibrium Line.
+- Premium (> 50% Area): Search for Short (Sell) setups only. Scan for Premium Arrays: Order Blocks (OB), Breaker Blocks, Mitigation Blocks, Rejection Blocks, Bearish FVGs, Liquidity Voids, or Old Highs.
+- Discount (< 50% Area): Search for Long (Buy) setups only. Scan for Discount PD Arrays in reverse.
+
+## 3. Day-Trading Execution Protocols (The Live Analysis Logic)
+
+### Step 1: Determine the Higher Timeframe (HTF) Daily Bias
+- Weekly & Daily chart structure (HH/HL = Bullish, LH/LL = Bearish).
+- Pullback & Fractal Flow: If Bullish but undergoes short-term pullback (3+ consecutive daily bearish candles down into HTF Demand/Discount Array), track the Fractal Order Flow switch. Once Fractal Order Flow turns bullish inside the demand zone, switch back to a strict Bullish Daily Bias.
+
+### Step 2: Intraday Open & Session Manipulations
+- Daily Open Reference Check:
+  - Trading ABOVE Daily Open = Short-term premium pricing. Filter for Short setups hitting Premium arrays.
+  - Trading BELOW Daily Open = Short-term discount pricing. Filter for Long setups hitting Discount arrays.
+- Time-of-Day Filter (Strict Killzone Restrictions):
+  - London Killzone: 2:00 AM – 5:00 AM New York (NY) Time.
+  - New York AM Killzone: 7:00 AM – 10:00 AM NY Time.
+  - Expect stops run/sweep first (Manipulation phase) inside the Killzone before the actual expansion move.
+
+### Step 3: Lower Timeframe (LTF) Reconfirmation & Entry
+Drop to M15/M5 inside Killzones after HTF Bias confirms:
+- MSS (Market Structure Shift): Price aggressively breaks swing point of pullback leg with candle body close.
+- CISD (Change in State of Delivery): Price closes past the open/close body boundaries of the counter-trend candle inside the demand array.
+- Entry: Execute Limit Order at the 15-Min / 5-Min Demand Range or fresh FVG formed right at the MSS/CISD point. Ignore counter-bias setups.
+
+## 4. Rigid Risk Profile & Trade Management Rules
+- Stop-Loss (SL): Positioned mechanically right below the structural sweep low (clearing PDL/SSL).
+- Take-Profit (TP):
+  - Option A: Fixed 1:3 to 1:3.3 Risk-to-Reward (RR) ratio.
+  - Option B: Target opposing PDH/PDL (Opposing Liquidity Zone).
+- Macro Protection: Avoid entries against high-impact news acceleration waves (NFP, CPI, FOMC). Monitor USD Index (USDX) inverse correlation.
 """,
             is_active=True
         )
@@ -338,7 +369,14 @@ async def silverbullet_analyze(req: SilverBulletRequest, db: Session = Depends(g
         target_reward_ratio=result.get("target_reward_ratio"),
         reasoning=result.get("reasoning"),
         invalidation=result.get("invalidation"),
-        risk_notes=result.get("risk_notes")
+        risk_notes=result.get("risk_notes"),
+        
+        # Advanced strategy computed variables
+        equilibrium_price=result.get("equilibrium_price"),
+        zone_type=result.get("zone_type"),
+        daily_open_relation=result.get("daily_open_relation"),
+        killzone_valid=result.get("killzone_valid"),
+        counter_trend_locked=result.get("counter_trend_locked")
     )
 
 
