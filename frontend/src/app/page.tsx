@@ -1299,7 +1299,13 @@ export default function Dashboard() {
                                 };
 
                                 const eqY = getSvgY(eqPriceVal);
-                                const openY = getSvgY                                // Detect if setup is BEARISH to dynamically invert the candles and labels for Sells
+                                const openY = getSvgY(openVal);
+                                const currY = getSvgY(currentPriceVal);
+                                const pdhY = getSvgY(pdhVal);
+                                const pdlY = getSvgY(pdlVal);
+                                const entryY = entryPriceVal ? getSvgY(entryPriceVal) : null;
+                                const slY = getSvgY(stopLossVal);
+                                // Detect if setup is BEARISH to dynamically invert the candles and labels for Sells
                                 const isBearishSetup = sbResult.daily_bias === "BEARISH";
 
                                 // Map 11 candle columns with wide spacing (60px step) for maximum TradingView look
