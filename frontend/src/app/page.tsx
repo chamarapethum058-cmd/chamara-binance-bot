@@ -49,6 +49,11 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(false);
   const [backendHealth, setBackendHealth] = useState<"online" | "offline">("offline");
 
+  // Settings & preferences states
+  const [geminiApiKey, setGeminiApiKey] = useState("");
+  const [tempApiKey, setTempApiKey] = useState("");
+  const [showSettings, setShowSettings] = useState(false);
+
   // News states
   const [news, setNews] = useState<any[]>([]);
   const [newsLoading, setNewsLoading] = useState(false);
@@ -68,7 +73,46 @@ export default function Dashboard() {
     fetchStrategies();
     fetchHistory();
     fetchNews();
+    fetchPreferences();
   }, []);
+
+  const fetchPreferences = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/preferences`);
+      if (res.ok) {
+        const data = await res.json();
+        const apiKeyPref = data.find((p: any) => p.key === "gemini_api_key");
+        if (apiKeyPref) {
+          setGeminiApiKey(apiKeyPref.value);
+          setTempApiKey(apiKeyPref.value);
+        }
+      }
+    } catch (e) {
+      console.error("Error fetching preferences:", e);
+    }
+  };
+
+  const saveApiKey = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await fetch(`${API_BASE}/preferences`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: "gemini_api_key", value: tempApiKey }),
+      });
+      if (res.ok) {
+        setGeminiApiKey(tempApiKey);
+        setShowSettings(false);
+        alert("API Key saved successfully!");
+        checkHealth();
+      } else {
+        alert("Failed to save API key.");
+      }
+    } catch (e) {
+      console.error("Error saving API key:", e);
+      alert("Error saving API key.");
+    }
+  };
 
   // Scroll chat to bottom
   useEffect(() => {
@@ -230,6 +274,11 @@ export default function Dashboard() {
     if (!inputMessage.trim() || chatLoading) return;
 
     const userText = inputMessage;
+    const currentHistory = chatMessages.map(msg => ({
+      sender: msg.sender,
+      text: msg.text
+    }));
+
     setChatMessages((prev) => [
       ...prev,
       { sender: "user", text: userText, timestamp: new Date() },
@@ -237,30 +286,41 @@ export default function Dashboard() {
     setInputMessage("");
     setChatLoading(true);
 
-    // Simple delay for mock analysis answers or calling backend
-    setTimeout(() => {
-      let responseText = "";
-      if (!currentAnalysis) {
-        responseText = "Please trigger an analysis first so I can assist you based on market conditions.";
-      } else {
-        const lower = userText.toLowerCase();
-        if (lower.includes("why") || lower.includes("reason") || lower.includes("setup")) {
-          responseText = `**Structure Breakdown for ${currentAnalysis.symbol}**:\n\n${currentAnalysis.reasoning}`;
-        } else if (lower.includes("invalidation") || lower.includes("stop loss") || lower.includes("sl")) {
-          responseText = `**Risk & Invalidation Specifications**:\n\n${currentAnalysis.invalidation}\n\n**Risk Management Tip**: ${currentAnalysis.risk_notes}`;
-        } else if (lower.includes("strategy") || lower.includes("rules")) {
-          responseText = `**Active Strategy Applied**:\n\n${activeStrategy?.content || "SMC Standard Strategy"}`;
-        } else {
-          responseText = `As your AI Analyst, based on the **${currentAnalysis.signal}** structure, here is what we are tracking:\n\n* **Invalidation Zone**: ${currentAnalysis.invalidation.substring(0, 100)}...\n* **Confidence**: ${currentAnalysis.confidence}% alignment.\n\nWould you like me to explain the exact swing rules or structural blocks?`;
-        }
-      }
+    try {
+      const res = await fetch(`${API_BASE}/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: userText,
+          symbol: selectedSymbol,
+          timeframe: selectedTimeframe,
+          analysis_id: currentAnalysis?.id || null,
+          history: currentHistory
+        }),
+      });
 
+      if (res.ok) {
+        const data = await res.json();
+        setChatMessages((prev) => [
+          ...prev,
+          { sender: "falcon", text: data.response, timestamp: new Date() },
+        ]);
+      } else {
+        const error = await res.json();
+        setChatMessages((prev) => [
+          ...prev,
+          { sender: "falcon", text: `Error: ${error.detail || "Failed to query AI assistant."}`, timestamp: new Date() },
+        ]);
+      }
+    } catch (err) {
+      console.error("Chat error:", err);
       setChatMessages((prev) => [
         ...prev,
-        { sender: "falcon", text: responseText, timestamp: new Date() },
+        { sender: "falcon", text: "Error: Unable to connect to the backend server.", timestamp: new Date() },
       ]);
+    } finally {
       setChatLoading(false);
-    }, 1000);
+    }
   };
 
   const getSignalColor = (signal?: string) => {
@@ -348,6 +408,20 @@ export default function Dashboard() {
               {backendHealth === "online" ? "API ONLINE" : "API OFFLINE"}
             </span>
           </div>
+          <button
+            onClick={() => {
+              setTempApiKey(geminiApiKey);
+              setShowSettings(true);
+            }}
+            id="btn-settings"
+            className="bg-[#1E2138]/60 border border-[#1E2235] hover:border-indigo-500 text-gray-300 hover:text-white p-2 rounded-xl transition-all cursor-pointer flex items-center justify-center"
+            title="Settings"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </button>
         </div>
       </header>
 
@@ -910,6 +984,57 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      {showSettings && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+          <div className="bg-[#11131F] border border-[#1E2235] rounded-2xl w-full max-w-md p-6 shadow-2xl relative">
+            <button
+              onClick={() => setShowSettings(false)}
+              className="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            
+            <h3 className="text-lg font-bold text-white mb-1">Falcon Configuration</h3>
+            <p className="text-xs text-gray-500 font-mono mb-4">Set your preferences and API credentials</p>
+            
+            <form onSubmit={saveApiKey} className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs text-gray-400 font-semibold uppercase tracking-wider">Gemini API Key</label>
+                <input
+                  type="password"
+                  placeholder="AIzaSy... or AQ..."
+                  value={tempApiKey}
+                  onChange={(e) => setTempApiKey(e.target.value)}
+                  className="w-full bg-[#141626] border border-[#1E2235] rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#6366F1] font-mono"
+                />
+                <p className="text-[10px] text-gray-500 leading-normal mt-1">
+                  This key is stored securely in the database preferences and used by the AI Brain for technical analysis.
+                </p>
+              </div>
+              
+              <div className="flex justify-end gap-3 mt-2 border-t border-[#1E2235] pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowSettings(false)}
+                  className="px-4 py-2 text-xs font-semibold text-gray-400 hover:text-white transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="bg-[#6366F1] hover:bg-[#5053df] text-white px-4 py-2 rounded-xl text-xs font-semibold transition-colors shadow-lg shadow-indigo-500/10"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

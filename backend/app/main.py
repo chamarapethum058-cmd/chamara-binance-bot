@@ -9,9 +9,11 @@ from .models import StrategyModel, AnalysisModel, PreferenceModel
 from .schemas import (
     StrategyCreate, StrategyResponse, 
     AnalysisRequest, AnalysisResponse,
-    PreferenceCreate, PreferenceResponse
+    PreferenceCreate, PreferenceResponse,
+    ChatRequest
 )
 from .services import BinanceService, AIService, NewsService
+from .config import settings
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -67,6 +69,14 @@ def startup_populate():
         db.commit()
         db.refresh(default_smc)
         print("Default SMC strategy populated.")
+    
+    # Seed default Gemini API Key from settings if not set in DB
+    pref = db.query(PreferenceModel).filter(PreferenceModel.key == "gemini_api_key").first()
+    if not pref and settings.GEMINI_API_KEY:
+        db_pref = PreferenceModel(key="gemini_api_key", value=settings.GEMINI_API_KEY)
+        db.add(db_pref)
+        db.commit()
+        print("Default Gemini API Key preference seeded from settings (.env).")
 
 @app.get("/api/health")
 def health_check():
@@ -190,12 +200,17 @@ async def trigger_analysis(req: AnalysisRequest, db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Market data fetch error: {str(e)}")
     
+    # 2.5. Get API Key from DB preferences if exists
+    pref = db.query(PreferenceModel).filter(PreferenceModel.key == "gemini_api_key").first()
+    api_key = pref.value if pref else None
+
     # 3. Request analysis from AI Brain
     analysis_result = await AIService.analyze_market(
         symbol=req.symbol,
         timeframe=req.timeframe,
         klines=klines,
-        strategy_content=strategy.content
+        strategy_content=strategy.content,
+        api_key=api_key
     )
     
     # 4. Save analysis to history database
@@ -215,3 +230,42 @@ async def trigger_analysis(req: AnalysisRequest, db: Session = Depends(get_db)):
     db.refresh(db_analysis)
     
     return db_analysis
+
+
+@app.post("/api/chat")
+async def chat_with_ai(req: ChatRequest, db: Session = Depends(get_db)):
+    # 1. Retrieve the active strategy
+    strategy = db.query(StrategyModel).filter(StrategyModel.is_active == True).first()
+    strategy_content = strategy.content if strategy else "No active strategy rules configured."
+    
+    # 2. Retrieve the active analysis context if an analysis_id is provided
+    analysis_context = ""
+    if req.analysis_id:
+        analysis = db.query(AnalysisModel).filter(AnalysisModel.id == req.analysis_id).first()
+        if analysis:
+            analysis_context = (
+                f"Active Analysis Context:\n"
+                f"- Symbol: {analysis.symbol}\n"
+                f"- Timeframe: {analysis.timeframe}\n"
+                f"- Current Signal: {analysis.signal}\n"
+                f"- Confidence Level: {analysis.confidence}%\n"
+                f"- Reasoning: {analysis.reasoning}\n"
+                f"- Invalidation rules: {analysis.invalidation}\n"
+                f"- Risk warnings: {analysis.risk_notes}\n"
+            )
+            
+    # 3. Get API Key from DB preferences if exists
+    pref = db.query(PreferenceModel).filter(PreferenceModel.key == "gemini_api_key").first()
+    api_key = pref.value if pref else None
+    
+    # 4. Fetch dynamic chat response from Gemini
+    response_text = await AIService.chat_response(
+        message=req.message,
+        strategy_content=strategy_content,
+        analysis_context=analysis_context,
+        chat_history=req.history or [],
+        api_key=api_key
+    )
+    
+    return {"response": response_text}
+

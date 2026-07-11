@@ -54,3 +54,12 @@ class PreferenceResponse(PreferenceBase):
 
     class Config:
         from_attributes = True
+
+# Chat schemas
+class ChatRequest(BaseModel):
+    message: str
+    symbol: Optional[str] = None
+    timeframe: Optional[str] = None
+    analysis_id: Optional[int] = None
+    history: Optional[List[dict]] = None
+

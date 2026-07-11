@@ -2,7 +2,8 @@ import httpx
 import json
 import logging
 from typing import Dict, Any, List, Optional
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from .config import settings
 
 logger = logging.getLogger(__name__)
@@ -86,7 +87,8 @@ class AIService:
         symbol: str, 
         timeframe: str, 
         klines: List[List[Any]], 
-        strategy_content: str
+        strategy_content: str,
+        api_key: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Send market data and strategy guidelines to Gemini to perform technical analysis.
@@ -133,19 +135,20 @@ Format your output strictly as a JSON object with the following fields:
 OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formatting.
 """
 
-        # Check for Gemini API key
-        if not settings.GEMINI_API_KEY:
+        # Use passed key if available, otherwise check settings
+        active_key = api_key or settings.GEMINI_API_KEY
+        if not active_key:
             logger.warning("GEMINI_API_KEY not configured. Falling back to mock technical analysis.")
             return cls._get_mock_analysis(symbol, timeframe, current_price)
             
         try:
-            genai.configure(api_key=settings.GEMINI_API_KEY)
-            model = genai.GenerativeModel('gemini-1.5-flash')
-            
-            # Request response in JSON format
-            response = model.generate_content(
-                prompt,
-                generation_config={"response_mime_type": "application/json"}
+            client = genai.Client(api_key=active_key)
+            response = client.models.generate_content(
+                model='gemini-3.5-flash',
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json"
+                )
             )
             
             result = json.loads(response.text.strip())
@@ -175,6 +178,69 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
             "invalidation": invalidation,
             "risk_notes": risk_notes
         }
+
+    @classmethod
+    async def chat_response(
+        cls,
+        message: str,
+        strategy_content: str,
+        analysis_context: str,
+        chat_history: List[Dict[str, Any]],
+        api_key: Optional[str] = None
+    ) -> str:
+        """
+        Engage in chat conversation with Gemini about the trading strategy and current market context.
+        """
+        active_key = api_key or settings.GEMINI_API_KEY
+        if not active_key:
+            return (
+                "Gemini API key is not configured. Please add your Gemini API Key in the settings "
+                "to talk to the AI Trading Assistant."
+            )
+            
+        try:
+            client = genai.Client(api_key=active_key)
+            
+            # Format chat history for prompt or construct system prompt
+            system_prompt = f"""
+You are the AI Brain of Project Falcon, a Personal AI Trading Assistant.
+Your core mission is to help the user analyze financial markets and learn trading based on their strategies.
+
+CRITICAL RULES:
+1. Never execute or automate trades.
+2. Never suggest guaranteed profits or make win rate promises.
+3. You must only provide analysis and education, not financial advice.
+4. Adhere strictly to the rules of the user's strategy. Do not invent new indicators or run outside analysis.
+5. Provide clear, educational explanations to help the trader learn.
+6. Language adaptability: Respond in the same language as the user's message. If the user asks in English, respond in English. If the user asks in Sinhala (including Singlish/transliterated Sinhala), respond in clear, user-friendly Sinhala.
+
+-----------------------------------------
+USER'S TRADING STRATEGY RULES:
+{strategy_content}
+-----------------------------------------
+
+{analysis_context}
+"""
+            # Build history list in google-genai format
+            contents = [
+                types.Content(role="user", parts=[types.Part(text=system_prompt)]),
+                types.Content(role="model", parts=[types.Part(text="Understood. I am Project Falcon AI Brain. I will follow your guidelines and active strategy rules.")]),
+            ]
+            for msg in chat_history:
+                role = "user" if msg.get("sender") == "user" else "model"
+                contents.append(types.Content(role=role, parts=[types.Part(text=msg.get("text", ""))]))
+                
+            contents.append(types.Content(role="user", parts=[types.Part(text=message)]))
+            
+            response = client.models.generate_content(
+                model='gemini-3.5-flash',
+                contents=contents
+            )
+            return response.text.strip()
+        except Exception as e:
+            logger.error(f"Gemini API chat failed: {e}")
+            return f"Error contacting AI Brain: {str(e)}"
+
 
 
 class NewsService:
