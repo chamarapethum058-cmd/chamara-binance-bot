@@ -1149,7 +1149,17 @@ export default function Dashboard() {
 
                 {/* TradingView RSI Chart for Silver Bullet */}
                 <div className="bg-[#141626]/60 border border-[#1E2235]/60 rounded-xl p-4 flex flex-col gap-2 h-[520px] mt-2 relative">
-                  <span className="text-[10px] font-semibold text-[#8B5CF6] uppercase tracking-widest font-mono px-1">Relative Strength Index (RSI)</span>
+                  <div className="flex justify-between items-center px-1">
+                    <span className="text-[10px] font-semibold text-[#8B5CF6] uppercase tracking-widest font-mono">Relative Strength Index (RSI)</span>
+                    <a
+                      href={`https://www.tradingview.com/chart/?symbol=${getTradingViewSymbol(sbSymbol)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[10px] text-indigo-400 hover:text-indigo-300 transition-colors font-semibold flex items-center gap-1 font-mono"
+                    >
+                      Open in TradingView ↗
+                    </a>
+                  </div>
                   <div className="flex-1 w-full rounded-lg overflow-hidden border border-[#1E2235]/40 bg-black/40 relative">
                     <iframe
                       id="tradingview-sb-rsi-widget"
@@ -2135,7 +2145,17 @@ export default function Dashboard() {
 
           {/* TradingView Live Chart */}
           <div className="bg-[#11131F]/90 border border-[#1E2235] rounded-2xl p-4 shadow-xl h-[450px] flex flex-col gap-2 relative">
-            <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest font-mono px-1">TradingView Live Chart</span>
+            <div className="flex justify-between items-center px-1">
+              <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest font-mono">TradingView Live Chart</span>
+              <a
+                href={`https://www.tradingview.com/chart/?symbol=BINANCE:${selectedSymbol}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[10px] text-indigo-400 hover:text-indigo-300 transition-colors font-semibold flex items-center gap-1 font-mono"
+              >
+                Open in TradingView ↗
+              </a>
+            </div>
             <div className="flex-1 w-full rounded-xl overflow-hidden border border-[#1E2235]/60 bg-black/40">
               <iframe
                 id="tradingview-chart-widget"
