@@ -93,6 +93,10 @@ class SilverBulletRequest(BaseModel):
     ltf_trigger: Optional[str] = None # "MSS", "CISD", "NONE"
     has_fresh_fvg: Optional[bool] = None
     high_impact_news: Optional[bool] = None
+    
+    # Advanced 9:00 AM Candle Range parameters
+    candle_9am_high: Optional[float] = None
+    candle_9am_low: Optional[float] = None
 
 class SilverBulletResponse(BaseModel):
     is_valid: bool
@@ -118,6 +122,10 @@ class SilverBulletResponse(BaseModel):
     erl_irl_state: Optional[str] = None
     swept_liquidity_pool: Optional[str] = None
     mitigated_pd_array_type: Optional[str] = None
+    
+    # Advanced 9AM range filter details
+    is_advanced_setup: Optional[bool] = None
+    advanced_setup_status: Optional[str] = None # "NONE", "9AM_LOW_SWEPT_MSS_PENDING", "9AM_HIGH_SWEPT_MSS_PENDING", "TRIGGERED"
 
 
 

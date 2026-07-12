@@ -83,12 +83,14 @@ export default function Dashboard() {
   // Advanced Strategy States
   const [sbDealingRangeHigh, setSbDealingRangeHigh] = useState<number | "">(2360);
   const [sbDealingRangeLow, setSbDealingRangeLow] = useState<number | "">(2310);
-  const [sbKillzone, setSbKillzone] = useState("LONDON");
+  const [sbKillzone, setSbKillzone] = useState("LONDON_SB");
   const [sbDiscountPdArray, setSbDiscountPdArray] = useState(true);
   const [sbPremiumPdArray, setSbPremiumPdArray] = useState(false);
   const [sbLtfTrigger, setSbLtfTrigger] = useState("MSS");
   const [sbHasFreshFvg, setSbHasFreshFvg] = useState(true);
   const [sbHighImpactNews, setSbHighImpactNews] = useState(false);
+  const [sbCandle9amHigh, setSbCandle9amHigh] = useState<number | "">(2335);
+  const [sbCandle9amLow, setSbCandle9amLow] = useState<number | "">(2315);
   
   const [sbResult, setSbResult] = useState<any | null>(null);
   const [sbLoading, setSbLoading] = useState(false);
@@ -108,10 +110,12 @@ export default function Dashboard() {
         if (data.pdh !== undefined) {
           setSbPdh(Number(data.pdh));
           setSbDealingRangeHigh(Number(data.pdh));
+          setSbCandle9amHigh(Number(data.pdh) - 5);
         }
         if (data.pdl !== undefined) {
           setSbPdl(Number(data.pdl));
           setSbDealingRangeLow(Number(data.pdl));
+          setSbCandle9amLow(Number(data.pdl) + 5);
         }
         if (data.open !== undefined) setSbOpen(Number(data.open));
         if (data.close !== undefined) setSbClose(Number(data.close));
@@ -156,6 +160,8 @@ export default function Dashboard() {
         ltf_trigger: sbInputMode === "form" ? sbLtfTrigger : null,
         has_fresh_fvg: sbInputMode === "form" ? sbHasFreshFvg : null,
         high_impact_news: sbInputMode === "form" ? sbHighImpactNews : null,
+        candle_9am_high: sbInputMode === "form" && sbCandle9amHigh !== "" ? Number(sbCandle9amHigh) : null,
+        candle_9am_low: sbInputMode === "form" && sbCandle9amLow !== "" ? Number(sbCandle9amLow) : null,
       };
 
       const res = await fetch(`${API_BASE}/silverbullet/analyze`, {
@@ -974,12 +980,47 @@ export default function Dashboard() {
                             onChange={(e) => setSbKillzone(e.target.value)}
                             className="bg-[#141626] border border-[#1E2235] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#6366F1]"
                           >
-                            <option value="LONDON">London (2AM - 5AM NY)</option>
-                            <option value="NY_AM">New York AM (7AM - 10AM NY)</option>
-                            <option value="NONE">Outside Killzones</option>
+                            <option value="LONDON_SB">London Open Silver Bullet (3AM - 4AM NY)</option>
+                            <option value="NY_AM_SB">AM Session Silver Bullet (10AM - 11AM NY)</option>
+                            <option value="NY_PM_SB">PM Session Silver Bullet (2PM - 3PM NY)</option>
+                            <option value="LONDON">London Killzone (2AM - 5AM NY)</option>
+                            <option value="NY_AM">New York AM Killzone (7AM - 10AM NY)</option>
+                            <option value="NONE">Outside Killzones (Inactive)</option>
                           </select>
                         </div>
                       </div>
+
+                      {/* Dynamic 9:00 AM Candle Range inputs (specifically for NY AM Silver Bullet and AM Killzone) */}
+                      {(sbKillzone === "NY_AM_SB" || sbKillzone === "NY_AM") && (
+                        <div className="grid grid-cols-2 gap-4 animate-fadeIn border border-[#1E2235] bg-[#141626]/20 p-4 rounded-xl">
+                          <div className="flex flex-col gap-1.5 col-span-2">
+                            <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider font-mono">Advanced 9:00 AM Range Filter</span>
+                            <span className="text-[9px] text-gray-500">Scan for liquidity sweep of 9:00 AM 1H candle boundaries</span>
+                          </div>
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider font-mono">9:00 AM Candle High</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              placeholder="e.g. 2335"
+                              value={sbCandle9amHigh}
+                              onChange={(e) => setSbCandle9amHigh(e.target.value === "" ? "" : Number(e.target.value))}
+                              className="bg-[#141626] border border-[#1E2235] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#6366F1] font-mono"
+                            />
+                          </div>
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider font-mono">9:00 AM Candle Low</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              placeholder="e.g. 2315"
+                              value={sbCandle9amLow}
+                              onChange={(e) => setSbCandle9amLow(e.target.value === "" ? "" : Number(e.target.value))}
+                              className="bg-[#141626] border border-[#1E2235] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#6366F1] font-mono"
+                            />
+                          </div>
+                        </div>
+                      )}
 
                       {/* Strategy Rules Checkboxes */}
                       <div className="flex flex-col gap-2.5 mt-2 bg-[#141626]/40 p-4 rounded-xl border border-[#1E2235]">
@@ -1112,7 +1153,7 @@ export default function Dashboard() {
                   <div className="flex-1 w-full rounded-lg overflow-hidden border border-[#1E2235]/40 bg-black/40 relative">
                     <iframe
                       id="tradingview-sb-rsi-widget"
-                      src={`https://s.tradingview.com/widgetembed/?frameElementId=tradingview-sb-rsi-widget&symbol=${getTradingViewSymbol(sbSymbol)}&interval=240&theme=dark&style=1&timezone=Etc%2FUTC&studies=RSI%40tv-basicstudies&hide_volume=true`}
+                      src={`https://s.tradingview.com/widgetembed/?frameElementId=tradingview-sb-rsi-widget&symbol=${getTradingViewSymbol(sbSymbol)}&interval=240&theme=dark&style=1&timezone=America%2FNew_York&studies=RSI%40tv-basicstudies&hide_volume=true`}
                       className="w-full h-full border-none"
                       allowFullScreen
                     />
@@ -1307,7 +1348,7 @@ export default function Dashboard() {
                                   if (!matches) return null;
                                   const pdlVal = Number(sbPdl);
                                   if (!isNaN(pdlVal) && pdlVal > 50) {
-                                    const priceMatch = matches.find(m => Number(m) > 50);
+                                    const priceMatch = matches.find((m: string) => Number(m) > 50);
                                     if (priceMatch) return Number(priceMatch);
                                   }
                                   return Number(matches[matches.length - 1]);
@@ -1607,66 +1648,157 @@ export default function Dashboard() {
                         {/* Antigravity Checklist Structural Tree */}
                         {sbResult && (
                           <div className="bg-[#141626]/40 border border-[#1E2235]/60 rounded-xl p-5 flex flex-col gap-4">
-                            <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2 font-mono">
-                              <span className={`w-2 h-2 rounded-full ${sbResult.is_valid ? "bg-emerald-500 animate-pulse" : "bg-rose-500 animate-pulse"}`} />
-                              Antigravity Engine Checklist Tree
-                            </h4>
+                            <div className="flex justify-between items-center border-b border-[#1E2235]/40 pb-3">
+                              <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2 font-mono">
+                                <span className={`w-2 h-2 rounded-full ${sbResult.is_valid && !sbResult.counter_trend_locked ? "bg-emerald-500 animate-pulse" : "bg-rose-500 animate-pulse"}`} />
+                                Antigravity Master Spec Validation Tree
+                              </h4>
+                              <span className="text-[10px] text-gray-400 font-mono">
+                                System Status: <span className={sbResult.counter_trend_locked ? "text-rose-400 font-bold" : sbResult.daily_bias !== "NEUTRAL" ? "text-emerald-400 font-bold" : "text-amber-400 font-bold"}>
+                                  {sbResult.counter_trend_locked ? "LOCKOUT ACTIVE" : sbResult.daily_bias !== "NEUTRAL" ? "EXECUTION CONFIRMED" : "PENDING CRITERIA"}
+                                </span>
+                              </span>
+                            </div>
                             
-                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3.5 relative">
-                              {/* Step 1: HTF Trend */}
-                              <div className="bg-[#07080E]/70 p-3 rounded-lg border border-[#1E2235]/40 flex flex-col gap-1.5">
-                                <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wider font-mono">1. HTF Trend</span>
-                                <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                                  <span className={`w-1.5 h-1.5 rounded-full ${sbResult.daily_bias !== "NEUTRAL" ? "bg-emerald-400" : "bg-amber-400"}`} />
-                                  {sbResult.daily_bias === "BULLISH" ? "BULLISH" : sbResult.daily_bias === "BEARISH" ? "BEARISH" : "NEUTRAL / RANGE"}
-                                </span>
-                                <span className="text-[10px] text-gray-400 font-mono">Bias Mapped</span>
+                            {/* Sleek Vertical Tree Structure */}
+                            <div className="relative pl-6 border-l-2 border-dashed border-[#1E2235]/80 flex flex-col gap-5 py-2">
+                              {/* Node 1: HTF Trend (Daily Bias) */}
+                              <div className="relative flex flex-col gap-1">
+                                <div className="absolute -left-[31px] top-1.5 w-4 h-4 rounded-full bg-[#07080E] border-2 border-[#1E2235] flex items-center justify-center">
+                                  <div className={`w-1.5 h-1.5 rounded-full ${sbResult.daily_bias !== "NEUTRAL" ? "bg-emerald-400" : "bg-amber-400"}`} />
+                                </div>
+                                <div className="bg-[#07080E]/70 p-3 rounded-lg border border-[#1E2235]/40 hover:border-[#6366F1]/30 transition-colors">
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wider font-mono">1. HTF Trend / Daily Bias Vector</span>
+                                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${
+                                      sbResult.daily_bias === "BULLISH" ? "bg-emerald-500/10 text-emerald-400" :
+                                      sbResult.daily_bias === "BEARISH" ? "bg-rose-500/10 text-rose-400" : "bg-amber-500/10 text-amber-400"
+                                    }`}>{sbResult.daily_bias}</span>
+                                  </div>
+                                  <span className="text-xs font-semibold text-white mt-1 block">
+                                    {sbResult.daily_bias === "BULLISH" ? "Bullish Institutional Order Flow" :
+                                     sbResult.daily_bias === "BEARISH" ? "Bearish Institutional Order Flow" :
+                                     "Consolidating / Strategy Neutral State"}
+                                  </span>
+                                  <span className="text-[10px] text-gray-500 font-mono mt-0.5 block">HTF Context Mapped</span>
+                                </div>
                               </div>
 
-                              {/* Step 2: Open Bias Vector */}
-                              <div className="bg-[#07080E]/70 p-3 rounded-lg border border-[#1E2235]/40 flex flex-col gap-1.5">
-                                <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wider font-mono">2. Open Bias Vector</span>
-                                <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                                  <span className={`w-1.5 h-1.5 rounded-full ${sbResult.daily_open_relation ? "bg-emerald-400" : "bg-gray-500"}`} />
-                                  {sbResult.daily_open_relation === "ABOVE_OPEN" ? "ABOVE DAILY OPEN" : sbResult.daily_open_relation === "BELOW_OPEN" ? "BELOW DAILY OPEN" : "N/A"}
-                                </span>
-                                <span className="text-[10px] text-gray-400 font-mono">
-                                  {sbResult.daily_open_relation === "ABOVE_OPEN" ? "Short-Term Premium" : sbResult.daily_open_relation === "BELOW_OPEN" ? "Short-Term Discount" : "Flat Market"}
-                                </span>
+                              {/* Node 2: Active Silver Bullet Window */}
+                              <div className="relative flex flex-col gap-1">
+                                <div className="absolute -left-[31px] top-1.5 w-4 h-4 rounded-full bg-[#07080E] border-2 border-[#1E2235] flex items-center justify-center">
+                                  <div className={`w-1.5 h-1.5 rounded-full ${sbResult.killzone_valid ? "bg-emerald-400" : "bg-rose-400"}`} />
+                                </div>
+                                <div className="bg-[#07080E]/70 p-3 rounded-lg border border-[#1E2235]/40 hover:border-[#6366F1]/30 transition-colors">
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wider font-mono">2. Active Silver Bullet Window</span>
+                                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${
+                                      sbResult.killzone_valid ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400"
+                                    }`}>{sbResult.killzone_valid ? "ACTIVE" : "INACTIVE"}</span>
+                                  </div>
+                                  <span className="text-xs font-semibold text-white mt-1 block font-mono">
+                                    Window: {sbKillzone === "LONDON_SB" ? "London Open (3-4 AM NY / 12:30-1:30 PM LK)" :
+                                             sbKillzone === "NY_AM_SB" ? "AM Session (10-11 AM NY / 7:30-8:30 PM LK)" :
+                                             sbKillzone === "NY_PM_SB" ? "PM Session (2-3 PM NY / 11:30 PM-12:30 AM LK)" :
+                                             sbKillzone === "LONDON" ? "London Killzone (2-5 AM NY)" :
+                                             sbKillzone === "NY_AM" ? "New York AM Killzone (7-10 AM NY)" : "None (Outside Designated Windows)"}
+                                  </span>
+                                </div>
                               </div>
 
-                              {/* Step 3: Swept Liquidity */}
-                              <div className="bg-[#07080E]/70 p-3 rounded-lg border border-[#1E2235]/40 flex flex-col gap-1.5">
-                                <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wider font-mono">3. Swept Liquidity Pool</span>
-                                <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                                  <span className={`w-1.5 h-1.5 rounded-full ${sbResult.swept_liquidity_pool && sbResult.swept_liquidity_pool !== "NONE" ? "bg-emerald-400" : "bg-amber-400"}`} />
-                                  {sbResult.swept_liquidity_pool === "PDL_SSL" ? "PDL / SSL SWEPT" : sbResult.swept_liquidity_pool === "PDH_BSL" ? "PDH / BSL SWEPT" : "NO SWEEP DETECTED"}
-                                </span>
-                                <span className="text-[10px] text-gray-400 font-mono">Liquidity Magnets</span>
+                              {/* Node 3: Daily Open Bias Vector */}
+                              <div className="relative flex flex-col gap-1">
+                                <div className="absolute -left-[31px] top-1.5 w-4 h-4 rounded-full bg-[#07080E] border-2 border-[#1E2235] flex items-center justify-center">
+                                  <div className={`w-1.5 h-1.5 rounded-full ${sbResult.daily_open_relation ? "bg-emerald-400" : "bg-gray-500"}`} />
+                                </div>
+                                <div className="bg-[#07080E]/70 p-3 rounded-lg border border-[#1E2235]/40 hover:border-[#6366F1]/30 transition-colors">
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wider font-mono">3. Daily Open Bias Vector</span>
+                                    <span className="text-[9px] font-mono text-gray-400 font-bold">Open: {sbOpen !== "" ? Number(sbOpen).toFixed(2) : "N/A"}</span>
+                                  </div>
+                                  <span className="text-xs font-semibold text-white mt-1 block">
+                                    Price relation is {sbResult.daily_open_relation === "BELOW_OPEN" ? "BELOW DAILY OPEN (Discount Pricing Vector)" :
+                                                       sbResult.daily_open_relation === "ABOVE_OPEN" ? "ABOVE DAILY OPEN (Premium Pricing Vector)" : "N/A"}
+                                  </span>
+                                </div>
                               </div>
 
-                              {/* Step 4: Mitigated Array */}
-                              <div className="bg-[#07080E]/70 p-3 rounded-lg border border-[#1E2235]/40 flex flex-col gap-1.5">
-                                <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wider font-mono">4. Mitigated PD Array</span>
-                                <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                                  <span className={`w-1.5 h-1.5 rounded-full ${sbResult.mitigated_pd_array_type && sbResult.mitigated_pd_array_type !== "NONE" ? "bg-emerald-400" : "bg-gray-500"}`} />
-                                  {sbResult.mitigated_pd_array_type && sbResult.mitigated_pd_array_type !== "NONE" ? `${sbResult.mitigated_pd_array_type} MITIGATED` : "NO ACTIVE ARRAY"}
-                                </span>
-                                <span className="text-[10px] text-gray-400 font-mono">SMC Footprint Block</span>
+                              {/* Node 4: Swept Liquidity Pool */}
+                              <div className="relative flex flex-col gap-1">
+                                <div className="absolute -left-[31px] top-1.5 w-4 h-4 rounded-full bg-[#07080E] border-2 border-[#1E2235] flex items-center justify-center">
+                                  <div className={`w-1.5 h-1.5 rounded-full ${sbResult.swept_liquidity_pool && sbResult.swept_liquidity_pool !== "NONE" ? "bg-emerald-400" : "bg-amber-400"}`} />
+                                </div>
+                                <div className="bg-[#07080E]/70 p-3 rounded-lg border border-[#1E2235]/40 hover:border-[#6366F1]/30 transition-colors">
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wider font-mono">4. Swept Liquidity Pool</span>
+                                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${
+                                      sbResult.swept_liquidity_pool && sbResult.swept_liquidity_pool !== "NONE" ? "bg-emerald-500/10 text-emerald-400" : "bg-amber-500/10 text-amber-400"
+                                    }`}>{sbResult.swept_liquidity_pool && sbResult.swept_liquidity_pool !== "NONE" ? "SWEPT" : "NO SWEEP DETECTED"}</span>
+                                  </div>
+                                  <span className="text-xs font-semibold text-white mt-1 block">
+                                    {sbResult.swept_liquidity_pool === "9AM_LOW_SSL" ? "9:00 AM Candle Low (Sell-Side Liquidity) Swept" :
+                                     sbResult.swept_liquidity_pool === "9AM_HIGH_BSL" ? "9:00 AM Candle High (Buy-Side Liquidity) Swept" :
+                                     sbResult.swept_liquidity_pool === "PDL_SSL" ? "Previous Daily Low (PDL/SSL) Swept" :
+                                     sbResult.swept_liquidity_pool === "PDH_BSL" ? "Previous Daily High (PDH/BSL) Swept" :
+                                     "Waiting for retail stop raid / liquidity sweep"}
+                                  </span>
+                                </div>
                               </div>
 
-                              {/* Step 5: Execution Parameters */}
-                              <div className="bg-[#07080E]/70 p-3 rounded-lg border border-[#1E2235]/40 flex flex-col gap-1.5">
-                                <span className="text-[9px] font-bold text-rose-400 uppercase tracking-wider font-mono">5. Execution Parameters</span>
-                                <div className="flex flex-col gap-0.5 text-[10px] text-gray-300 font-mono">
-                                  {sbResult.is_valid ? (
-                                    <>
-                                      <div className="text-emerald-400 font-bold">ENTRY: {sbResult.entry_price_area || "Triggered"}</div>
-                                      <div className="text-rose-400">SL: {sbResult.stop_loss_level ? sbResult.stop_loss_level.toFixed(2) : "N/A"}</div>
-                                      <div className="text-indigo-400 font-bold">RR: {sbResult.target_reward_ratio || "1:3.0"}</div>
-                                    </>
+                              {/* Node 5: Mitigated PD Array */}
+                              <div className="relative flex flex-col gap-1">
+                                <div className="absolute -left-[31px] top-1.5 w-4 h-4 rounded-full bg-[#07080E] border-2 border-[#1E2235] flex items-center justify-center">
+                                  <div className={`w-1.5 h-1.5 rounded-full ${sbResult.mitigated_pd_array_type && sbResult.mitigated_pd_array_type !== "NONE" ? "bg-emerald-400" : "bg-gray-500"}`} />
+                                </div>
+                                <div className="bg-[#07080E]/70 p-3 rounded-lg border border-[#1E2235]/40 hover:border-[#6366F1]/30 transition-colors">
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wider font-mono">5. Mitigated PD Array Type</span>
+                                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${
+                                      sbResult.mitigated_pd_array_type && sbResult.mitigated_pd_array_type !== "NONE" ? "bg-emerald-500/10 text-emerald-400" : "bg-gray-500/10 text-gray-400"
+                                    }`}>{sbResult.mitigated_pd_array_type || "NONE"}</span>
+                                  </div>
+                                  <span className="text-xs font-semibold text-white mt-1 block">
+                                    Footprint: {sbResult.mitigated_pd_array_type === "FVG" ? "Fair Value Gap (Inefficiency Rebalanced)" :
+                                               sbResult.mitigated_pd_array_type === "OB" ? "Order Block (Institutional Buy/Sell Zone Mitigated)" :
+                                               sbResult.mitigated_pd_array_type === "BREAKER" ? "Breaker Block Mitigated" :
+                                               sbResult.mitigated_pd_array_type === "MITIGATION" ? "Mitigation Block Mitigated" :
+                                               sbResult.mitigated_pd_array_type === "REJECTION" ? "Rejection Block Mitigated" :
+                                               "No active mitigated array matched"}
+                                  </span>
+                                  <span className="text-[10px] text-gray-500 font-mono mt-0.5 block">State tracking: ERL vs IRL State is {sbResult.erl_irl_state || "NONE"}</span>
+                                </div>
+                              </div>
+
+                              {/* Node 6: Execution Parameters */}
+                              <div className="relative flex flex-col gap-1">
+                                <div className="absolute -left-[31px] top-1.5 w-4 h-4 rounded-full bg-[#07080E] border-2 border-rose-500/50 flex items-center justify-center">
+                                  <div className={`w-1.5 h-1.5 rounded-full ${sbResult.is_valid && !sbResult.counter_trend_locked ? "bg-emerald-400" : "bg-rose-500 animate-pulse"}`} />
+                                </div>
+                                <div className="bg-[#07080E]/70 p-3 rounded-lg border border-rose-500/30 hover:border-rose-500/50 transition-colors">
+                                  <span className="text-[9px] font-bold text-rose-400 uppercase tracking-wider font-mono">6. Execution Parameters (1:3 RR Target Output)</span>
+                                  {sbResult.is_valid && !sbResult.counter_trend_locked ? (
+                                    <div className="flex flex-col gap-2 mt-2 bg-[#0E101A]/60 p-3 rounded-lg border border-[#1E2235]">
+                                      <div className="flex justify-between items-center text-xs text-white">
+                                        <span>Order Type:</span>
+                                        <span className="font-bold text-indigo-400 uppercase">{sbResult.daily_bias === "BULLISH" ? "Buy Limit" : "Sell Limit"}</span>
+                                      </div>
+                                      <div className="flex justify-between items-center text-xs text-emerald-400 font-bold">
+                                        <span>Entry Price Area:</span>
+                                        <span className="font-mono">{sbResult.entry_price_area || "Midpoint / Consequent Encroachment of FVG"}</span>
+                                      </div>
+                                      <div className="flex justify-between items-center text-xs text-rose-400">
+                                        <span>Stop Loss (Absolute SL):</span>
+                                        <span className="font-mono">{sbResult.stop_loss_level ? Number(sbResult.stop_loss_level).toFixed(2) : "N/A"}</span>
+                                      </div>
+                                      <div className="flex justify-between items-center text-xs text-indigo-300">
+                                        <span>Take Profit Target:</span>
+                                        <span className="font-mono font-bold text-indigo-400">{sbResult.liquidity_target ? Number(sbResult.liquidity_target).toFixed(2) : "N/A"} ({sbResult.target_reward_ratio || "1:3 RR"})</span>
+                                      </div>
+                                    </div>
                                   ) : (
-                                    <span className="text-rose-400 font-bold">LOCKED / INACTIVE</span>
+                                    <div className="mt-2 bg-rose-950/20 border border-rose-500/30 p-3 rounded-lg text-rose-400 text-xs font-bold font-mono">
+                                      {sbResult.counter_trend_locked ? "STRATEGY RULE LOCKOUT / COUNTER-BIAS SETUP IGNORED" : "LOCKED / INACTIVE - Setup criteria not fully met"}
+                                    </div>
                                   )}
                                 </div>
                               </div>
@@ -2007,7 +2139,7 @@ export default function Dashboard() {
             <div className="flex-1 w-full rounded-xl overflow-hidden border border-[#1E2235]/60 bg-black/40">
               <iframe
                 id="tradingview-chart-widget"
-                src={`https://s.tradingview.com/widgetembed/?frameElementId=tradingview-chart-widget&symbol=BINANCE%3A${selectedSymbol}&interval=${getIntervalForTradingView(selectedTimeframe)}&theme=dark&style=1&timezone=Etc%2FUTC&hide_volume=true`}
+                src={`https://s.tradingview.com/widgetembed/?frameElementId=tradingview-chart-widget&symbol=BINANCE%3A${selectedSymbol}&interval=${getIntervalForTradingView(selectedTimeframe)}&theme=dark&style=1&timezone=America%2FNew_York&hide_volume=true`}
                 className="w-full h-full border-none"
                 allowFullScreen
               />

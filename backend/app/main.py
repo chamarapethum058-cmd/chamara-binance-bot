@@ -79,59 +79,78 @@ def startup_populate():
         db.query(StrategyModel).update({StrategyModel.is_active: False})
         default_sb = StrategyModel(
             name="ICT Silver Bullet",
-            description="Specialized multi-asset trading strategy using Premium/Discount Equilibrium, Daily Open relation, Killzones, and lower timeframe MSS/CISD + FVG confirmations.",
-            content="""# ICT Silver Bullet & Liquidity Flow Strategy Spec
+            description="Ultimate scalp trading specification for multi-timeframe bias and execution assistant (London Open, AM Session, PM Session, and 9:00 AM range sweep mechanics).",
+            content="""# ULTIMATE SYSTEM SPECIFICATION DOCUMENT (FINAL PRODUCTION READY)
+## ENGINE LOGIC FOR MULTI-TIMEFRAME BIAS & ICT SILVER BULLET ASSISTANT
 
-## 1. General System Framework
-- Target Asset: Multi-Asset Support (e.g., SOL, BTC, GOLD, Forex).
-- Core Logic: Smart Money Concepts (SMC) & Inner Circle Trader (ICT) Frameworks.
-- System Goal: Automatically identify Daily Bias, filter entries via institutional liquidity arrays, and validate mechanical execution protocols.
+### 1. ALGORITHMIC CORE & SYSTEM NATURE
+*   System Foundation: Inner Circle Trader (ICT) & Smart Money Concepts (SMC) frameworks.
+*   Algorithmic Deliverables: The market algorithm moves non-randomly between External Range Liquidity (ERL) and Internal Range Liquidity (IRL). Its mechanics are bounded by:
+    1. Hunt Liquidity (Seek & Destroy retail stop losses).
+    2. Re-balance Inefficiencies (Fair Valuation Engine via FVGs and Liquidity Voids).
+    3. Engineered Liquidity (Generating structural liquidity pools to act as future draws).
+    4. Rebalancing Equilibrium (Systematic pricing flow back and forth between Premium and Discount arrays).
+*   Dealing Range Formation: After previous Buy-Side Liquidity (BSL) and Sell-Side Liquidity (SSL) are completely taken, the system defines a new active dealing range using the absolute swing high and swing low. Draw an exact 50% Equilibrium Line.
 
-## 2. Core Theoretical Modules (The Input Logic)
+---
 
-### Module A: Market Nature & Drivers
-Price moves based on the 4 core pillars of price delivery:
-1. Hunt Liquidity (Seek & Destroy): Price seeks liquidity pools to trigger stops and fill institutional orders.
-2. Re-balance Inefficiencies: Price constantly mitigates unmitigated Fair Value Gaps (FVGs) and Liquidity Voids.
-3. Engineered Liquidity: Price builds Buy-Side (BSL) and Sell-Side (SSL) pools (Equal Highs/Lows, Trendline Liquidity).
-4. Rebalancing Equilibrium: Price expands/retraces between Premium and Discount matrices within designated dealing ranges.
+### 2. DYNAMIC PD-ARRAY MATRIX PROCESSING
+The system must automatically calculate the 50% Equilibrium Line across the active dealing range and map the structural hierarchy of the Premium-to-Discount Array List:
 
-### Module B: Proximity Logic & Liquidity Magnets
-- Rule: Locate nearest major liquidity pools (PDH/PDL, PWH/PWL, or Major Equal Highs/Lows).
-- Condition: If price is closer to BSL, active bias remains Bullish until taken. If closer to SSL, active bias remains Bearish until cleared.
+*   Premium Zone (Above 50% Line) -> Allowed Setup: Shorts (Sells) Only. Valid PD Arrays: Old High/Low, Rejection Block, Bearish Order Block, Fair Value Gap (FVG/SIBI), Liquidity Void, Bearish Breaker Block, Bearish Mitigation Block.
+*   Discount Zone (Below 50% Line) -> Allowed Setup: Buys (Longs) Only. Valid PD Arrays: Bullish Mitigation Block, Bullish Breaker Block, Liquidity Void, Fair Value Gap (FVG/BISI), Bullish Order Block, Rejection Block, Old Low/High.
 
-### Module C: Premium vs. Discount Array Matrix
-- Rule: Map active dealing range using outermost swing high/low. Draw 50% Equilibrium Line.
-- Premium (> 50% Area): Search for Short (Sell) setups only. Scan for Premium Arrays: Order Blocks (OB), Breaker Blocks, Mitigation Blocks, Rejection Blocks, Bearish FVGs, Liquidity Voids, or Old Highs.
-- Discount (< 50% Area): Search for Long (Buy) setups only. Scan for Discount PD Arrays in reverse.
+#### Mechanical Footprint Definitions for Coding:
+1.  Order Blocks (OB): Specific candles showing high institutional volume blocks. Sells at highest point of expansion; Buys at lowest point of retracement.
+2.  Breaker Blocks: A failed order block broken through aggressively during an MSS, acting as support/resistance inversion.
+3.  Mitigation Blocks: Similar to a breaker block but specifically formed during a Failure Swing scenario (price fails to create a higher high or lower low before shifting structure aggressively).
+4.  Rejection Blocks: Price zones at the wicks of a swing high/low where liquidity is raided, but candle bodies fail to close.
 
-## 3. Day-Trading Execution Protocols (The Live Analysis Logic)
+---
 
-### Step 1: Determine the Higher Timeframe (HTF) Daily Bias
-- Weekly & Daily chart structure (HH/HL = Bullish, LH/LL = Bearish).
-- Pullback & Fractal Flow: If Bullish but undergoes short-term pullback (3+ consecutive daily bearish candles down into HTF Demand/Discount Array), track the Fractal Order Flow switch. Once Fractal Order Flow turns bullish inside the demand zone, switch back to a strict Bullish Daily Bias.
+### 3. FRACTAL BIAS & INTRADAY MAGNET TRACKING
+*   Proximity Filter: If price is near BSL, the operational bias is Bullish until taken; if near SSL, it is Bearish until cleared.
+*   The HTF Pullback Rule (GOLD Case Study): If the Daily structure is Bullish but undergoes a 3-day consecutive bearish pullback (Monday to Wednesday) into a HTF Demand array, track the lower timeframe Fractal Order Flow shift. Once Fractal Order Flow aligns bullishly, Daily Bias locks back to Bullish targeting the PDH (Previous Daily High).
+*   Daily Open Vector: Price trading ABOVE Daily Open = Premium Pricing (Filter for Short-Term Bearish reversals). Price trading BELOW Daily Open = Discount Pricing (Filter for High-Probability Buy setups).
 
-### Step 2: Intraday Open & Session Manipulations
-- Daily Open Reference Check:
-  - Trading ABOVE Daily Open = Short-term premium pricing. Filter for Short setups hitting Premium arrays.
-  - Trading BELOW Daily Open = Short-term discount pricing. Filter for Long setups hitting Discount arrays.
-- Time-of-Day Filter (Strict Killzone Restrictions):
-  - London Killzone: 2:00 AM – 5:00 AM New York (NY) Time.
-  - New York AM Killzone: 7:00 AM – 10:00 AM NY Time.
-  - Expect stops run/sweep first (Manipulation phase) inside the Killzone before the actual expansion move.
+---
 
-### Step 3: Lower Timeframe (LTF) Reconfirmation & Entry
-Drop to M15/M5 inside Killzones after HTF Bias confirms:
-- MSS (Market Structure Shift): Price aggressively breaks swing point of pullback leg with candle body close.
-- CISD (Change in State of Delivery): Price closes past the open/close body boundaries of the counter-trend candle inside the demand array.
-- Entry: Execute Limit Order at the 15-Min / 5-Min Demand Range or fresh FVG formed right at the MSS/CISD point. Ignore counter-bias setups.
+### 4. THE ICT SILVER BULLET EXECUTION ENGINE
 
-## 4. Rigid Risk Profile & Trade Management Rules
-- Stop-Loss (SL): Positioned mechanically right below the structural sweep low (clearing PDL/SSL).
-- Take-Profit (TP):
-  - Option A: Fixed 1:3 to 1:3.3 Risk-to-Reward (RR) ratio.
-  - Option B: Target opposing PDH/PDL (Opposing Liquidity Zone).
-- Macro Protection: Avoid entries against high-impact news acceleration waves (NFP, CPI, FOMC). Monitor USD Index (USDX) inverse correlation.
+#### A. Strict Silver Bullet Time Ranges (NY Time vs. Local Sri Lankan Time)
+The engine must strictly monitor setups only during these three independent operational windows:
+1.  London Open Silver Bullet: 03:00 AM - 04:00 AM NY Time (12:30 PM - 01:30 PM Sri Lankan Time).
+2.  AM Session Silver Bullet: 10:00 AM - 11:00 AM NY Time (07:30 PM - 08:30 PM Sri Lankan Time) -> Priority Zone: Heavily correlated with NY Stock Exchange open volatility.
+3.  PM Session Silver Bullet: 02:00 PM - 03:00 PM NY Time (11:30 PM - 12:30 AM Sri Lankan Time).
+
+#### B. Timeframe Alignment Matrix
+*   HTF Anchor: 1-Hour (1H) or 15-Minute (15MIN) structure to identify market context and clear Draw on Liquidity points.
+*   LTF Execution: 5-Minute, 3-Minute, or 1-Minute charts (1-Minute chart is the optimal execution layer).
+
+#### C. Normal Scenario Entry Setup Mechanics
+*   Step 1: Identify a Liquidity Grab (Stop Hunt) -> Look for a clear sweep of a previous high/low (SSL Sweep or BSL Sweep) with an aggressive move beyond liquidity followed by a strong rejection candle footprint.
+*   Step 2: Confirm Market Structure Shift (MSS) -> Price must break a key swing level with strong momentum, confirming smart money directional change.
+*   Step 3: Locate an Inefficiency Array -> Locate a Fair Value Gap (BISI for Buy / SIBI for Sell) left inside the displacement leg between the MSS point and the liquidity grab low/high.
+*   Step 4: Enter the Trade -> Set a limit order at the midpoint (50% Consequent Encroachment) of the FVG, OR enter at market if price reaches the FVG and shows signs of immediate rejection.
+
+#### D. Advanced Scenario Setup Mechanics (9:00 AM Candlestick Range Filter)
+*   *Application Window:* Applied specifically to the 10:00 AM - 11:00 AM NY Silver Bullet Window.
+*   *Mechanical Filter:* Map the exact 09:00 AM Candle High and 09:00 AM Candle Low on the 1H chart.
+*   Advanced Buy Setup Condition: Price handles execution inside the 10-11 AM window by first driving lower to completely violate/sweep the 09:00 AM Candle Low. This acts as the structural Liquidity Raid. Once MSS/CISD triggers post-sweep, execute the buy setup targeting the 09:00 AM Candle High.
+*   Advanced Sell Setup Condition: Price drives higher inside the 10-11 AM window to violate/sweep the 09:00 AM Candle High (Liquidity Raid). Once mss triggers on the LTF, execute the short target matching the 09:00 AM Candle Low.
+
+---
+
+### 5. RISK PROFILE & POSITION METRICS
+*   Risk Management Constraints: Never risk more than 1% to 2% per trade (0.5% configuration strongly recommended for funded account safety protocols). Ignore all counter-trend setups.
+*   Stop-Loss (SL) Placement Rules:
+    *   For Longs: Mechanically place SL below the lowest Swing Low or the last validated Liquidity Point.
+    *   For Shorts: Mechanically place SL above the highest Swing High or the last validated Liquidity Point.
+    *   *Alternative Local SL:* If structural swing points are too distant, place the SL right below/above the specific FVG candle boundary to optimize risk.
+*   Take-Profit (TP) Target Hierarchy:
+    *   First TP: Nearest local liquidity pool (Major Equal Highs or Equal Lows).
+    *   Second TP: A key higher timeframe liquidity magnet point (PDH/PDL or session highs).
+    *   Final TP: Next remaining unfilled FVG (Algorithmic target).
 """,
             is_active=True
         )
@@ -357,6 +376,25 @@ async def silverbullet_analyze(req: SilverBulletRequest, db: Session = Depends(g
     # Run analysis
     result = await AIService.analyze_silver_bullet(req.dict(), api_key=api_key)
     
+    # Sanitize float fields
+    for field in ["liquidity_target", "stop_loss_level", "equilibrium_price"]:
+        val = result.get(field)
+        if val is not None:
+            if isinstance(val, str):
+                val_clean = val.strip().lower()
+                if val_clean in ["none", "n/a", "null", ""]:
+                    result[field] = None
+                else:
+                    try:
+                        result[field] = float(val)
+                    except ValueError:
+                        result[field] = None
+            else:
+                try:
+                    result[field] = float(val)
+                except (ValueError, TypeError):
+                    result[field] = None
+
     # Ensure correct format in response
     return SilverBulletResponse(
         is_valid=result.get("is_valid", False),
@@ -381,7 +419,9 @@ async def silverbullet_analyze(req: SilverBulletRequest, db: Session = Depends(g
         # Antigravity Master Spec fields
         erl_irl_state=result.get("erl_irl_state"),
         swept_liquidity_pool=result.get("swept_liquidity_pool"),
-        mitigated_pd_array_type=result.get("mitigated_pd_array_type")
+        mitigated_pd_array_type=result.get("mitigated_pd_array_type"),
+        is_advanced_setup=result.get("is_advanced_setup"),
+        advanced_setup_status=result.get("advanced_setup_status")
     )
 
 
