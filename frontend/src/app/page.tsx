@@ -1537,6 +1537,76 @@ export default function Dashboard() {
                           </div>
                         )}
 
+                        {/* Antigravity Checklist Structural Tree */}
+                        {sbResult && (
+                          <div className="bg-[#141626]/40 border border-[#1E2235]/60 rounded-xl p-5 flex flex-col gap-4">
+                            <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2 font-mono">
+                              <span className={`w-2 h-2 rounded-full ${sbResult.is_valid ? "bg-emerald-500 animate-pulse" : "bg-rose-500 animate-pulse"}`} />
+                              Antigravity Engine Checklist Tree
+                            </h4>
+                            
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3.5 relative">
+                              {/* Step 1: HTF Trend */}
+                              <div className="bg-[#07080E]/70 p-3 rounded-lg border border-[#1E2235]/40 flex flex-col gap-1.5">
+                                <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wider font-mono">1. HTF Trend</span>
+                                <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                                  <span className={`w-1.5 h-1.5 rounded-full ${sbResult.daily_bias !== "NEUTRAL" ? "bg-emerald-400" : "bg-amber-400"}`} />
+                                  {sbResult.daily_bias === "BULLISH" ? "BULLISH" : sbResult.daily_bias === "BEARISH" ? "BEARISH" : "NEUTRAL / RANGE"}
+                                </span>
+                                <span className="text-[10px] text-gray-400 font-mono">Bias Mapped</span>
+                              </div>
+
+                              {/* Step 2: Open Bias Vector */}
+                              <div className="bg-[#07080E]/70 p-3 rounded-lg border border-[#1E2235]/40 flex flex-col gap-1.5">
+                                <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wider font-mono">2. Open Bias Vector</span>
+                                <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                                  <span className={`w-1.5 h-1.5 rounded-full ${sbResult.daily_open_relation ? "bg-emerald-400" : "bg-gray-500"}`} />
+                                  {sbResult.daily_open_relation === "ABOVE_OPEN" ? "ABOVE DAILY OPEN" : sbResult.daily_open_relation === "BELOW_OPEN" ? "BELOW DAILY OPEN" : "N/A"}
+                                </span>
+                                <span className="text-[10px] text-gray-400 font-mono">
+                                  {sbResult.daily_open_relation === "ABOVE_OPEN" ? "Short-Term Premium" : sbResult.daily_open_relation === "BELOW_OPEN" ? "Short-Term Discount" : "Flat Market"}
+                                </span>
+                              </div>
+
+                              {/* Step 3: Swept Liquidity */}
+                              <div className="bg-[#07080E]/70 p-3 rounded-lg border border-[#1E2235]/40 flex flex-col gap-1.5">
+                                <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wider font-mono">3. Swept Liquidity Pool</span>
+                                <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                                  <span className={`w-1.5 h-1.5 rounded-full ${sbResult.swept_liquidity_pool && sbResult.swept_liquidity_pool !== "NONE" ? "bg-emerald-400" : "bg-amber-400"}`} />
+                                  {sbResult.swept_liquidity_pool === "PDL_SSL" ? "PDL / SSL SWEPT" : sbResult.swept_liquidity_pool === "PDH_BSL" ? "PDH / BSL SWEPT" : "NO SWEEP DETECTED"}
+                                </span>
+                                <span className="text-[10px] text-gray-400 font-mono">Liquidity Magnets</span>
+                              </div>
+
+                              {/* Step 4: Mitigated Array */}
+                              <div className="bg-[#07080E]/70 p-3 rounded-lg border border-[#1E2235]/40 flex flex-col gap-1.5">
+                                <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wider font-mono">4. Mitigated PD Array</span>
+                                <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                                  <span className={`w-1.5 h-1.5 rounded-full ${sbResult.mitigated_pd_array_type && sbResult.mitigated_pd_array_type !== "NONE" ? "bg-emerald-400" : "bg-gray-500"}`} />
+                                  {sbResult.mitigated_pd_array_type && sbResult.mitigated_pd_array_type !== "NONE" ? `${sbResult.mitigated_pd_array_type} MITIGATED` : "NO ACTIVE ARRAY"}
+                                </span>
+                                <span className="text-[10px] text-gray-400 font-mono">SMC Footprint Block</span>
+                              </div>
+
+                              {/* Step 5: Execution Parameters */}
+                              <div className="bg-[#07080E]/70 p-3 rounded-lg border border-[#1E2235]/40 flex flex-col gap-1.5">
+                                <span className="text-[9px] font-bold text-rose-400 uppercase tracking-wider font-mono">5. Execution Parameters</span>
+                                <div className="flex flex-col gap-0.5 text-[10px] text-gray-300 font-mono">
+                                  {sbResult.is_valid ? (
+                                    <>
+                                      <div className="text-emerald-400 font-bold">ENTRY: {sbResult.entry_price_area || "Triggered"}</div>
+                                      <div className="text-rose-400">SL: {sbResult.stop_loss_level ? sbResult.stop_loss_level.toFixed(2) : "N/A"}</div>
+                                      <div className="text-indigo-400 font-bold">RR: {sbResult.target_reward_ratio || "1:3.0"}</div>
+                                    </>
+                                  ) : (
+                                    <span className="text-rose-400 font-bold">LOCKED / INACTIVE</span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
                         {/* Reasoning tabs */}
                         <div className="flex flex-col gap-4">
                           <div className="border-t border-[#1E2235] pt-5">

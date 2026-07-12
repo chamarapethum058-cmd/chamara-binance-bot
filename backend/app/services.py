@@ -394,8 +394,11 @@ YOUR TASK:
 3. Compare Current Price to the Equilibrium Line. Determine if price is in PREMIUM or DISCOUNT zone.
 4. Compare Current Price to Daily Open. Determine if open relation is ABOVE_OPEN or BELOW_OPEN.
 5. Check if the Killzone is LONDON or NY_AM. Mark killzone_valid as true/false.
-6. Verify trend alignment. If Daily Bias is Bullish but the current setup violates Premium/Discount rules (e.g. trying to buy in the Premium Zone, or buying above Daily Open, or counter-bias setups), mark counter_trend_locked as true and force Daily Bias to NEUTRAL.
-7. Return bilingual explanations (English + Sinhala) for "market_structure_status", "reasoning", "invalidation", and "risk_notes".
+6. Verify trend alignment. If Daily Bias is Bullish but the current setup violates Premium/Discount rules (e.g. trying to buy in the Premium Zone, or buying above Daily Open, or counter-bias setups), mark counter_trend_locked as true, force is_valid to false, force Daily Bias to NEUTRAL, and trigger Strategy Rule Lockout! Discard and auto-ignore counter-trend setups.
+7. Determine the ERL vs IRL tracking state: Set "erl_irl_state" to "ERL_TO_IRL" if price swept PDH/PDL and is retracing into internal FVG/OB arrays. Set to "IRL_TO_ERL" if expanding from discount/premium arrays towards ERL targets. Otherwise "NONE".
+8. Identify swept liquidity pool: Set "swept_liquidity_pool" to "PDL_SSL" if PDL/Asian lows were swept, "PDH_BSL" if PDH/Asian highs were swept, or "NONE".
+9. Identify the mitigated PD Array footprint type: Set "mitigated_pd_array_type" to one of "OB", "BREAKER", "MITIGATION", "REJECTION", "FVG", or "NONE".
+10. Return bilingual explanations (English + Sinhala) for "market_structure_status", "reasoning", "invalidation", and "risk_notes".
 
 -----------------------------------------
 OUTPUT FORMAT:
@@ -416,6 +419,9 @@ Return a JSON object with these exact keys:
 14. "daily_open_relation": string ("ABOVE_OPEN" or "BELOW_OPEN")
 15. "killzone_valid": boolean
 16. "counter_trend_locked": boolean
+17. "erl_irl_state": string ("ERL_TO_IRL", "IRL_TO_ERL", or "NONE")
+18. "swept_liquidity_pool": string ("PDL_SSL", "PDH_BSL", or "NONE")
+19. "mitigated_pd_array_type": string ("OB", "BREAKER", "MITIGATION", "REJECTION", "FVG", or "NONE")
 
 OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formatting.
 """
@@ -611,7 +617,10 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                 "zone_type": zone,
                 "daily_open_relation": open_relation,
                 "killzone_valid": kz_valid,
-                "counter_trend_locked": ct_locked
+                "counter_trend_locked": ct_locked,
+                "erl_irl_state": "IRL_TO_ERL",
+                "swept_liquidity_pool": "PDL_SSL" if pdl is not None else "NONE",
+                "mitigated_pd_array_type": "OB"
             }
         else:
             reasons = []
@@ -665,7 +674,10 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                 "zone_type": zone,
                 "daily_open_relation": open_relation,
                 "killzone_valid": kz_valid,
-                "counter_trend_locked": ct_locked
+                "counter_trend_locked": ct_locked,
+                "erl_irl_state": "NONE",
+                "swept_liquidity_pool": "NONE",
+                "mitigated_pd_array_type": "NONE"
             }
 
 

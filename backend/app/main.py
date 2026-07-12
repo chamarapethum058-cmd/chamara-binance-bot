@@ -376,7 +376,12 @@ async def silverbullet_analyze(req: SilverBulletRequest, db: Session = Depends(g
         zone_type=result.get("zone_type"),
         daily_open_relation=result.get("daily_open_relation"),
         killzone_valid=result.get("killzone_valid"),
-        counter_trend_locked=result.get("counter_trend_locked")
+        counter_trend_locked=result.get("counter_trend_locked"),
+        
+        # Antigravity Master Spec fields
+        erl_irl_state=result.get("erl_irl_state"),
+        swept_liquidity_pool=result.get("swept_liquidity_pool"),
+        mitigated_pd_array_type=result.get("mitigated_pd_array_type")
     )
 
 

@@ -113,6 +113,11 @@ class SilverBulletResponse(BaseModel):
     daily_open_relation: Optional[str] = None # "ABOVE_OPEN", "BELOW_OPEN", "N/A"
     killzone_valid: Optional[bool] = None
     counter_trend_locked: Optional[bool] = None
+    
+    # Antigravity Master Spec fields
+    erl_irl_state: Optional[str] = None
+    swept_liquidity_pool: Optional[str] = None
+    mitigated_pd_array_type: Optional[str] = None
 
 
 
