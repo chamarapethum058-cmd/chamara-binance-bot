@@ -570,6 +570,24 @@ export default function Dashboard() {
     }
   };
 
+  const getTradingViewSymbol = (symbolStr: string) => {
+    const sym = (symbolStr || "BTC").toUpperCase().trim();
+    if (sym === "GOLD" || sym === "XAUUSD" || sym === "XAU/USD") {
+      return "OANDA:XAUUSD";
+    }
+    if (sym === "EURUSD" || sym === "EUR/USD") {
+      return "FX:EURUSD";
+    }
+    if (sym === "GBPUSD" || sym === "GBP/USD") {
+      return "FX:GBPUSD";
+    }
+    if (sym.includes(":")) {
+      return sym;
+    }
+    const hasUsdt = sym.endsWith("USDT") || sym.endsWith("USD");
+    return `BINANCE:${sym}${hasUsdt ? "" : "USDT"}`;
+  };
+
   return (
     <div className="flex-1 bg-[#090A0F] text-[#E4E6EB] min-h-screen font-sans flex flex-col selection:bg-[#6366F1] selection:text-white">
       {/* Top Navigation */}
@@ -1087,6 +1105,19 @@ export default function Dashboard() {
                     )}
                   </button>
                 </form>
+
+                {/* TradingView RSI Chart for Silver Bullet */}
+                <div className="bg-[#141626]/60 border border-[#1E2235]/60 rounded-xl p-4 flex flex-col gap-2 h-[340px] mt-2">
+                  <span className="text-[10px] font-semibold text-[#8B5CF6] uppercase tracking-widest font-mono px-1">Relative Strength Index (RSI)</span>
+                  <div className="flex-1 w-full rounded-lg overflow-hidden border border-[#1E2235]/40 bg-black/40">
+                    <iframe
+                      id="tradingview-sb-rsi-widget"
+                      src={`https://s.tradingview.com/widgetembed/?frameElementId=tradingview-sb-rsi-widget&symbol=${getTradingViewSymbol(sbSymbol)}&interval=240&theme=dark&style=2&timezone=Etc%2FUTC&studies=RSI%40tv-basicstudies&hide_volume=true`}
+                      className="w-full h-full border-none"
+                      allowFullScreen
+                    />
+                  </div>
+                </div>
               </div>
 
               {/* OUTPUT PANEL */}
@@ -1947,18 +1978,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* TradingView RSI Chart */}
-          <div className="bg-[#11131F]/90 border border-[#1E2235] rounded-2xl p-4 shadow-xl h-[450px] flex flex-col gap-2 relative">
-            <span className="text-[10px] font-semibold text-[#8B5CF6] uppercase tracking-widest font-mono px-1">Relative Strength Index (RSI)</span>
-            <div className="flex-1 w-full rounded-xl overflow-hidden border border-[#1E2235]/60 bg-black/40">
-              <iframe
-                id="tradingview-rsi-widget"
-                src={`https://s.tradingview.com/widgetembed/?frameElementId=tradingview-rsi-widget&symbol=BINANCE%3A${selectedSymbol}&interval=${getIntervalForTradingView(selectedTimeframe)}&theme=dark&style=2&timezone=Etc%2FUTC&studies=RSI%40tv-basicstudies&hide_volume=true`}
-                className="w-full h-full border-none"
-                allowFullScreen
-              />
-            </div>
-          </div>
+
 
           {/* Analysis View Details */}
           {loading ? (
