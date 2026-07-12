@@ -1107,12 +1107,12 @@ export default function Dashboard() {
                 </form>
 
                 {/* TradingView RSI Chart for Silver Bullet */}
-                <div className="bg-[#141626]/60 border border-[#1E2235]/60 rounded-xl p-4 flex flex-col gap-2 h-[340px] mt-2">
+                <div className="bg-[#141626]/60 border border-[#1E2235]/60 rounded-xl p-4 flex flex-col gap-2 h-[520px] mt-2 relative">
                   <span className="text-[10px] font-semibold text-[#8B5CF6] uppercase tracking-widest font-mono px-1">Relative Strength Index (RSI)</span>
-                  <div className="flex-1 w-full rounded-lg overflow-hidden border border-[#1E2235]/40 bg-black/40">
+                  <div className="flex-1 w-full rounded-lg overflow-hidden border border-[#1E2235]/40 bg-black/40 relative">
                     <iframe
                       id="tradingview-sb-rsi-widget"
-                      src={`https://s.tradingview.com/widgetembed/?frameElementId=tradingview-sb-rsi-widget&symbol=${getTradingViewSymbol(sbSymbol)}&interval=240&theme=dark&style=2&timezone=Etc%2FUTC&studies=RSI%40tv-basicstudies&hide_volume=true`}
+                      src={`https://s.tradingview.com/widgetembed/?frameElementId=tradingview-sb-rsi-widget&symbol=${getTradingViewSymbol(sbSymbol)}&interval=240&theme=dark&style=1&timezone=Etc%2FUTC&studies=RSI%40tv-basicstudies&hide_volume=true`}
                       className="w-full h-full border-none"
                       allowFullScreen
                     />
@@ -1391,6 +1391,9 @@ export default function Dashboard() {
                                 ];
 
                                 const mssLineY = isBearishSetup ? getSvgY(pdhVal - rangeP * 0.3) : getSvgY(pdlVal + rangeP * 0.3);
+                                const target1Val = entryPriceVal ? (isBearishSetup ? entryPriceVal - Math.abs(entryPriceVal - pdlVal) * 0.5 : entryPriceVal + Math.abs(pdhVal - entryPriceVal) * 0.5) : (isBearishSetup ? pdlVal + rangeP * 0.3 : pdhVal - rangeP * 0.3);
+                                const target1Y = getSvgY(target1Val);
+                                const target2Y = isBearishSetup ? pdlY : pdhY;
 
                                 return (
                                   <svg className="w-full h-full p-2 bg-[#07080E]" viewBox="0 0 800 320" xmlns="http://www.w3.org/2000/svg">
@@ -1417,10 +1420,29 @@ export default function Dashboard() {
 
                                     {/* Center Chart Title */}
                                     <text x="338" y="28" textAnchor="middle" fill="#FFFFFF" fontSize="16" fontWeight="extrabold" fontFamily="sans-serif" letterSpacing="1.5">ICT Silver Bullet</text>
-
-                                    {/* Killzone Shading */}
-                                    <rect x="210" y="42" width="280" height="248" fill="#6366F1" fillOpacity="0.035" rx="6" />
-                                    <text x="220" y="58" fill="#6366F1" fillOpacity="0.65" fontSize="9" fontFamily="monospace" fontWeight="bold">KILLZONE ({sbKillzone})</text>
+                                    
+                                    {/* TradingView-Style Long/Short Position Tool Shading */}
+                                    {sbResult.is_valid && entryY !== null && (
+                                       <g>
+                                         {isBearishSetup ? (
+                                           // Bearish Short Position: Red Stop Loss above Entry, Green Targets below Entry
+                                           <>
+                                             {/* SL Red zone */}
+                                             <rect x="500" y={Math.min(slY, entryY)} width="165" height={Math.abs(slY - entryY)} fill="#EF4444" fillOpacity="0.1" stroke="#EF4444" strokeWidth="0.75" strokeOpacity="0.25" />
+                                             {/* Target Green zone */}
+                                             <rect x="500" y={Math.min(entryY, target2Y)} width="165" height={Math.abs(entryY - target2Y)} fill="#10B981" fillOpacity="0.1" stroke="#10B981" strokeWidth="0.75" strokeOpacity="0.25" />
+                                           </>
+                                         ) : (
+                                           // Bullish Long Position: Green Targets above Entry, Red Stop Loss below Entry
+                                           <>
+                                             {/* Target Green zone */}
+                                             <rect x="500" y={Math.min(target2Y, entryY)} width="165" height={Math.abs(target2Y - entryY)} fill="#10B981" fillOpacity="0.1" stroke="#10B981" strokeWidth="0.75" strokeOpacity="0.25" />
+                                             {/* SL Red zone */}
+                                             <rect x="500" y={Math.min(entryY, slY)} width="165" height={Math.abs(entryY - slY)} fill="#EF4444" fillOpacity="0.1" stroke="#EF4444" strokeWidth="0.75" strokeOpacity="0.25" />
+                                           </>
+                                         )}
+                                       </g>
+                                     )}
 
                                     {/* Price Target and Level dashed lines */}
                                     <line x1="10" y1={pdhY} x2="675" y2={pdhY} stroke={isBearishSetup ? "#EF4444" : "#10B981"} strokeWidth="1" strokeDasharray="3,3" />
@@ -1438,21 +1460,22 @@ export default function Dashboard() {
                                     </text>
 
                                     {/* MSS / CHoCH Horizontal Breakout Line */}
-                                    <line x1="300" y1={mssLineY} x2="430" y2={mssLineY} stroke="#FFFFFF" strokeWidth="1.5" />
+                                    <line x1="300" y1={mssLineY} x2="430" y2={mssLineY} stroke="#FFFFFF" strokeWidth="1.5" strokeDasharray="1,1" />
                                     <text x="365" y={mssLineY - 6} textAnchor="middle" fill="#FFFFFF" fontSize="8" fontWeight="bold" fontFamily="sans-serif" letterSpacing="0.5">MSS / CHoCH</text>
 
-                                    {/* Supply Zone / Demand Zone Box */}
-                                    {isBearishSetup ? (
-                                      <g>
-                                        <rect x="210" y={pdhY - 2} width="160" height="28" fill="#8B5CF6" fillOpacity="0.08" stroke="#8B5CF6" strokeWidth="0.75" strokeDasharray="2,2" rx="3" />
-                                        <text x="220" y={pdhY + 15} fill="#C084FC" fontSize="8" fontWeight="bold" fontFamily="sans-serif">Supply Zone</text>
-                                      </g>
-                                    ) : (
-                                      <g>
-                                        <rect x="210" y={pdlY} width="160" height="28" fill="#8B5CF6" fillOpacity="0.08" stroke="#8B5CF6" strokeWidth="0.75" strokeDasharray="2,2" rx="3" />
-                                        <text x="220" y={pdlY + 17} fill="#C084FC" fontSize="8" fontWeight="bold" fontFamily="sans-serif">Demand Zone</text>
-                                      </g>
-                                    )}
+                                    {/* Fair Value Gap (FVG) and Demand/Supply Shading */}
+                                    {(() => {
+                                       const fvgTop = isBearishSetup ? getSvgY(pdhVal - rangeP * 0.35) : getSvgY(pdlVal + rangeP * 0.55);
+                                       const fvgBottom = isBearishSetup ? getSvgY(pdhVal - rangeP * 0.55) : getSvgY(pdlVal + rangeP * 0.35);
+                                       return (
+                                         <g>
+                                           <rect x="350" y={Math.min(fvgTop, fvgBottom)} width="120" height={Math.abs(fvgTop - fvgBottom)} fill="#8B5CF6" fillOpacity="0.08" stroke="#8B5CF6" strokeWidth="0.75" strokeDasharray="2,2" rx="3" />
+                                           <text x="358" y={Math.min(fvgTop, fvgBottom) + 13} fill="#C084FC" fontSize="8" fontWeight="bold" fontFamily="sans-serif">
+                                             {isBearishSetup ? "Bearish FVG (Supply)" : "Bullish FVG (Demand)"}
+                                           </text>
+                                         </g>
+                                       );
+                                     })()}
 
                                     {/* Limit Entry Pointer Arrow */}
                                     {entryY !== null && (
@@ -1471,13 +1494,26 @@ export default function Dashboard() {
                                       </g>
                                     )}
 
-                                    {/* Stop Loss Line */}
+                                    {/* Stop Loss Line & Dotted Markers */}
                                     {(sbResult.daily_bias === "BULLISH" || sbResult.daily_bias === "BEARISH") && (
                                       <>
                                         <line x1="10" y1={slY} x2="675" y2={slY} stroke="#EF4444" strokeWidth="0.75" strokeDasharray="4,4" />
                                         <text x="20" y={isBearishSetup ? slY - 6 : slY + 12} fill="#EF4444" fontSize="8" fontWeight="bold" fontFamily="monospace">Stop Loss</text>
                                       </>
                                     )}
+
+                                    {/* Target Lines inside Position Tool */}
+                                    {sbResult.is_valid && entryPriceVal && (
+                                       <>
+                                         {/* Target 1 */}
+                                         <line x1="500" y1={target1Y} x2="665" y2={target1Y} stroke="#34D399" strokeWidth="0.75" strokeDasharray="3,3" />
+                                         <text x="508" y={isBearishSetup ? target1Y + 9 : target1Y - 4} fill="#34D399" fontSize="7" fontWeight="bold" fontFamily="monospace">Target 1 (1:1.5 RR)</text>
+
+                                         {/* Target 2 */}
+                                         <line x1="500" y1={target2Y} x2="665" y2={target2Y} stroke="#10B981" strokeWidth="1" strokeDasharray="4,4" />
+                                         <text x="508" y={isBearishSetup ? target2Y + 9 : target2Y - 4} fill="#10B981" fontSize="7" fontWeight="bold" fontFamily="monospace">Target 2 (Final Target)</text>
+                                       </>
+                                     )}
 
                                     {/* RIGHT SIDE PRICE SCALE ACTIVE PANEL (Exactly like TradingView) */}
                                     <line x1="680" y1="15" x2="680" y2="305" stroke="#1E2235" strokeWidth="1.5" />
