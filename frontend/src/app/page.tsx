@@ -639,6 +639,47 @@ export default function Dashboard() {
     return `BINANCE:${sym}${hasUsdt ? "" : "USDT"}`;
   };
 
+  const getOverlayLevels = () => {
+    if (!sbResult) return null;
+    
+    const entryMatch = sbResult.entry_price_area?.match(/\d+(?:\.\d+)?/);
+    if (!entryMatch) return null;
+    const entry = parseFloat(entryMatch[0]);
+    
+    const sl = sbResult.stop_loss_level;
+    const tp = sbResult.liquidity_target;
+    
+    if (!entry || !sl || !tp) return null;
+    
+    const prices = [entry, sl, tp];
+    const maxP = Math.max(...prices);
+    const minP = Math.min(...prices);
+    const span = maxP - minP || 1.0;
+    
+    const chartMax = maxP + span * 0.15;
+    const chartMin = minP - span * 0.15;
+    const chartSpan = chartMax - chartMin;
+    
+    const getYPct = (price: number) => {
+      const pct = ((chartMax - price) / chartSpan) * 100;
+      return 15 + (pct / 100) * 40;
+    };
+    
+    const slPct = ((sl - entry) / entry) * 100;
+    const tpPct = ((tp - entry) / entry) * 100;
+    
+    return {
+      entry,
+      entryY: getYPct(entry),
+      sl,
+      slY: getYPct(sl),
+      slPct: slPct.toFixed(2),
+      tp,
+      tpY: getYPct(tp),
+      tpPct: tpPct.toFixed(2)
+    };
+  };
+
   return (
     <div className="flex-1 bg-[#090A0F] text-[#E4E6EB] min-h-screen font-sans flex flex-col selection:bg-[#6366F1] selection:text-white">
       {/* Top Navigation */}
@@ -1241,6 +1282,54 @@ export default function Dashboard() {
                       className="w-full h-full border-none"
                       allowFullScreen
                     />
+                    
+                    {/* Dynamic TradingView Overlay Levels */}
+                    {(() => {
+                      const levels = getOverlayLevels();
+                      if (!levels) return null;
+                      
+                      return (
+                        <div className="absolute inset-0 pointer-events-none z-10 font-mono">
+                          {/* Take Profit (TP) Line */}
+                          <div 
+                            className="absolute left-0 right-0 border-t border-emerald-500/80 flex justify-between items-center transition-all duration-300"
+                            style={{ top: `${levels.tpY}%` }}
+                          >
+                            <div className="h-[1px] bg-gradient-to-r from-emerald-500/80 to-transparent w-24" />
+                            <span className="absolute right-4 transform -translate-y-1/2 bg-emerald-500 text-black text-[9px] font-extrabold px-1.5 py-0.5 rounded shadow-lg flex items-center gap-1">
+                              <span>TP (1:4.0R)</span>
+                              <span className="opacity-75">(+{levels.tpPct}%)</span>
+                              <span className="bg-black/15 px-1 rounded">{levels.tp.toFixed(2)}</span>
+                            </span>
+                          </div>
+
+                          {/* Entry Line */}
+                          <div 
+                            className="absolute left-0 right-0 border-t-2 border-dashed border-amber-500/80 flex justify-between items-center transition-all duration-300"
+                            style={{ top: `${levels.entryY}%` }}
+                          >
+                            <div className="h-[1px] bg-gradient-to-r from-amber-500/80 to-transparent w-24" />
+                            <span className="absolute right-4 transform -translate-y-1/2 bg-amber-500 text-black text-[9px] font-extrabold px-1.5 py-0.5 rounded shadow-lg flex items-center gap-1 animate-pulse">
+                              <span>ENTRY</span>
+                              <span className="bg-black/15 px-1 rounded">{levels.entry.toFixed(2)}</span>
+                            </span>
+                          </div>
+
+                          {/* Stop Loss (SL) Line */}
+                          <div 
+                            className="absolute left-0 right-0 border-t border-rose-500/80 flex justify-between items-center transition-all duration-300"
+                            style={{ top: `${levels.slY}%` }}
+                          >
+                            <div className="h-[1px] bg-gradient-to-r from-rose-500/80 to-transparent w-24" />
+                            <span className="absolute right-4 transform -translate-y-1/2 bg-rose-500 text-white text-[9px] font-extrabold px-1.5 py-0.5 rounded shadow-lg flex items-center gap-1">
+                              <span>STOP</span>
+                              <span className="opacity-75">({levels.slPct}%)</span>
+                              <span className="bg-black/25 px-1 rounded">{levels.sl.toFixed(2)}</span>
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>
