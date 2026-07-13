@@ -1252,6 +1252,47 @@ export default function Dashboard() {
                             </div>
                           )}
 
+                          {/* Pre-Warning Setup Alert */}
+                          {sbResult.is_valid && sbResult.daily_bias === "NEUTRAL" && !sbResult.counter_trend_locked && sbResult.entry_price_area && sbResult.entry_price_area !== "No Entry Triggered" && (
+                            <div className="bg-[#4F46E5]/10 border border-[#4F46E5]/30 rounded-xl p-5 flex items-start gap-3 shadow-[0_0_15px_rgba(79,70,229,0.08)] animate-pulse">
+                              <svg className="w-5 h-5 text-indigo-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              <div className="flex flex-col gap-1 w-full">
+                                <div className="flex justify-between items-center">
+                                  <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-wider">⏳ Pre-Warning: Potential Setup Forming</h4>
+                                  <span className="text-[9px] font-bold bg-[#4F46E5]/20 text-indigo-300 px-2 py-0.5 rounded font-mono">EST. 5 MINS TO TRIGGER</span>
+                                </div>
+                                <p className="text-xs text-gray-300 leading-relaxed font-sans mt-1 font-mono">
+                                  {sbResult.advanced_setup_status === "9AM_LOW_SWEPT_MSS_PENDING" || sbResult.swept_liquidity_pool === "PDL_SSL"
+                                    ? "Liquidity has been swept! A potential BUY setup is forming. Wait for M1/M5 Market Structure Shift (MSS) and fresh FVG confirmation before entering."
+                                    : "Liquidity has been swept! A potential SELL setup is forming. Wait for M1/M5 Market Structure Shift (MSS) and fresh FVG confirmation before entering."
+                                  }
+                                </p>
+                                <div className="grid grid-cols-3 gap-2 mt-3 bg-black/40 p-2.5 rounded-lg border border-[#4F46E5]/20 text-xs font-mono">
+                                  <div className="flex flex-col">
+                                    <span className="text-[9px] text-gray-500 uppercase">Est. Entry Area</span>
+                                    <span className="text-white font-bold">{sbResult.entry_price_area}</span>
+                                  </div>
+                                  <div className="flex flex-col">
+                                    <span className="text-[9px] text-gray-500 uppercase">Est. Stop-Loss</span>
+                                    <span className="text-rose-400 font-bold">{sbResult.stop_loss_level || "N/A"}</span>
+                                  </div>
+                                  <div className="flex flex-col">
+                                    <span className="text-[9px] text-gray-500 uppercase">Est. Reward (1:3)</span>
+                                    <span className="text-emerald-400 font-bold">{sbResult.liquidity_target || "N/A"}</span>
+                                  </div>
+                                </div>
+                                <span className="text-[10px] text-indigo-300/85 font-sans mt-2">
+                                  {sbResult.advanced_setup_status === "9AM_LOW_SWEPT_MSS_PENDING" || sbResult.swept_liquidity_pool === "PDL_SSL"
+                                    ? "සිංහල: ද්‍රවශීලතාවය (Liquidity) sweep කර ඇත! මිලදී ගැනීමේ (BUY) setup එකක් සෑදෙමින් පවතී. M1/M5 MSS තහවුරු වූ පසු ළඟ TP සහ tight SL සහිතව ඇතුල් වීමට සූදානම් වන්න."
+                                    : "සිංහල: ද්‍රවශීලතාවය (Liquidity) sweep කර ඇත! විකිණීමේ (SELL) setup එකක් සෑදෙමින් පවතී. M1/M5 MSS තහවුරු වූ පසු ළඟ TP සහ tight SL සහිතව ඇතුල් වීමට සූදානම් වන්න."
+                                  }
+                                </span>
+                              </div>
+                            </div>
+                          )}
+
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             {/* Equilibrium Zone Card */}
                             {sbResult.equilibrium_price && (
@@ -1326,7 +1367,18 @@ export default function Dashboard() {
                           </div>
 
                           <div className="bg-[#141626]/40 border border-[#1E2235]/60 rounded-xl p-4 flex flex-col gap-2.5">
-                            <h4 className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider font-mono">Entry Price Area</h4>
+                            <div className="flex justify-between items-center">
+                              <h4 className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider font-mono">Entry Price Area</h4>
+                              {sbResult.daily_bias === "BULLISH" && (
+                                <span className="bg-emerald-500/10 text-emerald-400 text-[9px] font-bold px-2 py-0.5 rounded font-mono">BUY (LONG)</span>
+                              )}
+                              {sbResult.daily_bias === "BEARISH" && (
+                                <span className="bg-rose-500/10 text-rose-400 text-[9px] font-bold px-2 py-0.5 rounded font-mono">SELL (SHORT)</span>
+                              )}
+                              {sbResult.daily_bias === "NEUTRAL" && (
+                                <span className="bg-gray-500/10 text-gray-400 text-[9px] font-bold px-2 py-0.5 rounded font-mono">NEUTRAL</span>
+                              )}
+                            </div>
                             <span className="text-xs font-semibold text-white font-mono">{sbResult.entry_price_area || "N/A"}</span>
                           </div>
 

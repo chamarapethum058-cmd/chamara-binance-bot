@@ -892,15 +892,53 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                 f"ගනුදෙනුව අවහිර කර හෝ මධ්‍යස්ථව ඇත. Trade එකට ඇතුල් නොවන්න. ප්‍රධාන පුවත්: {high_impact_news}."
             )
             
+            pot_entry = "No Entry Triggered"
+            pot_sl = None
+            pot_target = pdh
+            pot_rr = "N/A"
+
+            if is_adv and adv_status in ["9AM_LOW_SWEPT_MSS_PENDING", "9AM_HIGH_SWEPT_MSS_PENDING"] and candle_9am_high and candle_9am_low:
+                if adv_status == "9AM_LOW_SWEPT_MSS_PENDING":
+                    pe = candle_9am_low + (candle_9am_high - candle_9am_low) * 0.05
+                    psl = candle_9am_low - (candle_9am_high - candle_9am_low) * 0.02
+                    pt = candle_9am_high
+                    pot_entry = f"Est. Buy Limit at {pe:.2f}"
+                else:
+                    pe = candle_9am_high - (candle_9am_high - candle_9am_low) * 0.05
+                    psl = candle_9am_high + (candle_9am_high - candle_9am_low) * 0.02
+                    pt = candle_9am_low
+                    pot_entry = f"Est. Sell Limit at {pe:.2f}"
+                pot_sl = round(psl, 2)
+                pot_target = round(pt, 2)
+                risk = abs(pe - psl)
+                reward = abs(pt - pe)
+                pot_rr = f"1:{(reward/risk if risk > 0 else 3.0):.2f} (Est.)"
+            elif not is_adv and swept_pool != "NONE":
+                if setup_direction == "BULLISH":
+                    pe = pdl - 0.5 if pdl else (current_price or 2320.0)
+                    psl = pe - 1.5
+                    pt = pdh if pdh else (pe + 6.0)
+                    pot_entry = f"Est. Buy Limit at {pe:.2f}"
+                else:
+                    pe = pdh + 0.5 if pdh else (current_price or 2320.0)
+                    psl = pe + 1.5
+                    pt = pdl if pdl else (pe - 6.0)
+                    pot_entry = f"Est. Sell Limit at {pe:.2f}"
+                pot_sl = round(psl, 2)
+                pot_target = round(pt, 2)
+                risk = abs(pe - psl)
+                reward = abs(pt - pe)
+                pot_rr = f"1:{(reward/risk if risk > 0 else 3.0):.2f} (Est.)"
+
             return {
                 "is_valid": True,
                 "status_message": "Success",
                 "market_structure_status": market_structure_status,
                 "daily_bias": "NEUTRAL",
-                "liquidity_target": pdh,
-                "entry_price_area": "No Entry Triggered",
-                "stop_loss_level": None,
-                "target_reward_ratio": "N/A",
+                "liquidity_target": pot_target,
+                "entry_price_area": pot_entry,
+                "stop_loss_level": pot_sl,
+                "target_reward_ratio": pot_rr,
                 "reasoning": reasoning,
                 "invalidation": invalidation,
                 "risk_notes": risk_notes,
