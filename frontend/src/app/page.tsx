@@ -1440,18 +1440,30 @@ export default function Dashboard() {
                             </span>
                           </div>
 
-                          <div className="bg-[#141626]/40 border border-[#1E2235]/60 rounded-xl p-4 flex flex-col gap-2.5">
+                          <div className={`bg-[#141626]/40 border rounded-xl p-4 flex flex-col gap-2.5 transition-all ${
+                            sbResult.confidence && sbResult.confidence >= 90 ? "border-indigo-500/50 shadow-md shadow-indigo-500/5" : "border-[#1E2235]/60"
+                          }`}>
                             <div className="flex justify-between items-center">
                               <h4 className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider font-mono">Entry Price Area</h4>
-                              {sbResult.daily_bias === "BULLISH" && (
-                                <span className="bg-emerald-500/10 text-emerald-400 text-[9px] font-bold px-2 py-0.5 rounded font-mono">BUY (LONG)</span>
-                              )}
-                              {sbResult.daily_bias === "BEARISH" && (
-                                <span className="bg-rose-500/10 text-rose-400 text-[9px] font-bold px-2 py-0.5 rounded font-mono">SELL (SHORT)</span>
-                              )}
-                              {sbResult.daily_bias === "NEUTRAL" && (
-                                <span className="bg-gray-500/10 text-gray-400 text-[9px] font-bold px-2 py-0.5 rounded font-mono">NEUTRAL</span>
-                              )}
+                              <div className="flex items-center gap-1.5">
+                                {sbResult.confidence !== undefined && (
+                                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded font-mono flex items-center gap-1 ${
+                                    sbResult.confidence >= 90 ? "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20" : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                                  }`}>
+                                    <span className={`w-1.5 h-1.5 rounded-full ${sbResult.confidence >= 90 ? "bg-indigo-400 animate-pulse" : "bg-rose-400"}`} />
+                                    {sbResult.confidence}% CONFIRMED
+                                  </span>
+                                )}
+                                {sbResult.daily_bias === "BULLISH" && (
+                                  <span className="bg-emerald-500/10 text-emerald-400 text-[9px] font-bold px-2 py-0.5 rounded font-mono">BUY (LONG)</span>
+                                )}
+                                {sbResult.daily_bias === "BEARISH" && (
+                                  <span className="bg-rose-500/10 text-rose-400 text-[9px] font-bold px-2 py-0.5 rounded font-mono">SELL (SHORT)</span>
+                                )}
+                                {sbResult.daily_bias === "NEUTRAL" && (
+                                  <span className="bg-gray-500/10 text-gray-400 text-[9px] font-bold px-2 py-0.5 rounded font-mono">NEUTRAL</span>
+                                )}
+                              </div>
                             </div>
                             <span className="text-xs font-semibold text-white font-mono">{sbResult.entry_price_area || "N/A"}</span>
                           </div>

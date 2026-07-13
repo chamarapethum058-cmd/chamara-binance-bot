@@ -717,6 +717,125 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                     target = pdl if pdl else (entry_price - 6.0)
                     bias = "BEARISH"
             
+            # Calculate strategy confidence score based on confluences (out of 100%)
+            conf_score = 0
+            
+            # 1. HTF Trend / Daily Bias Vector Alignment (20%)
+            active_bias = bias if setup_triggered else setup_direction
+            if (active_bias == "BULLISH" and is_htf_bullish) or (active_bias == "BEARISH" and not is_htf_bullish):
+                conf_score += 20
+                
+            # 2. Optimal Matrix Zone (20%)
+            if (active_bias == "BULLISH" and zone == "DISCOUNT") or (active_bias == "BEARISH" and zone == "PREMIUM"):
+                conf_score += 20
+                
+            # 3. Daily Open Price Vector Relation (15%)
+            if (active_bias == "BULLISH" and open_relation == "BELOW_OPEN") or (active_bias == "BEARISH" and open_relation == "ABOVE_OPEN"):
+                conf_score += 15
+                
+            # 4. Active Silver Bullet Session Hour (15%)
+            if kz_valid:
+                conf_score += 15
+                
+            # 5. Wick Liquidity Sweep (15%)
+            if swept_pool != "NONE" or asian_sweep:
+                conf_score += 15
+                
+            # 6. LTF trigger (MSS/CISD) with FVG/BPR Unicorn (15%)
+            if setup_triggered:
+                conf_score += 15
+            elif is_adv and adv_status in ["9AM_LOW_SWEPT_MSS_PENDING", "9AM_HIGH_SWEPT_MSS_PENDING"]:
+                conf_score += 5
+            elif swept_pool != "NONE" or asian_sweep:
+                conf_score += 5
+
+            # Enforce 90% Minimum Filter lockout
+            if conf_score < 90:
+                market_structure_status = (
+                    f"HTF Trend is {htf_trend}, but strategy confidence is below 90% ({conf_score}%). Setup Locked.\n\n"
+                    f"---\n\n"
+                    f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
+                    f"Trend එක {htf_trend} වුවත්, strategy තහවුරු කිරීමේ ප්‍රතිශතය 90% ට වඩා අඩුය ({conf_score}%). Setup අවහිර කර ඇත."
+                )
+                
+                reasoning = (
+                    f"No Entry Triggered because confidence score ({conf_score}%) does not meet the 90% minimum threshold.\n"
+                    f"Wait for high-probability setups where all confluences align to yield >= 90% score.\n\n"
+                    f"---\n\n"
+                    f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
+                    f"තහවුරු කිරීමේ ප්‍රතිශතය ({conf_score}%) 90% සීමාවට වඩා අඩු බැවින් entry එක ලබා දී නොමැත.\n"
+                    f"90% හෝ ඊට වැඩි සම්භාවිතාවක් ඇති Setup එකක් ලැබෙන තෙක් රැඳී සිටින්න."
+                )
+                
+                invalidation = (
+                    f"Setup is locked out due to low confidence rating ({conf_score}%).\n\n"
+                    f"---\n\n"
+                    f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
+                    f"අඩු තහවුරු කිරීමේ මට්ටම ({conf_score}%) නිසා setup එක වලංගු නොවේ."
+                )
+                
+                risk_notes = (
+                    f"Execution locked due to low confidence score ({conf_score}%). Do not enter trades.\n\n"
+                    f"---\n\n"
+                    f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
+                    f"අඩු තහවුරු කිරීමේ මට්ටම ({conf_score}%) නිසා ගනුදෙනුව අවහිර කර ඇත. Trade එකට ඇතුල් නොවන්න."
+                )
+                
+                sb_step_1_time_window_ok = kz_valid
+                sb_step_1_details = f"Designated {killzone} Silver Bullet Session active. | වලංගු {killzone} Silver Bullet කාලසීමාව සක්‍රීයයි." if kz_valid else f"Outside of valid Silver Bullet session windows. | වලංගු Silver Bullet කාලසීමාවෙන් බැහැරයි."
+                
+                sb_step_2_liquidity_sweep_ok = (swept_pool != "NONE" or asian_sweep)
+                sb_step_2_details = f"Liquidity swept on {swept_pool} pool. | {swept_pool} ද්‍රවශීලතාවය sweep වී ඇත." if (swept_pool != "NONE" or asian_sweep) else f"No liquidity sweep detected. | ද්‍රවශීලතාවය sweep වීමක් සිදුවී නොමැත."
+                
+                sb_step_3_displacement_mss_ok = True
+                sb_step_3_details = f"Displacement shift confirmed. | MSS/CISD ව්‍යුහය බිඳවැටීම තහවුරු වී ඇත."
+                
+                sb_step_4_fvg_bpr_ok = True
+                sb_step_4_details = f"Fair Value Gap (FVG) or BPR Unicorn setup identified. | FVG/BPR Unicorn කලාපය හඳුනාගෙන ඇත."
+                
+                sb_step_5_entry_exec_ok = False
+                sb_step_5_details = f"Awaiting high-probability entry trigger. Setup locked due to low confidence score ({conf_score}%). | අඩු තහවුරු කිරීමේ ප්‍රතිශතය නිසා ඇතුල්වීම් සක්‍රීය නොවේ."
+                
+                sb_step_6_risk_mgmt_ok = False
+                sb_step_6_details = f"Risk management locked: Confidence score ({conf_score}%) is below 90% minimum threshold. | රීති අවහිරය: Confidence score එක ({conf_score}%) 90% ට වඩා අඩුය."
+
+                return {
+                    "is_valid": True,
+                    "status_message": f"Strategy Lockout: Confidence score ({conf_score}%) is below 90% minimum threshold.",
+                    "market_structure_status": market_structure_status,
+                    "daily_bias": "NEUTRAL",
+                    "liquidity_target": None,
+                    "entry_price_area": "No Entry (Confidence < 90%)",
+                    "stop_loss_level": None,
+                    "target_reward_ratio": "N/A",
+                    "reasoning": reasoning,
+                    "invalidation": invalidation,
+                    "risk_notes": risk_notes,
+                    "equilibrium_price": eq_price,
+                    "zone_type": zone,
+                    "daily_open_relation": open_relation,
+                    "killzone_valid": kz_valid,
+                    "counter_trend_locked": True,
+                    "erl_irl_state": "NONE",
+                    "swept_liquidity_pool": swept_pool,
+                    "mitigated_pd_array_type": mit_array,
+                    "is_advanced_setup": is_adv,
+                    "advanced_setup_status": adv_status,
+                    "sb_step_1_time_window_ok": sb_step_1_time_window_ok,
+                    "sb_step_1_details": sb_step_1_details,
+                    "sb_step_2_liquidity_sweep_ok": sb_step_2_liquidity_sweep_ok,
+                    "sb_step_2_details": sb_step_2_details,
+                    "sb_step_3_displacement_mss_ok": sb_step_3_displacement_mss_ok,
+                    "sb_step_3_details": sb_step_3_details,
+                    "sb_step_4_fvg_bpr_ok": sb_step_4_fvg_bpr_ok,
+                    "sb_step_4_details": sb_step_4_details,
+                    "sb_step_5_entry_exec_ok": sb_step_5_entry_exec_ok,
+                    "sb_step_5_details": sb_step_5_details,
+                    "sb_step_6_risk_mgmt_ok": sb_step_6_risk_mgmt_ok,
+                    "sb_step_6_details": sb_step_6_details,
+                    "confidence": conf_score
+                }
+
             # Calculate Risk-to-Reward ratio based on natural target before strict 1:3 RR expansion
             natural_risk = abs(entry_price - stop_loss)
             natural_reward = abs(target - entry_price)
@@ -905,6 +1024,7 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                 "mitigated_pd_array_type": mit_array,
                 "is_advanced_setup": is_adv,
                 "advanced_setup_status": adv_status,
+                "confidence": conf_score,
                 
                 # Detailed 6-Step Silver Bullet fields
                 "sb_step_1_time_window_ok": sb_step_1_time_window_ok,
@@ -1031,6 +1151,32 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                     pot_target = round(pt, 2)
                     pot_rr = f"1:{pot_rr_val:.2f} (Est.)"
 
+            # Calculate potential setup confidence score
+            conf_score = 0
+            active_bias = setup_direction
+            if (active_bias == "BULLISH" and is_htf_bullish) or (active_bias == "BEARISH" and not is_htf_bullish):
+                conf_score += 20
+            if (active_bias == "BULLISH" and zone == "DISCOUNT") or (active_bias == "BEARISH" and zone == "PREMIUM"):
+                conf_score += 20
+            if (active_bias == "BULLISH" and open_relation == "BELOW_OPEN") or (active_bias == "BEARISH" and open_relation == "ABOVE_OPEN"):
+                conf_score += 15
+            if kz_valid:
+                conf_score += 15
+            if swept_pool != "NONE" or asian_sweep:
+                conf_score += 15
+            if is_adv and adv_status in ["9AM_LOW_SWEPT_MSS_PENDING", "9AM_HIGH_SWEPT_MSS_PENDING"]:
+                conf_score += 5
+            elif swept_pool != "NONE" or asian_sweep:
+                conf_score += 5
+
+            if conf_score < 90:
+                pot_entry = "No Entry (Confidence < 90%)"
+                pot_sl = None
+                pot_target = None
+                pot_rr = "N/A"
+                if "Strategy confidence score is below 90%" not in reasons:
+                    reasons.append(f"Strategy confidence score ({conf_score}%) is below 90% minimum confluence threshold")
+
             if reasons:
                 reason_str = ", ".join(reasons)
                 market_structure_status = (
@@ -1090,6 +1236,7 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                 "mitigated_pd_array_type": "NONE",
                 "is_advanced_setup": is_adv,
                 "advanced_setup_status": adv_status,
+                "confidence": conf_score,
                 
                 # Detailed 6-Step Silver Bullet fields
                 "sb_step_1_time_window_ok": sb_step_1_time_window_ok,

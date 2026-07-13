@@ -140,6 +140,9 @@ class SilverBulletResponse(BaseModel):
     sb_step_5_details: Optional[str] = None
     sb_step_6_risk_mgmt_ok: Optional[bool] = None
     sb_step_6_details: Optional[str] = None
+    
+    # Confidence/Confirmation Rate field
+    confidence: Optional[int] = None
 
 
 

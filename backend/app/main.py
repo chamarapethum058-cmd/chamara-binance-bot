@@ -422,7 +422,23 @@ async def silverbullet_analyze(req: SilverBulletRequest, db: Session = Depends(g
         swept_liquidity_pool=result.get("swept_liquidity_pool"),
         mitigated_pd_array_type=result.get("mitigated_pd_array_type"),
         is_advanced_setup=result.get("is_advanced_setup"),
-        advanced_setup_status=result.get("advanced_setup_status")
+        advanced_setup_status=result.get("advanced_setup_status"),
+        
+        # Detailed 6-Step Silver Bullet fields
+        sb_step_1_time_window_ok=result.get("sb_step_1_time_window_ok"),
+        sb_step_1_details=result.get("sb_step_1_details"),
+        sb_step_2_liquidity_sweep_ok=result.get("sb_step_2_liquidity_sweep_ok"),
+        sb_step_2_details=result.get("sb_step_2_details"),
+        sb_step_3_displacement_mss_ok=result.get("sb_step_3_displacement_mss_ok"),
+        sb_step_3_details=result.get("sb_step_3_details"),
+        sb_step_4_fvg_bpr_ok=result.get("sb_step_4_fvg_bpr_ok"),
+        sb_step_4_details=result.get("sb_step_4_details"),
+        sb_step_5_entry_exec_ok=result.get("sb_step_5_entry_exec_ok"),
+        sb_step_5_details=result.get("sb_step_5_details"),
+        sb_step_6_risk_mgmt_ok=result.get("sb_step_6_risk_mgmt_ok"),
+        sb_step_6_details=result.get("sb_step_6_details"),
+        
+        confidence=result.get("confidence")
     )
 
 

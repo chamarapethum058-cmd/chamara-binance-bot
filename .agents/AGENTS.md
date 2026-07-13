@@ -37,3 +37,9 @@ The bot must strictly enforce the following session hours mapped between New Yor
 2. **NY AM Silver Bullet Session:** 10:00 AM - 11:00 AM NY Time / 07:30 PM - 08:30 PM Sri Lankan Time.
 3. **NY PM Silver Bullet Session:** 02:00 PM - 03:00 PM NY Time / 11:30 PM - 12:30 AM Sri Lankan Time.
 4. **M1 Timeframe Constraint:** The entry detection and strategy confirmations (Liquidity Sweep, Displacement, MSS, FVG/BPR, limit order placement) must occur strictly on the 1-minute (1m) chart. No other timeframe confirmation is permitted.
+
+## 6. 90% Minimum Confirmation Rate Constraint
+The bot must strictly enforce the following confidence scoring boundaries:
+1. **Confidence Score Calculation:** Calculate a strategy confidence score out of 100% based on rule confluences (Trend alignment: 20%, Optimal matrix zone discount/premium: 20%, Daily Open alignment: 15%, Active Silver Bullet window: 15%, Wick Liquidity sweep: 15%, and LTF Shift/MSS with FVG: 15%).
+2. **90% Minimum Filter:** Only deliver trade setups that achieve a confidence score of 90% or higher.
+3. **Low-Confidence Entry Lockout:** If confidence is below 90%, the bot must suppress and lockout the setup, returning "No Entry (Confidence < 90%)" to prevent low-probability trades and shield the user from unnecessary stop losses. Display this confirmation percentage on the frontend page next to the Entry Price Area card.
