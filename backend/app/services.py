@@ -475,13 +475,13 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
     @classmethod
     def _get_tight_scalp_risk(cls, entry_price: float) -> float:
         if entry_price > 1000.0:
-            return 1.5  # Gold-like assets
+            return 0.75  # Gold-like assets
         elif entry_price > 100.0:
-            return 1.0  # Larger crypto coins (e.g. ETH)
+            return 0.50  # Larger crypto coins (e.g. ETH)
         elif entry_price > 10.0:
-            return 0.5  # Medium crypto coins (e.g. SOL)
+            return 0.20  # Medium crypto coins (e.g. SOL)
         else:
-            return 0.1  # Small assets
+            return 0.05  # Small assets
 
     @classmethod
     def _get_mock_silver_bullet(cls, req: Dict[str, Any]) -> Dict[str, Any]:
@@ -811,16 +811,16 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                     "sb_step_6_details": sb_step_6_details
                 }
             
-            # Recalculate strict 1:3 Risk-to-Reward parameters if needed
+            # Recalculate strict 1:4 Risk-to-Reward parameters if needed
             risk = abs(entry_price - stop_loss)
             if risk > 0:
                 if bias == "BULLISH":
-                    target = entry_price + (risk * 3.0)
+                    target = entry_price + (risk * 4.0)
                 else:
-                    target = entry_price - (risk * 3.0)
+                    target = entry_price - (risk * 4.0)
             
             reward = abs(target - entry_price)
-            rr_ratio = reward / risk if risk > 0 else 3.0
+            rr_ratio = reward / risk if risk > 0 else 4.0
             
             action_type = "Buy Limit" if bias == "BULLISH" else "Sell Limit"
             
