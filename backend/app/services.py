@@ -473,6 +473,17 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
             return cls._get_mock_silver_bullet(req)
 
     @classmethod
+    def _get_tight_scalp_risk(cls, entry_price: float) -> float:
+        if entry_price > 1000.0:
+            return 1.5  # Gold-like assets
+        elif entry_price > 100.0:
+            return 1.0  # Larger crypto coins (e.g. ETH)
+        elif entry_price > 10.0:
+            return 0.5  # Medium crypto coins (e.g. SOL)
+        else:
+            return 0.1  # Small assets
+
+    @classmethod
     def _get_mock_silver_bullet(cls, req: Dict[str, Any]) -> Dict[str, Any]:
         """Provides a structured mock analysis for Silver Bullet strategy if API key fails."""
         symbol = req.get("symbol") or "XAUUSD"
@@ -685,23 +696,23 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
             if is_adv:
                 if swept_pool == "9AM_LOW_SSL":
                     entry_price = candle_9am_low + (candle_9am_high - candle_9am_low) * 0.05
-                    stop_loss = candle_9am_low - (candle_9am_high - candle_9am_low) * 0.02
+                    stop_loss = entry_price - cls._get_tight_scalp_risk(entry_price)
                     target = candle_9am_high
                     bias = "BULLISH"
                 else:
                     entry_price = candle_9am_high - (candle_9am_high - candle_9am_low) * 0.05
-                    stop_loss = candle_9am_high + (candle_9am_high - candle_9am_low) * 0.02
+                    stop_loss = entry_price + cls._get_tight_scalp_risk(entry_price)
                     target = candle_9am_low
                     bias = "BEARISH"
             else:
                 if setup_direction == "BULLISH":
                     entry_price = pdl - 0.5 if pdl else (current_price or 2320.0)
-                    stop_loss = entry_price - 1.5
+                    stop_loss = entry_price - cls._get_tight_scalp_risk(entry_price)
                     target = pdh if pdh else (entry_price + 6.0)
                     bias = "BULLISH"
                 else:
                     entry_price = pdh + 0.5 if pdh else (current_price or 2320.0)
-                    stop_loss = entry_price + 1.5
+                    stop_loss = entry_price + cls._get_tight_scalp_risk(entry_price)
                     target = pdl if pdl else (entry_price - 6.0)
                     bias = "BEARISH"
             
@@ -900,35 +911,73 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
             if is_adv and adv_status in ["9AM_LOW_SWEPT_MSS_PENDING", "9AM_HIGH_SWEPT_MSS_PENDING"] and candle_9am_high and candle_9am_low:
                 if adv_status == "9AM_LOW_SWEPT_MSS_PENDING":
                     pe = candle_9am_low + (candle_9am_high - candle_9am_low) * 0.05
-                    psl = candle_9am_low - (candle_9am_high - candle_9am_low) * 0.02
+                    psl = pe - cls._get_tight_scalp_risk(pe)
                     pt = candle_9am_high
-                    pot_entry = f"Est. Buy Limit at {pe:.2f}"
+                    pot_label = "Est. Buy Limit"
                 else:
                     pe = candle_9am_high - (candle_9am_high - candle_9am_low) * 0.05
-                    psl = candle_9am_high + (candle_9am_high - candle_9am_low) * 0.02
+                    psl = pe + cls._get_tight_scalp_risk(pe)
                     pt = candle_9am_low
-                    pot_entry = f"Est. Sell Limit at {pe:.2f}"
-                pot_sl = round(psl, 2)
-                pot_target = round(pt, 2)
+                    pot_label = "Est. Sell Limit"
+                
                 risk = abs(pe - psl)
                 reward = abs(pt - pe)
-                pot_rr = f"1:{(reward/risk if risk > 0 else 3.0):.2f} (Est.)"
+                pot_rr_val = reward / risk if risk > 0 else 0.0
+                if pot_rr_val < 2.0:
+                    pot_entry = "No Entry Triggered (Poor RR)"
+                    pot_sl = None
+                    pot_target = pdh
+                    pot_rr = "N/A"
+                    reasons.append(f"Potential setup yields poor Risk-to-Reward ratio ({pot_rr_val:.2f})")
+                else:
+                    pot_entry = f"{pot_label} at {pe:.2f}"
+                    pot_sl = round(psl, 2)
+                    pot_target = round(pt, 2)
+                    pot_rr = f"1:{pot_rr_val:.2f} (Est.)"
             elif not is_adv and swept_pool != "NONE":
                 if setup_direction == "BULLISH":
                     pe = pdl - 0.5 if pdl else (current_price or 2320.0)
-                    psl = pe - 1.5
+                    psl = pe - cls._get_tight_scalp_risk(pe)
                     pt = pdh if pdh else (pe + 6.0)
-                    pot_entry = f"Est. Buy Limit at {pe:.2f}"
+                    pot_label = "Est. Buy Limit"
                 else:
                     pe = pdh + 0.5 if pdh else (current_price or 2320.0)
-                    psl = pe + 1.5
+                    psl = pe + cls._get_tight_scalp_risk(pe)
                     pt = pdl if pdl else (pe - 6.0)
-                    pot_entry = f"Est. Sell Limit at {pe:.2f}"
-                pot_sl = round(psl, 2)
-                pot_target = round(pt, 2)
+                    pot_label = "Est. Sell Limit"
+                
                 risk = abs(pe - psl)
                 reward = abs(pt - pe)
-                pot_rr = f"1:{(reward/risk if risk > 0 else 3.0):.2f} (Est.)"
+                pot_rr_val = reward / risk if risk > 0 else 0.0
+                if pot_rr_val < 2.0:
+                    pot_entry = "No Entry Triggered (Poor RR)"
+                    pot_sl = None
+                    pot_target = pdh
+                    pot_rr = "N/A"
+                    reasons.append(f"Potential setup yields poor Risk-to-Reward ratio ({pot_rr_val:.2f})")
+                else:
+                    pot_entry = f"{pot_label} at {pe:.2f}"
+                    pot_sl = round(psl, 2)
+                    pot_target = round(pt, 2)
+                    pot_rr = f"1:{pot_rr_val:.2f} (Est.)"
+
+            if reasons:
+                reason_str = ", ".join(reasons)
+                market_structure_status = (
+                    f"HTF structure is {htf_trend}, but setup conditions are incomplete or counter-bias. Setup Locked: {ct_locked}.\n\n"
+                    f"---\n\n"
+                    f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
+                    f"ප්‍රධාන Trend එක {htf_trend} වුවත්, setup එක සම්පූර්ණ වීමට අවශ්‍ය කොන්දේසි සපුරා නොමැත. Setup අවහිර වීම: {ct_locked}."
+                )
+                
+                reasoning = (
+                    f"The Daily Bias is NEUTRAL because setup conditions are incomplete or locked: {reason_str}.\n"
+                    f"Wait for a valid sweep/mitigation inside London, NY AM, or NY PM Silver Bullet windows with a LTF shift (MSS/CISD) aligned with HTF bias.\n\n"
+                    f"---\n\n"
+                    f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
+                    f"පහත සඳහන් setup කොන්දේසි සම්පූර්ණ නොවීම හෝ අවහිර වීම නිසා Daily Bias එක මධ්‍යස්ථ (NEUTRAL) වේ: {reason_str}.\n"
+                    f"වලංගු London, NY AM, හෝ NY PM Silver Bullet window එකක් ඇතුළත sweep/mitigation එකක් සිදුවී, LTF shift (MSS/CISD) එකක් සිදුවන තෙක් රැඳී සිටින්න."
+                )
 
             return {
                 "is_valid": True,

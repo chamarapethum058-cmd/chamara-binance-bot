@@ -1253,7 +1253,7 @@ export default function Dashboard() {
                           )}
 
                           {/* Pre-Warning Setup Alert */}
-                          {sbResult.is_valid && sbResult.daily_bias === "NEUTRAL" && !sbResult.counter_trend_locked && sbResult.entry_price_area && sbResult.entry_price_area !== "No Entry Triggered" && (
+                          {sbResult.is_valid && sbResult.daily_bias === "NEUTRAL" && !sbResult.counter_trend_locked && sbResult.entry_price_area && sbResult.entry_price_area !== "No Entry Triggered" && sbResult.entry_price_area !== "No Entry Triggered (Poor RR)" && (
                             <div className="bg-[#4F46E5]/10 border border-[#4F46E5]/30 rounded-xl p-5 flex items-start gap-3 shadow-[0_0_15px_rgba(79,70,229,0.08)] animate-pulse">
                               <svg className="w-5 h-5 text-indigo-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
