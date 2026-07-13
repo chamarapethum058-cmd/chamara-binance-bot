@@ -126,6 +126,21 @@ class SilverBulletResponse(BaseModel):
     # Advanced 9AM range filter details
     is_advanced_setup: Optional[bool] = None
     advanced_setup_status: Optional[str] = None # "NONE", "9AM_LOW_SWEPT_MSS_PENDING", "9AM_HIGH_SWEPT_MSS_PENDING", "TRIGGERED"
+    
+    # Detailed 6-Step Silver Bullet Confirmation fields
+    sb_step_1_time_window_ok: Optional[bool] = None
+    sb_step_1_details: Optional[str] = None
+    sb_step_2_liquidity_sweep_ok: Optional[bool] = None
+    sb_step_2_details: Optional[str] = None
+    sb_step_3_displacement_mss_ok: Optional[bool] = None
+    sb_step_3_details: Optional[str] = None
+    sb_step_4_fvg_bpr_ok: Optional[bool] = None
+    sb_step_4_details: Optional[str] = None
+    sb_step_5_entry_exec_ok: Optional[bool] = None
+    sb_step_5_details: Optional[str] = None
+    sb_step_6_risk_mgmt_ok: Optional[bool] = None
+    sb_step_6_details: Optional[str] = None
+
 
 
 

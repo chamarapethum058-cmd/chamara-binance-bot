@@ -1868,6 +1868,185 @@ export default function Dashboard() {
                           </div>
                         )}
 
+                        {/* Detailed ICT Silver Bullet 6-Step Confirmation Pipeline */}
+                        {sbResult && (
+                          <div className="bg-[#11131F]/90 border border-[#1E2235] rounded-2xl p-5 shadow-xl flex flex-col gap-4">
+                            <div className="flex justify-between items-center border-b border-[#1E2235]/40 pb-3">
+                              <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2 font-mono">
+                                <svg className="w-4 h-4 text-[#8B5CF6] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                                </svg>
+                                ICT Silver Bullet 6-Step Confirmation Pipeline
+                              </h4>
+                              <span className="text-[10px] text-gray-400 font-mono">1m Execution Timeframe</span>
+                            </div>
+
+                            <div className="flex flex-col gap-4">
+                              {/* Step 1: Time Window Filter */}
+                              <div className="bg-[#07080E]/40 border border-[#1E2235]/40 rounded-xl p-3.5 flex items-start gap-3.5 hover:border-indigo-500/20 transition-all">
+                                <div className={`w-6 h-6 rounded-full shrink-0 flex items-center justify-center font-bold text-xs font-mono border ${
+                                  sbResult.sb_step_1_time_window_ok 
+                                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" 
+                                    : "bg-[#1E2235]/30 text-gray-500 border-[#1E2235]"
+                                }`}>
+                                  {sbResult.sb_step_1_time_window_ok ? "✓" : "1"}
+                                </div>
+                                <div className="flex flex-col gap-1 w-full">
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider font-mono">Step 1: Time Window Filter</span>
+                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded font-mono ${
+                                      sbResult.sb_step_1_time_window_ok ? "bg-emerald-500/10 text-emerald-400" : "bg-amber-500/10 text-amber-400"
+                                    }`}>
+                                      {sbResult.sb_step_1_time_window_ok ? "ACTIVE" : "INACTIVE"}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-white leading-relaxed mt-0.5">
+                                    {sbResult.sb_step_1_details ? sbResult.sb_step_1_details.split("|")[0].trim() : "Time window filter check."}
+                                  </p>
+                                  <span className="text-[10px] text-indigo-300/80 font-sans">
+                                    {sbResult.sb_step_1_details ? sbResult.sb_step_1_details.split("|")[1]?.trim() : ""}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Step 2: Liquidity Sweep */}
+                              <div className="bg-[#07080E]/40 border border-[#1E2235]/40 rounded-xl p-3.5 flex items-start gap-3.5 hover:border-indigo-500/20 transition-all">
+                                <div className={`w-6 h-6 rounded-full shrink-0 flex items-center justify-center font-bold text-xs font-mono border ${
+                                  sbResult.sb_step_2_liquidity_sweep_ok 
+                                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" 
+                                    : "bg-[#1E2235]/30 text-gray-500 border-[#1E2235]"
+                                }`}>
+                                  {sbResult.sb_step_2_liquidity_sweep_ok ? "✓" : "2"}
+                                </div>
+                                <div className="flex flex-col gap-1 w-full">
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider font-mono">Step 2: Liquidity Sweep (SSL/BSL)</span>
+                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded font-mono ${
+                                      sbResult.sb_step_2_liquidity_sweep_ok ? "bg-emerald-500/10 text-emerald-400" : "bg-amber-500/10 text-amber-400"
+                                    }`}>
+                                      {sbResult.sb_step_2_liquidity_sweep_ok ? "DETECTED" : "AWAITING"}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-white leading-relaxed mt-0.5">
+                                    {sbResult.sb_step_2_details ? sbResult.sb_step_2_details.split("|")[0].trim() : "Wick sweep detection."}
+                                  </p>
+                                  <span className="text-[10px] text-indigo-300/80 font-sans">
+                                    {sbResult.sb_step_2_details ? sbResult.sb_step_2_details.split("|")[1]?.trim() : ""}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Step 3: Displacement & MSS */}
+                              <div className="bg-[#07080E]/40 border border-[#1E2235]/40 rounded-xl p-3.5 flex items-start gap-3.5 hover:border-indigo-500/20 transition-all">
+                                <div className={`w-6 h-6 rounded-full shrink-0 flex items-center justify-center font-bold text-xs font-mono border ${
+                                  sbResult.sb_step_3_displacement_mss_ok 
+                                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" 
+                                    : "bg-[#1E2235]/30 text-gray-500 border-[#1E2235]"
+                                }`}>
+                                  {sbResult.sb_step_3_displacement_mss_ok ? "✓" : "3"}
+                                </div>
+                                <div className="flex flex-col gap-1 w-full">
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider font-mono">Step 3: Displacement & MSS</span>
+                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded font-mono ${
+                                      sbResult.sb_step_3_displacement_mss_ok ? "bg-emerald-500/10 text-emerald-400" : "bg-amber-500/10 text-amber-400"
+                                    }`}>
+                                      {sbResult.sb_step_3_displacement_mss_ok ? "CONFIRMED" : "PENDING"}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-white leading-relaxed mt-0.5">
+                                    {sbResult.sb_step_3_details ? sbResult.sb_step_3_details.split("|")[0].trim() : "Candle body close break check."}
+                                  </p>
+                                  <span className="text-[10px] text-indigo-300/80 font-sans">
+                                    {sbResult.sb_step_3_details ? sbResult.sb_step_3_details.split("|")[1]?.trim() : ""}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Step 4: FVG / BPR Unicorn Setup */}
+                              <div className="bg-[#07080E]/40 border border-[#1E2235]/40 rounded-xl p-3.5 flex items-start gap-3.5 hover:border-indigo-500/20 transition-all">
+                                <div className={`w-6 h-6 rounded-full shrink-0 flex items-center justify-center font-bold text-xs font-mono border ${
+                                  sbResult.sb_step_4_fvg_bpr_ok 
+                                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" 
+                                    : "bg-[#1E2235]/30 text-gray-500 border-[#1E2235]"
+                                }`}>
+                                  {sbResult.sb_step_4_fvg_bpr_ok ? "✓" : "4"}
+                                </div>
+                                <div className="flex flex-col gap-1 w-full">
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider font-mono">Step 4: Fair Value Gap / Balanced Price Range</span>
+                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded font-mono ${
+                                      sbResult.sb_step_4_fvg_bpr_ok ? "bg-emerald-500/10 text-emerald-400" : "bg-[#1E2235]/30 text-gray-400"
+                                    }`}>
+                                      {sbResult.sb_step_4_fvg_bpr_ok ? "FOUND" : "AWAITING"}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-white leading-relaxed mt-0.5">
+                                    {sbResult.sb_step_4_details ? sbResult.sb_step_4_details.split("|")[0].trim() : "Unicorn block overlap check."}
+                                  </p>
+                                  <span className="text-[10px] text-indigo-300/80 font-sans">
+                                    {sbResult.sb_step_4_details ? sbResult.sb_step_4_details.split("|")[1]?.trim() : ""}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Step 5: Entry Execution */}
+                              <div className="bg-[#07080E]/40 border border-[#1E2235]/40 rounded-xl p-3.5 flex items-start gap-3.5 hover:border-indigo-500/20 transition-all">
+                                <div className={`w-6 h-6 rounded-full shrink-0 flex items-center justify-center font-bold text-xs font-mono border ${
+                                  sbResult.sb_step_5_entry_exec_ok 
+                                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" 
+                                    : "bg-[#1E2235]/30 text-gray-500 border-[#1E2235]"
+                                }`}>
+                                  {sbResult.sb_step_5_entry_exec_ok ? "✓" : "5"}
+                                </div>
+                                <div className="flex flex-col gap-1 w-full">
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider font-mono">Step 5: Entry Execution</span>
+                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded font-mono ${
+                                      sbResult.sb_step_5_entry_exec_ok ? "bg-indigo-500/10 text-indigo-400" : "bg-[#1E2235]/30 text-gray-400"
+                                    }`}>
+                                      {sbResult.sb_step_5_entry_exec_ok ? "ORDER READY" : "INACTIVE"}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-white leading-relaxed mt-0.5">
+                                    {sbResult.sb_step_5_details ? sbResult.sb_step_5_details.split("|")[0].trim() : "Limit entry trigger."}
+                                  </p>
+                                  <span className="text-[10px] text-indigo-300/80 font-sans">
+                                    {sbResult.sb_step_5_details ? sbResult.sb_step_5_details.split("|")[1]?.trim() : ""}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Step 6: Risk Management */}
+                              <div className="bg-[#07080E]/40 border border-[#1E2235]/40 rounded-xl p-3.5 flex items-start gap-3.5 hover:border-indigo-500/20 transition-all">
+                                <div className={`w-6 h-6 rounded-full shrink-0 flex items-center justify-center font-bold text-xs font-mono border ${
+                                  sbResult.sb_step_6_risk_mgmt_ok 
+                                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" 
+                                    : "bg-[#1E2235]/30 text-gray-500 border-[#1E2235]"
+                                }`}>
+                                  {sbResult.sb_step_6_risk_mgmt_ok ? "✓" : "6"}
+                                </div>
+                                <div className="flex flex-col gap-1 w-full">
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider font-mono">Step 6: Risk Management</span>
+                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded font-mono ${
+                                      sbResult.sb_step_6_risk_mgmt_ok ? "bg-emerald-500/10 text-emerald-400" : "bg-[#1E2235]/30 text-gray-400"
+                                    }`}>
+                                      {sbResult.sb_step_6_risk_mgmt_ok ? "VERIFIED" : "LOCKED"}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-white leading-relaxed mt-0.5">
+                                    {sbResult.sb_step_6_details ? sbResult.sb_step_6_details.split("|")[0].trim() : "SL / TP settings."}
+                                  </p>
+                                  <span className="text-[10px] text-indigo-300/80 font-sans">
+                                    {sbResult.sb_step_6_details ? sbResult.sb_step_6_details.split("|")[1]?.trim() : ""}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
                         {/* Reasoning tabs */}
                         <div className="flex flex-col gap-4">
                           <div className="border-t border-[#1E2235] pt-5">

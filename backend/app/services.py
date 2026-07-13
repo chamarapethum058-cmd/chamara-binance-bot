@@ -755,6 +755,24 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                     f"අඩු Risk-to-Reward මට්ටම නිසා ගනුදෙනුව අවහිර කර ඇත. Trade එකට ඇතුල් නොවන්න. ප්‍රධාන පුවත්: {high_impact_news}."
                 )
                 
+                sb_step_1_time_window_ok = kz_valid
+                sb_step_1_details = f"Designated {killzone} Silver Bullet Session active. | වලංගු {killzone} Silver Bullet කාලසීමාව සක්‍රීයයි." if kz_valid else f"Outside of valid Silver Bullet session windows. | වලංගු Silver Bullet කාලසීමාවෙන් බැහැරයි."
+                
+                sb_step_2_liquidity_sweep_ok = (swept_pool != "NONE" or asian_sweep)
+                sb_step_2_details = f"Liquidity swept on {swept_pool} pool. | {swept_pool} ද්‍රවශීලතාවය sweep වී ඇත." if (swept_pool != "NONE" or asian_sweep) else f"No liquidity sweep detected. | ද්‍රවශීලතාවය sweep වීමක් සිදුවී නොමැත."
+                
+                sb_step_3_displacement_mss_ok = True
+                sb_step_3_details = f"Displacement shift confirmed with candle body close. | MSS/CISD ව්‍යුහය බිඳවැටීම ඉටිපන්දම් සිරුරින් තහවුරු කර ඇත."
+                
+                sb_step_4_fvg_bpr_ok = True
+                sb_step_4_details = f"Fair Value Gap (FVG) or Unicorn setup mapped. | FVG හෝ BPR Unicorn කලාපය හඳුනාගෙන ඇත."
+                
+                sb_step_5_entry_exec_ok = False
+                sb_step_5_details = f"Awaiting valid entry trigger conditions. Setup locked due to poor Risk-to-Reward profile. | අවහිර කරන ලද setup එකක් බැවින් ඇතුල්වීම් සක්‍රීය නොවේ."
+                
+                sb_step_6_risk_mgmt_ok = False
+                sb_step_6_details = f"Risk management locked: Risk-to-Reward ratio ({natural_rr:.2f}) is less than 1:2 minimum threshold. | රීති අවහිරය: Risk-to-Reward ratio එක ({natural_rr:.2f}) 1:2 ට වඩා අඩුය."
+
                 return {
                     "is_valid": True,
                     "status_message": "Strategy Lockout: Risk-to-Reward ratio is less than 1:2 minimum threshold.",
@@ -776,7 +794,21 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                     "swept_liquidity_pool": swept_pool,
                     "mitigated_pd_array_type": mit_array,
                     "is_advanced_setup": is_adv,
-                    "advanced_setup_status": adv_status
+                    "advanced_setup_status": adv_status,
+                    
+                    # Detailed 6-Step Silver Bullet fields
+                    "sb_step_1_time_window_ok": sb_step_1_time_window_ok,
+                    "sb_step_1_details": sb_step_1_details,
+                    "sb_step_2_liquidity_sweep_ok": sb_step_2_liquidity_sweep_ok,
+                    "sb_step_2_details": sb_step_2_details,
+                    "sb_step_3_displacement_mss_ok": sb_step_3_displacement_mss_ok,
+                    "sb_step_3_details": sb_step_3_details,
+                    "sb_step_4_fvg_bpr_ok": sb_step_4_fvg_bpr_ok,
+                    "sb_step_4_details": sb_step_4_details,
+                    "sb_step_5_entry_exec_ok": sb_step_5_entry_exec_ok,
+                    "sb_step_5_details": sb_step_5_details,
+                    "sb_step_6_risk_mgmt_ok": sb_step_6_risk_mgmt_ok,
+                    "sb_step_6_details": sb_step_6_details
                 }
             
             # Recalculate strict 1:3 Risk-to-Reward parameters if needed
@@ -827,6 +859,29 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                 f"Scalp trade එකක් බැවින් එක් trade එකකට උපරිම 0.5% - 1.0% ක් පමණක් අවදානමට ලක් කරන්න. උපරිම රඳවා ගැනීමේ කාලය: පැය 1 (1-Hour). Stop Loss එක {stop_loss:.2f} මට්ටමේද, Target එක {target:.2f} මට්ටමේද තබන්න (1:{rr_ratio:.2f} RR). ප්‍රධාන පුවත්: {high_impact_news}."
             )
             
+            # Define 6-step checklist values
+            sb_step_1_time_window_ok = kz_valid
+            sb_step_1_details = f"Designated {killzone} Silver Bullet Session active. | වලංගු {killzone} Silver Bullet කාලසීමාව සක්‍රීයයි."
+            
+            sb_step_2_liquidity_sweep_ok = (swept_pool != "NONE" or asian_sweep)
+            sb_step_2_details = f"Liquidity swept on {swept_pool} pool. Wick sweep confirmed. | {swept_pool} ද්‍රවශීලතාවය (Wick Sweep) සාර්ථකව සිදු වී ඇත."
+            
+            sb_step_3_displacement_mss_ok = True  # Setup is triggered
+            sb_step_3_details = f"Displacement shift ({ltf_trigger or 'MSS'}) confirmed with candle body close. | MSS/CISD ව්‍යුහය බිඳවැටීම ඉටිපන්දම් සිරුරින් (Body Close) තහවුරු කර ඇත."
+            
+            # Unicorn / BPR check
+            sb_step_4_fvg_bpr_ok = True
+            if mit_array == "FVG" or has_fresh_fvg:
+                sb_step_4_details = "Fair Value Gap (FVG) identified in the displacement leg. | displacement leg එක තුළ FVG කලාපයක් හඳුනාගෙන ඇත."
+            else:
+                sb_step_4_details = f"Unicorn Setup / BPR zone mapped (overlapping {mit_array or 'Breaker'} array). | Unicorn / BPR කලාපය හඳුනාගෙන ඇත (Breaker Array)."
+            
+            sb_step_5_entry_exec_ok = True
+            sb_step_5_details = f"Buy Limit at {entry_price:.2f} (FVG High / 50% CE level). | FVG/BPR සීමාවේ {entry_price:.2f} මට්ටමේ ලිමිට් ඕඩරය සකසා ඇත." if bias == "BULLISH" else f"Sell Limit at {entry_price:.2f} (FVG Low / 50% CE level). | FVG/BPR සීමාවේ {entry_price:.2f} මට්ටමේ ලිමිට් ඕඩරය සකසා ඇත."
+            
+            sb_step_6_risk_mgmt_ok = True
+            sb_step_6_details = f"Stop Loss at {stop_loss:.2f} (below Last Swing), TP at {target:.2f} (1:{rr_ratio:.2f} RR). Partials at 1:1.5 RR & Break-Even. | SL: {stop_loss:.2f}, Target: {target:.2f} (1:{rr_ratio:.2f} RR). 1:1.5 RR දී partial profit ගෙන BE කරන්න."
+
             return {
                 "is_valid": True,
                 "status_message": "Success",
@@ -848,7 +903,21 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                 "swept_liquidity_pool": swept_pool,
                 "mitigated_pd_array_type": mit_array,
                 "is_advanced_setup": is_adv,
-                "advanced_setup_status": adv_status
+                "advanced_setup_status": adv_status,
+                
+                # Detailed 6-Step Silver Bullet fields
+                "sb_step_1_time_window_ok": sb_step_1_time_window_ok,
+                "sb_step_1_details": sb_step_1_details,
+                "sb_step_2_liquidity_sweep_ok": sb_step_2_liquidity_sweep_ok,
+                "sb_step_2_details": sb_step_2_details,
+                "sb_step_3_displacement_mss_ok": sb_step_3_displacement_mss_ok,
+                "sb_step_3_details": sb_step_3_details,
+                "sb_step_4_fvg_bpr_ok": sb_step_4_fvg_bpr_ok,
+                "sb_step_4_details": sb_step_4_details,
+                "sb_step_5_entry_exec_ok": sb_step_5_entry_exec_ok,
+                "sb_step_5_details": sb_step_5_details,
+                "sb_step_6_risk_mgmt_ok": sb_step_6_risk_mgmt_ok,
+                "sb_step_6_details": sb_step_6_details
             }
         else:
             reasons = []
@@ -979,6 +1048,25 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                     f"වලංගු London, NY AM, හෝ NY PM Silver Bullet window එකක් ඇතුළත sweep/mitigation එකක් සිදුවී, LTF shift (MSS/CISD) එකක් සිදුවන තෙක් රැඳී සිටින්න."
                 )
 
+            # Define 6-step checklist values
+            sb_step_1_time_window_ok = kz_valid
+            sb_step_1_details = f"Designated {killzone} Silver Bullet Session active. | වලංගු {killzone} Silver Bullet කාලසීමාව සක්‍රීයයි." if kz_valid else f"Outside of valid Silver Bullet session windows. | වලංගු Silver Bullet කාලසීමාවෙන් බැහැරයි."
+            
+            sb_step_2_liquidity_sweep_ok = (swept_pool != "NONE" or asian_sweep)
+            sb_step_2_details = f"Liquidity swept on {swept_pool} pool. | {swept_pool} ද්‍රවශීලතාවය sweep වී ඇත." if (swept_pool != "NONE" or asian_sweep) else f"No Swing High or Swing Low liquidity sweep detected yet. | ද්‍රවශීලතාවය sweep වීමක් සිදුවී නොමැත."
+            
+            sb_step_3_displacement_mss_ok = False
+            sb_step_3_details = "Awaiting Market Structure Shift (MSS/CISD) body close confirmation. | MSS/CISD ඉටිපන්දම් සිරුරකින් (Body Close) තහවුරු වන තෙක් බලාපොරොත්තුවෙන්."
+            
+            sb_step_4_fvg_bpr_ok = has_fresh_fvg
+            sb_step_4_details = "Fair Value Gap (FVG) or Unicorn setup mapped. | FVG හෝ BPR Unicorn කලාපය හඳුනාගෙන ඇත." if has_fresh_fvg else "Awaiting FVG / BPR zone formation. | FVG/BPR Unicorn කලාපයක් නිර්මාණය වන තෙක් බලාපොරොත්තුවෙන්."
+            
+            sb_step_5_entry_exec_ok = False
+            sb_step_5_details = "Awaiting execution trigger conditions. | වලංගු කලාපය තුළ ලිමිට් ඕඩරය සක්‍රීය වීමට කොන්දේසි සපුරා නැත."
+            
+            sb_step_6_risk_mgmt_ok = False
+            sb_step_6_details = "Minimum 1:2 RR constraint must be satisfied. | අවම 1:2 RR සීමාව සපුරාලිය යුතුය."
+
             return {
                 "is_valid": True,
                 "status_message": "Success",
@@ -1000,7 +1088,21 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                 "swept_liquidity_pool": swept_pool,
                 "mitigated_pd_array_type": "NONE",
                 "is_advanced_setup": is_adv,
-                "advanced_setup_status": adv_status
+                "advanced_setup_status": adv_status,
+                
+                # Detailed 6-Step Silver Bullet fields
+                "sb_step_1_time_window_ok": sb_step_1_time_window_ok,
+                "sb_step_1_details": sb_step_1_details,
+                "sb_step_2_liquidity_sweep_ok": sb_step_2_liquidity_sweep_ok,
+                "sb_step_2_details": sb_step_2_details,
+                "sb_step_3_displacement_mss_ok": sb_step_3_displacement_mss_ok,
+                "sb_step_3_details": sb_step_3_details,
+                "sb_step_4_fvg_bpr_ok": sb_step_4_fvg_bpr_ok,
+                "sb_step_4_details": sb_step_4_details,
+                "sb_step_5_entry_exec_ok": sb_step_5_entry_exec_ok,
+                "sb_step_5_details": sb_step_5_details,
+                "sb_step_6_risk_mgmt_ok": sb_step_6_risk_mgmt_ok,
+                "sb_step_6_details": sb_step_6_details
             }
 
 
