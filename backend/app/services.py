@@ -695,23 +695,23 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
         if setup_triggered:
             if is_adv:
                 if swept_pool == "9AM_LOW_SSL":
-                    entry_price = candle_9am_low + (candle_9am_high - candle_9am_low) * 0.05
+                    entry_price = candle_9am_low + ((current_price or candle_9am_high) - candle_9am_low) * 0.60
                     stop_loss = entry_price - cls._get_tight_scalp_risk(entry_price)
                     target = candle_9am_high
                     bias = "BULLISH"
                 else:
-                    entry_price = candle_9am_high - (candle_9am_high - candle_9am_low) * 0.05
+                    entry_price = candle_9am_high - (candle_9am_high - (current_price or candle_9am_low)) * 0.60
                     stop_loss = entry_price + cls._get_tight_scalp_risk(entry_price)
                     target = candle_9am_low
                     bias = "BEARISH"
             else:
                 if setup_direction == "BULLISH":
-                    entry_price = pdl - 0.5 if pdl else (current_price or 2320.0)
+                    entry_price = pdl + ((current_price or (pdl + 6.0)) - pdl) * 0.60 if pdl else (current_price or 2320.0)
                     stop_loss = entry_price - cls._get_tight_scalp_risk(entry_price)
                     target = pdh if pdh else (entry_price + 6.0)
                     bias = "BULLISH"
                 else:
-                    entry_price = pdh + 0.5 if pdh else (current_price or 2320.0)
+                    entry_price = pdh - (pdh - (current_price or (pdh - 6.0))) * 0.60 if pdh else (current_price or 2320.0)
                     stop_loss = entry_price + cls._get_tight_scalp_risk(entry_price)
                     target = pdl if pdl else (entry_price - 6.0)
                     bias = "BEARISH"
@@ -888,7 +888,7 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                 "market_structure_status": market_structure_status,
                 "daily_bias": bias,
                 "liquidity_target": target,
-                "entry_price_area": f"Limit {action_type.lower()} order at {entry_price:.2f}",
+                "entry_price_area": f"{action_type} at {entry_price:.2f}",
                 "stop_loss_level": stop_loss,
                 "target_reward_ratio": f"1:{rr_ratio:.2f}",
                 "reasoning": reasoning,
@@ -979,12 +979,12 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
 
             if is_adv and adv_status in ["9AM_LOW_SWEPT_MSS_PENDING", "9AM_HIGH_SWEPT_MSS_PENDING"] and candle_9am_high and candle_9am_low:
                 if adv_status == "9AM_LOW_SWEPT_MSS_PENDING":
-                    pe = candle_9am_low + (candle_9am_high - candle_9am_low) * 0.05
+                    pe = candle_9am_low + ((current_price or candle_9am_high) - candle_9am_low) * 0.60
                     psl = pe - cls._get_tight_scalp_risk(pe)
                     pt = candle_9am_high
                     pot_label = "Est. Buy Limit"
                 else:
-                    pe = candle_9am_high - (candle_9am_high - candle_9am_low) * 0.05
+                    pe = candle_9am_high - (candle_9am_high - (current_price or candle_9am_low)) * 0.60
                     psl = pe + cls._get_tight_scalp_risk(pe)
                     pt = candle_9am_low
                     pot_label = "Est. Sell Limit"
@@ -1005,12 +1005,12 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                     pot_rr = f"1:{pot_rr_val:.2f} (Est.)"
             elif not is_adv and swept_pool != "NONE":
                 if setup_direction == "BULLISH":
-                    pe = pdl - 0.5 if pdl else (current_price or 2320.0)
+                    pe = pdl + ((current_price or (pdl + 6.0)) - pdl) * 0.60 if pdl else (current_price or 2320.0)
                     psl = pe - cls._get_tight_scalp_risk(pe)
                     pt = pdh if pdh else (pe + 6.0)
                     pot_label = "Est. Buy Limit"
                 else:
-                    pe = pdh + 0.5 if pdh else (current_price or 2320.0)
+                    pe = pdh - (pdh - (current_price or (pdh - 6.0))) * 0.60 if pdh else (current_price or 2320.0)
                     psl = pe + cls._get_tight_scalp_risk(pe)
                     pt = pdl if pdl else (pe - 6.0)
                     pot_label = "Est. Sell Limit"
