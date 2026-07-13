@@ -853,10 +853,10 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
             )
             
             risk_notes = (
-                f"Scalp trade risk strictly 0.5% - 1.0% maximum per trade. Max holding duration: 1-Hour. Stop Loss at {stop_loss:.2f}, Target at {target:.2f} (1:{rr_ratio:.2f} RR). High-Impact News: {high_impact_news}.\n\n"
+                f"Scalp trade risk strictly 0.5% - 1.0% maximum per trade. Max holding duration: 15m - 20m. Stop Loss at {stop_loss:.2f}, Target at {target:.2f} (1:{rr_ratio:.2f} RR). High-Impact News: {high_impact_news}.\n\n"
                 f"---\n\n"
                 f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
-                f"Scalp trade එකක් බැවින් එක් trade එකකට උපරිම 0.5% - 1.0% ක් පමණක් අවදානමට ලක් කරන්න. උපරිම රඳවා ගැනීමේ කාලය: පැය 1 (1-Hour). Stop Loss එක {stop_loss:.2f} මට්ටමේද, Target එක {target:.2f} මට්ටමේද තබන්න (1:{rr_ratio:.2f} RR). ප්‍රධාන පුවත්: {high_impact_news}."
+                f"Scalp trade එකක් බැවින් එක් trade එකකට උපරිම 0.5% - 1.0% ක් පමණක් අවදානමට ලක් කරන්න. උපරිම රඳවා ගැනීමේ කාලය: විනාඩි 15 - 20 (15m - 20m). Stop Loss එක {stop_loss:.2f} මට්ටමේද, Target එක {target:.2f} මට්ටමේද තබන්න (1:{rr_ratio:.2f} RR). ප්‍රධාන පුවත්: {high_impact_news}."
             )
             
             # Define 6-step checklist values

@@ -25,8 +25,8 @@ The following system instructions must be strictly followed when analyzing, vali
 > [!IMPORTANT]
 > **STRICT PUSH RESTRICTION:** Never stage, commit, or push any code changes to GitHub automatically or on your own initiative.
 > You must ONLY stage, commit, or push changes to GitHub when the user explicitly requests it (e.g. "Save/push to GitHub now"). Keep all code edits strictly local by default unless explicitly instructed otherwise.
-## 4. 1-Hour Tight Scalping Constraints
+## 4. 15-20 Minutes High-Velocity Scalping Constraints
 The following execution boundaries must be strictly enforced for all actionable trade setups:
 1. **Tight Stop Loss (Tighter SL):** Keep the stop loss very close to the entry price to minimize risk exposure (e.g., maximum of 0.1% to 0.15% of the asset price, or 1.5 - 2.5 points on Gold-like assets). Avoid wide or distant stop losses.
-2. **Close Take Profit (Tighter TP):** Set target prices close to the entry price based strictly on 1:2 to 1:3 Risk-to-Reward (RR) ratios. Do not target distant higher timeframe levels (like major PDH/PDL ranges) if they are too far from the entry price and cannot be reasonably filled within a 1-hour session.
-3. **1-Hour Max Hold Limit:** All setups must be designed as high-velocity scalping entries meant to complete (either hitting SL or TP) within a maximum holding time of 1 Hour (1H). Reflect this holding warning in Risk Notes and Sinhala translations.
+2. **Close Take Profit (Tighter TP):** Set target prices close to the entry price based strictly on 1:2 to 1:4 Risk-to-Reward (RR) ratios. Do not target distant higher timeframe levels (like major PDH/PDL ranges) if they are too far from the entry price and cannot be reasonably filled within a short session.
+3. **15-20 Minutes Max Hold Limit:** All setups must be designed as high-velocity scalping entries meant to complete (either hitting SL or TP) within a maximum holding time of 15 to 20 Minutes. Reflect this holding warning in Risk Notes and Sinhala translations.
