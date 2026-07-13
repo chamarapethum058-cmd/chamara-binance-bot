@@ -84,6 +84,51 @@ export default function Dashboard() {
   const [sbDealingRangeHigh, setSbDealingRangeHigh] = useState<number | "">(2360);
   const [sbDealingRangeLow, setSbDealingRangeLow] = useState<number | "">(2310);
   const [sbKillzone, setSbKillzone] = useState("LONDON_SB");
+  const [sbAutoDetectSession, setSbAutoDetectSession] = useState(true);
+
+  // Auto-detect killzone based on New York Time
+  useEffect(() => {
+    if (!sbAutoDetectSession) return;
+
+    const detectSession = () => {
+      try {
+        const nyString = new Date().toLocaleString("en-US", { timeZone: "America/New_York" });
+        const nyDate = new Date(nyString);
+        const hours = nyDate.getHours();
+        
+        // London Open Silver Bullet: 3AM - 4AM NY
+        if (hours === 3) {
+          setSbKillzone("LONDON_SB");
+        }
+        // AM Session Silver Bullet: 10AM - 11AM NY
+        else if (hours === 10) {
+          setSbKillzone("NY_AM_SB");
+        }
+        // PM Session Silver Bullet: 2PM - 3PM NY
+        else if (hours === 14) {
+          setSbKillzone("NY_PM_SB");
+        }
+        // London Killzone: 2AM - 5AM NY (except 3AM SB window)
+        else if (hours >= 2 && hours < 5) {
+          setSbKillzone("LONDON");
+        }
+        // New York AM Killzone: 7AM - 10AM NY
+        else if (hours >= 7 && hours < 10) {
+          setSbKillzone("NY_AM");
+        }
+        // Outside Killzones
+        else {
+          setSbKillzone("NONE");
+        }
+      } catch (error) {
+        console.error("Failed to detect New York session time:", error);
+      }
+    };
+
+    detectSession();
+    const interval = setInterval(detectSession, 30000); // Check every 30 seconds
+    return () => clearInterval(interval);
+  }, [sbAutoDetectSession]);
   const [sbDiscountPdArray, setSbDiscountPdArray] = useState(true);
   const [sbPremiumPdArray, setSbPremiumPdArray] = useState(false);
   const [sbLtfTrigger, setSbLtfTrigger] = useState("MSS");
@@ -974,11 +1019,40 @@ export default function Dashboard() {
                           />
                         </div>
                         <div className="flex flex-col gap-1.5">
-                          <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider font-mono">Killzone Session</label>
+                          <div className="flex justify-between items-center">
+                            <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider font-mono">Killzone Session</label>
+                            <label className="flex items-center gap-1 cursor-pointer">
+                              <input 
+                                type="checkbox" 
+                                checked={sbAutoDetectSession} 
+                                onChange={(e) => {
+                                  setSbAutoDetectSession(e.target.checked);
+                                  if (e.target.checked) {
+                                    const nyString = new Date().toLocaleString("en-US", { timeZone: "America/New_York" });
+                                    const nyDate = new Date(nyString);
+                                    const hours = nyDate.getHours();
+                                    if (hours === 3) setSbKillzone("LONDON_SB");
+                                    else if (hours === 10) setSbKillzone("NY_AM_SB");
+                                    else if (hours === 14) setSbKillzone("NY_PM_SB");
+                                    else if (hours >= 2 && hours < 5) setSbKillzone("LONDON");
+                                    else if (hours >= 7 && hours < 10) setSbKillzone("NY_AM");
+                                    else setSbKillzone("NONE");
+                                  }
+                                }} 
+                                className="w-2.5 h-2.5 rounded bg-[#141626] border-[#1E2235] text-indigo-500 focus:ring-0 cursor-pointer"
+                              />
+                              <span className="text-[9px] text-[#8B5CF6] font-bold font-mono">AUTO (SL/NY TIME)</span>
+                            </label>
+                          </div>
                           <select
                             value={sbKillzone}
-                            onChange={(e) => setSbKillzone(e.target.value)}
-                            className="bg-[#141626] border border-[#1E2235] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#6366F1]"
+                            onChange={(e) => {
+                              setSbKillzone(e.target.value);
+                              setSbAutoDetectSession(false);
+                            }}
+                            className={`bg-[#141626] border rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#6366F1] ${
+                              sbAutoDetectSession ? "border-[#8B5CF6]/50 text-indigo-200" : "border-[#1E2235]"
+                            }`}
                           >
                             <option value="LONDON_SB">London Open Silver Bullet (3AM - 4AM NY)</option>
                             <option value="NY_AM_SB">AM Session Silver Bullet (10AM - 11AM NY)</option>
