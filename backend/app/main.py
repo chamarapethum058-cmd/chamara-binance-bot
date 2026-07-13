@@ -91,6 +91,7 @@ def startup_populate():
     3. Engineered Liquidity (Generating structural liquidity pools to act as future draws).
     4. Rebalancing Equilibrium (Systematic pricing flow back and forth between Premium and Discount arrays).
 *   Dealing Range Formation: After previous Buy-Side Liquidity (BSL) and Sell-Side Liquidity (SSL) are completely taken, the system defines a new active dealing range using the absolute swing high and swing low. Draw an exact 50% Equilibrium Line.
+*   System Nature (Scalp Constraints): Setups are high-velocity scalp entries designed to resolve within a maximum holding time of 1 Hour (1H). Risk must be kept tight (Stop Loss: 1.5 - 2.5 points) and target close (1:2 to 1:3 RR targets) to achieve fast execution and quick TP matches near current market price.
 
 ---
 

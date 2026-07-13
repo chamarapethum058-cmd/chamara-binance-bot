@@ -377,6 +377,11 @@ STRATEGY RULES:
   - Advanced Sell Setup: If current_price sweeps above the 09:00 AM Candle High, trigger a Sell Setup upon lower timeframe shift (MSS/CISD). Target is the 09:00 AM Candle Low.
 - Lower Timeframe Reconfirmation: Needs MSS (Market Structure Shift) or CISD (Change in State of Delivery) inside the Killzone on M15/M5 chart, accompanied by a fresh FVG.
 - Risk/Macro Protection: Ignore/block setups if high-impact news is active (NFP, CPI, FOMC). Lock out counter-bias setups to protect account.
+- Strict 1-Hour Scalp Constraints:
+  1. All setups must be high-velocity scalp entries meant to complete within a maximum hold time of 1 Hour (1H).
+  2. Tight Stop Loss: Place stop loss very close to the entry price (e.g. 1.5 - 2.5 points for gold-like assets) to minimize risk.
+  3. Close Take Profit: Set TP targets close to the entry based strictly on 1:2 to 1:3 RR. Do not target distant levels if they are too far and cannot be filled within 1 hour.
+  4. Include a 1-Hour hold time warning in the Risk Notes and their Sinhala translations.
 
 -----------------------------------------
 USER INPUT DATA:
@@ -679,25 +684,25 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
         if setup_triggered:
             if is_adv:
                 if swept_pool == "9AM_LOW_SSL":
-                    entry_price = candle_9am_low + (candle_9am_high - candle_9am_low) * 0.1
-                    stop_loss = candle_9am_low - (candle_9am_high - candle_9am_low) * 0.05
+                    entry_price = candle_9am_low + (candle_9am_high - candle_9am_low) * 0.05
+                    stop_loss = candle_9am_low - (candle_9am_high - candle_9am_low) * 0.02
                     target = candle_9am_high
                     bias = "BULLISH"
                 else:
-                    entry_price = candle_9am_high - (candle_9am_high - candle_9am_low) * 0.1
-                    stop_loss = candle_9am_high + (candle_9am_high - candle_9am_low) * 0.05
+                    entry_price = candle_9am_high - (candle_9am_high - candle_9am_low) * 0.05
+                    stop_loss = candle_9am_high + (candle_9am_high - candle_9am_low) * 0.02
                     target = candle_9am_low
                     bias = "BEARISH"
             else:
                 if setup_direction == "BULLISH":
-                    entry_price = pdl - 1.5 if pdl else (current_price or 2320.0)
-                    stop_loss = entry_price - 5.0
-                    target = pdh if pdh else (entry_price + 20)
+                    entry_price = pdl - 0.5 if pdl else (current_price or 2320.0)
+                    stop_loss = entry_price - 1.5
+                    target = pdh if pdh else (entry_price + 6.0)
                     bias = "BULLISH"
                 else:
-                    entry_price = pdh + 1.5 if pdh else (current_price or 2320.0)
-                    stop_loss = entry_price + 5.0
-                    target = pdl if pdl else (entry_price - 20)
+                    entry_price = pdh + 0.5 if pdh else (current_price or 2320.0)
+                    stop_loss = entry_price + 1.5
+                    target = pdl if pdl else (entry_price - 6.0)
                     bias = "BEARISH"
             
             # Calculate Risk-to-Reward ratio based on natural target before strict 1:3 RR expansion
@@ -805,10 +810,10 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
             )
             
             risk_notes = (
-                f"Scalp trade risk strictly 0.5% - 1.0% maximum per trade for funded account protocols. Stop Loss at {stop_loss:.2f}, Target at {target:.2f} (1:{rr_ratio:.2f} RR). High-Impact News: {high_impact_news}.\n\n"
+                f"Scalp trade risk strictly 0.5% - 1.0% maximum per trade. Max holding duration: 1-Hour. Stop Loss at {stop_loss:.2f}, Target at {target:.2f} (1:{rr_ratio:.2f} RR). High-Impact News: {high_impact_news}.\n\n"
                 f"---\n\n"
                 f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
-                f"Scalp trade එකක් බැවින් ගිණුම් ආරක්ෂාව සඳහා එක් trade එකකට උපරිම 0.5% - 1.0% ක් පමණක් අවදානමට ලක් කරන්න. Stop Loss එක {stop_loss:.2f} මට්ටමේද, Target එක {target:.2f} මට්ටමේද තබන්න (1:{rr_ratio:.2f} RR). ප්‍රධාන පුවත්: {high_impact_news}."
+                f"Scalp trade එකක් බැවින් එක් trade එකකට උපරිම 0.5% - 1.0% ක් පමණක් අවදානමට ලක් කරන්න. උපරිම රඳවා ගැනීමේ කාලය: පැය 1 (1-Hour). Stop Loss එක {stop_loss:.2f} මට්ටමේද, Target එක {target:.2f} මට්ටමේද තබන්න (1:{rr_ratio:.2f} RR). ප්‍රධාන පුවත්: {high_impact_news}."
             )
             
             return {
