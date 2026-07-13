@@ -474,14 +474,12 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
 
     @classmethod
     def _get_tight_scalp_risk(cls, entry_price: float) -> float:
-        if entry_price > 1000.0:
-            return 0.75  # Gold-like assets
-        elif entry_price > 100.0:
-            return 0.50  # Larger crypto coins (e.g. ETH)
-        elif entry_price > 10.0:
-            return 0.20  # Medium crypto coins (e.g. SOL)
+        if entry_price > 10000.0:
+            return round(entry_price * 0.0015, 2)  # BTC-like assets (0.15% of price)
+        elif entry_price > 1000.0:
+            return 0.40  # Gold-like assets
         else:
-            return 0.05  # Small assets
+            return round(entry_price * 0.0016, 4)  # General crypto coins (e.g. ETH, SOL, XRP, DOGE: 0.16% of price)
 
     @classmethod
     def _get_mock_silver_bullet(cls, req: Dict[str, Any]) -> Dict[str, Any]:
@@ -973,10 +971,10 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
             )
             
             risk_notes = (
-                f"Scalp trade risk strictly 0.5% - 1.0% maximum per trade. Max holding duration: 15m - 20m. Stop Loss at {stop_loss:.2f}, Target at {target:.2f} (1:{rr_ratio:.2f} RR). High-Impact News: {high_impact_news}.\n\n"
+                f"Scalp trade risk strictly 0.5% - 1.0% maximum per trade. Max holding duration: 10m - 15m. Stop Loss at {stop_loss:.2f}, Target at {target:.2f} (1:{rr_ratio:.2f} RR). High-Impact News: {high_impact_news}.\n\n"
                 f"---\n\n"
                 f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
-                f"Scalp trade එකක් බැවින් එක් trade එකකට උපරිම 0.5% - 1.0% ක් පමණක් අවදානමට ලක් කරන්න. උපරිම රඳවා ගැනීමේ කාලය: විනාඩි 15 - 20 (15m - 20m). Stop Loss එක {stop_loss:.2f} මට්ටමේද, Target එක {target:.2f} මට්ටමේද තබන්න (1:{rr_ratio:.2f} RR). ප්‍රධාන පුවත්: {high_impact_news}."
+                f"Scalp trade එකක් බැවින් එක් trade එකකට උපරිම 0.5% - 1.0% ක් පමණක් අවදානමට ලක් කරන්න. උපරිම රඳවා ගැනීමේ කාලය: විනාඩි 10 - 15 (10m - 15m). Stop Loss එක {stop_loss:.2f} මට්ටමේද, Target එක {target:.2f} මට්ටමේද තබන්න (1:{rr_ratio:.2f} RR). ප්‍රධාන පුවත්: {high_impact_news}."
             )
             
             # Define 6-step checklist values
