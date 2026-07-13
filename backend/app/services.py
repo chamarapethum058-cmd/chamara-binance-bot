@@ -569,10 +569,11 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
             elif current_price < daily_open:
                 open_relation = "BELOW_OPEN"
 
-        # Verify strict Silver Bullet killzone windows
-        # London: 3-4AM NY (LONDON_SB, LONDON)
-        # AM Session: 10-11AM NY (NY_AM_SB, NY_AM)
-        # PM Session: 2-3PM NY (NY_PM_SB)
+        # Verify strict Silver Bullet killzone windows mapped to Sri Lankan Time (SLST)
+        # London SB: 3-4AM NY / 12:30-1:30 PM LK
+        # AM Session SB: 10-11AM NY / 7:30-8:30 PM LK
+        # PM Session SB: 2-3PM NY / 11:30 PM-12:30 AM LK
+        # Strategy confirmations are strictly evaluated on the 1m chart timeframe.
         kz_valid = killzone in ["LONDON", "LONDON_SB", "NY_AM", "NY_AM_SB", "NY_PM", "NY_PM_SB"]
 
         # Parse text-based parameters if present
