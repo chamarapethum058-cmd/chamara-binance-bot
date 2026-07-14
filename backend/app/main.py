@@ -424,7 +424,7 @@ async def silverbullet_analyze(req: SilverBulletRequest, db: Session = Depends(g
         is_advanced_setup=result.get("is_advanced_setup"),
         advanced_setup_status=result.get("advanced_setup_status"),
         
-        # Detailed 6-Step Silver Bullet fields
+        # Detailed 10-Step Silver Bullet fields
         sb_step_1_time_window_ok=result.get("sb_step_1_time_window_ok"),
         sb_step_1_details=result.get("sb_step_1_details"),
         sb_step_2_liquidity_sweep_ok=result.get("sb_step_2_liquidity_sweep_ok"),
@@ -437,6 +437,14 @@ async def silverbullet_analyze(req: SilverBulletRequest, db: Session = Depends(g
         sb_step_5_details=result.get("sb_step_5_details"),
         sb_step_6_risk_mgmt_ok=result.get("sb_step_6_risk_mgmt_ok"),
         sb_step_6_details=result.get("sb_step_6_details"),
+        sb_step_7_london_asian_sweep_ok=result.get("sb_step_7_london_asian_sweep_ok"),
+        sb_step_7_details=result.get("sb_step_7_details"),
+        sb_step_8_htf_pd_mitigation_ok=result.get("sb_step_8_htf_pd_mitigation_ok"),
+        sb_step_8_details=result.get("sb_step_8_details"),
+        sb_step_9_ltf_choch_ok=result.get("sb_step_9_ltf_choch_ok"),
+        sb_step_9_details=result.get("sb_step_9_details"),
+        sb_step_10_fvg_limit_ok=result.get("sb_step_10_fvg_limit_ok"),
+        sb_step_10_details=result.get("sb_step_10_details"),
         
         confidence=result.get("confidence"),
         

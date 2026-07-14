@@ -698,6 +698,86 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                 )
             )
             result = json.loads(response.text.strip())
+            
+            # Calculate strategy confidence score locally based on confluences (out of 100%)
+            conf_score = 0
+            active_bias = result.get("daily_bias") or "NEUTRAL"
+            is_htf_bullish = htf_trend.upper() == "BULLISH" or (pullback_days is not None and pullback_days >= 3)
+            
+            # 1. HTF Trend / Daily Bias Vector Alignment (20%)
+            if (active_bias == "BULLISH" and is_htf_bullish) or (active_bias == "BEARISH" and not is_htf_bullish):
+                conf_score += 20
+                
+            # 2. Optimal Matrix Zone (20%)
+            zone = result.get("zone_type") or "N/A"
+            if (active_bias == "BULLISH" and zone == "DISCOUNT") or (active_bias == "BEARISH" and zone == "PREMIUM"):
+                conf_score += 20
+                
+            # 3. Daily Open Price Vector Relation (15%)
+            open_relation = result.get("daily_open_relation") or "N/A"
+            if (active_bias == "BULLISH" and open_relation == "BELOW_OPEN") or (active_bias == "BEARISH" and open_relation == "ABOVE_OPEN"):
+                conf_score += 15
+                
+            # 4. Active Silver Bullet Session Hour (15%)
+            if result.get("killzone_valid"):
+                conf_score += 15
+                
+            # 5. Wick Liquidity Sweep (15%)
+            swept_pool = result.get("swept_liquidity_pool") or "NONE"
+            if swept_pool != "NONE" or asian_sweep:
+                conf_score += 15
+                
+            # 6. LTF trigger (MSS/CISD) with FVG/BPR Unicorn (15%)
+            mit_array = result.get("mitigated_pd_array_type") or "NONE"
+            if active_bias in ["BULLISH", "BEARISH"] and (ltf_shift or ltf_trigger in ["MSS", "CISD", "CHOCH"]):
+                if has_fresh_fvg:
+                    conf_score += 15
+                elif mit_array not in ["NONE", "NONE_OB", None]:
+                    conf_score += 15
+
+            # Save computed confidence score
+            result["confidence"] = conf_score
+            
+            # Parse entry price from entry_price_area string
+            entry_price_val = 0.0
+            try:
+                import re
+                entry_match = re.search(r'(\d+(?:\.\d+)?)', result.get("entry_price_area") or "")
+                if entry_match:
+                    entry_price_val = float(entry_match.group(1))
+            except Exception:
+                pass
+            
+            # Parse target reward ratio
+            rr_val = 4.0
+            try:
+                import re
+                rr_match = re.search(r'1:(\d+(?:\.\d+)?)', result.get("target_reward_ratio") or "")
+                if rr_match:
+                    rr_val = float(rr_match.group(1))
+            except Exception:
+                pass
+
+            # Generate checklist steps
+            steps = cls._get_sb_steps(
+                kz_valid=result.get("killzone_valid", False),
+                killzone=killzone,
+                swept_pool=swept_pool,
+                asian_sweep=bool(asian_sweep),
+                ltf_shift=bool(ltf_shift),
+                ltf_trigger=ltf_trigger,
+                has_fresh_fvg=bool(has_fresh_fvg),
+                mit_array=mit_array,
+                ct_locked=result.get("counter_trend_locked", False),
+                setup_triggered=result.get("is_valid", False) and result.get("daily_bias") != "NEUTRAL",
+                entry_price=entry_price_val or current_price or 0.0,
+                rr_ratio=rr_val,
+                conf_score=conf_score,
+                timeframe=timeframe
+            )
+            
+            # Merge steps into result
+            result.update(steps)
             return result
         except Exception as e:
             logger.error(f"Gemini API Silver Bullet analysis failed: {e}. Falling back to mock analysis.")

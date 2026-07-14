@@ -2152,8 +2152,22 @@ export default function Dashboard() {
                                 <svg className="w-4 h-4 text-[#8B5CF6] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
                                 </svg>
-                                ICT Silver Bullet 6-Step Confirmation Pipeline
+                                ICT Silver Bullet 10-Step Confirmation Pipeline
                               </h4>
+                              {sbResult.sb_step_1_time_window_ok && 
+                               sbResult.sb_step_2_liquidity_sweep_ok && 
+                               sbResult.sb_step_3_displacement_mss_ok && 
+                               sbResult.sb_step_4_fvg_bpr_ok && 
+                               sbResult.sb_step_5_entry_exec_ok && 
+                               sbResult.sb_step_6_risk_mgmt_ok && 
+                               sbResult.sb_step_7_london_asian_sweep_ok && 
+                               sbResult.sb_step_8_htf_pd_mitigation_ok && 
+                               sbResult.sb_step_9_ltf_choch_ok && 
+                               sbResult.sb_step_10_fvg_limit_ok && (
+                                 <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[9px] font-bold px-1.5 py-0.5 rounded font-mono animate-pulse flex items-center gap-1">
+                                   <span>✓</span> 10/10 CONFLUENCES VERIFIED
+                                 </span>
+                              )}
                               <span className="text-[10px] text-gray-400 font-mono">1m Execution Timeframe</span>
                             </div>
 
@@ -2180,7 +2194,7 @@ export default function Dashboard() {
                                     {sbResult.sb_step_1_details ? sbResult.sb_step_1_details.split("|")[0].trim() : "Time window filter check."}
                                   </p>
                                   <span className="text-[10px] text-indigo-300/80 font-sans">
-                                    {sbResult.sb_step_1_details ? sbResult.sb_step_1_details.split("|")[1]?.trim() : ""}
+                                    {sbResult.sb_step_1_details ? (sbResult.sb_step_1_details.split("|")[1]?.trim() || "කාලසීමාව පරීක්ෂාව.") : "කාලසීමාව පරීක්ෂාව."}
                                   </span>
                                 </div>
                               </div>
@@ -2207,7 +2221,7 @@ export default function Dashboard() {
                                     {sbResult.sb_step_2_details ? sbResult.sb_step_2_details.split("|")[0].trim() : "Wick sweep detection."}
                                   </p>
                                   <span className="text-[10px] text-indigo-300/80 font-sans">
-                                    {sbResult.sb_step_2_details ? sbResult.sb_step_2_details.split("|")[1]?.trim() : ""}
+                                    {sbResult.sb_step_2_details ? (sbResult.sb_step_2_details.split("|")[1]?.trim() || "ද්‍රවශීලතාවය sweep වීම හඳුනාගැනීම.") : "ද්‍රවශීලතාවය sweep වීම හඳුනාගැනීම."}
                                   </span>
                                 </div>
                               </div>
@@ -2234,7 +2248,7 @@ export default function Dashboard() {
                                     {sbResult.sb_step_3_details ? sbResult.sb_step_3_details.split("|")[0].trim() : "Candle body close break check."}
                                   </p>
                                   <span className="text-[10px] text-indigo-300/80 font-sans">
-                                    {sbResult.sb_step_3_details ? sbResult.sb_step_3_details.split("|")[1]?.trim() : ""}
+                                    {sbResult.sb_step_3_details ? (sbResult.sb_step_3_details.split("|")[1]?.trim() || "MSS ඉටිපන්දම් සිරුරකින් බිඳවැටීම පරීක්ෂාව.") : "MSS ඉටිපන්දම් සිරුරකින් බිඳවැටීම පරීක්ෂාව."}
                                   </span>
                                 </div>
                               </div>
@@ -2261,7 +2275,7 @@ export default function Dashboard() {
                                     {sbResult.sb_step_4_details ? sbResult.sb_step_4_details.split("|")[0].trim() : "Unicorn block overlap check."}
                                   </p>
                                   <span className="text-[10px] text-indigo-300/80 font-sans">
-                                    {sbResult.sb_step_4_details ? sbResult.sb_step_4_details.split("|")[1]?.trim() : ""}
+                                    {sbResult.sb_step_4_details ? (sbResult.sb_step_4_details.split("|")[1]?.trim() || "FVG හෝ PD array කලාපයන් හඳුනාගැනීම.") : "FVG හෝ PD array කලාපයන් හඳුනාගැනීම."}
                                   </span>
                                 </div>
                               </div>
@@ -2288,7 +2302,7 @@ export default function Dashboard() {
                                     {sbResult.sb_step_5_details ? sbResult.sb_step_5_details.split("|")[0].trim() : "Limit entry trigger."}
                                   </p>
                                   <span className="text-[10px] text-indigo-300/80 font-sans">
-                                    {sbResult.sb_step_5_details ? sbResult.sb_step_5_details.split("|")[1]?.trim() : ""}
+                                    {sbResult.sb_step_5_details ? (sbResult.sb_step_5_details.split("|")[1]?.trim() || "ලිමිට් ඕඩරය සක්‍රීය වීම.") : "ලිමිට් ඕඩරය සක්‍රීය වීම."}
                                   </span>
                                 </div>
                               </div>
@@ -2315,7 +2329,7 @@ export default function Dashboard() {
                                     {sbResult.sb_step_6_details ? sbResult.sb_step_6_details.split("|")[0].trim() : "SL / TP settings."}
                                   </p>
                                   <span className="text-[10px] text-indigo-300/80 font-sans">
-                                    {sbResult.sb_step_6_details ? sbResult.sb_step_6_details.split("|")[1]?.trim() : ""}
+                                    {sbResult.sb_step_6_details ? (sbResult.sb_step_6_details.split("|")[1]?.trim() || "අවදානම් කළමනාකරණය (SL සහ TP මට්ටම්).") : "අවදානම් කළමනාකරණය (SL සහ TP මට්ටම්)."}
                                   </span>
                                 </div>
                               </div>
