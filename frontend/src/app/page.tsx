@@ -2593,23 +2593,22 @@ export default function Dashboard() {
               <div className="flex flex-col gap-1.5">
                 <div className="flex justify-between items-center">
                   <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Timeframe</label>
-                  <span className="text-[8px] bg-indigo-500/10 text-indigo-400 font-bold font-mono px-1.5 py-0.5 rounded border border-indigo-500/20 animate-pulse">
-                    M1 LOCKED (STRATEGY RULE)
+                  <span className="text-[8px] bg-indigo-500/10 text-indigo-400 font-bold font-mono px-1.5 py-0.5 rounded border border-indigo-500/20">
+                    MULTI-TIMEFRAME ACTIVE
                   </span>
                 </div>
                 <div className="flex bg-[#141626] border border-[#1E2235] rounded-xl p-1 gap-1">
                   {timeframes.map((tf) => {
-                    const isSelected = selectedTimeframe === tf || tf === "1m";
+                    const isSelected = selectedTimeframe === tf;
                     return (
                       <button
                         key={tf}
                         id={`tf-${tf}`}
-                        disabled={tf !== "1m"}
                         onClick={() => setSelectedTimeframe(tf)}
                         className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                          tf === "1m"
+                          isSelected
                             ? "bg-[#6366F1] text-white shadow-md shadow-indigo-500/10"
-                            : "text-gray-600 cursor-not-allowed opacity-35"
+                            : "text-gray-400 hover:text-gray-200 hover:bg-[#1C1F37]"
                         }`}
                       >
                         {tf}
