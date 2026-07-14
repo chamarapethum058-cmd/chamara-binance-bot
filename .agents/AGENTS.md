@@ -40,11 +40,11 @@ The bot must track the following session hours mapped between New York Time and 
 5. **Asian Liquidity Sweep & HTF Array:** Confirm that Asian Session liquidity is swept during the London Open window, and HTF PD Array (PDL, PDH, PWH, PWL, HTF-FVG, HTF-OB, HTF-BB) is mitigated.
 6. **Checklist Validation:** All 6 steps must evaluate individually and dynamically in the Validation Tree.
 
-## 6. 90% Minimum Confirmation Rate Constraint
+## 6. 85% Minimum Confirmation Rate Constraint
 The bot must strictly enforce the following confidence scoring boundaries:
 1. **Confidence Score Calculation:** Calculate a strategy confidence score out of 100% based on rule confluences (Trend alignment: 20%, Optimal matrix zone discount/premium: 20%, Daily Open alignment: 15%, Active Silver Bullet window: 15%, Wick Liquidity sweep: 15%, and LTF Shift/MSS with FVG: 15%).
-2. **90% Minimum Filter:** Only deliver trade setups that achieve a confidence score of 90% or higher.
-3. **Low-Confidence Entry Lockout:** If confidence is below 90%, the bot must suppress and lockout the setup, returning "No Entry (Confidence < 90%)" to prevent low-probability trades and shield the user from unnecessary stop losses. Display this confirmation percentage on the frontend page next to the Entry Price Area card.
+2. **85% Minimum Filter:** Only deliver trade setups that achieve a confidence score of 85% or higher.
+3. **Low-Confidence Entry Lockout:** If confidence is below 85%, the bot must suppress and lockout the setup, returning "No Entry (Confidence < 85%)" to prevent low-probability trades and shield the user from unnecessary stop losses. Display this confirmation percentage on the frontend page next to the Entry Price Area card.
 
 ## 7. Automated Economic News Lockout Constraint
 The bot must strictly enforce the following high-impact news rules:
@@ -62,7 +62,7 @@ The bot must strictly enforce the following high-impact news rules:
 ## 9. Triple-Verification Strategy Protocol (New Rule)
 > [!IMPORTANT]
 > **TRIPLE-VERIFICATION LOOP:** Before returning any actionable trade setup, the backend/AI engine must execute a strict triple-verification process.
-> It must sequentially check and match every parameter against the Falcon Rules (HTF Daily Bias, ERL/IRL zone, Daily Open vector relation, active Silver Bullet window, wick sweep, tight SL, close TP targets, news lockout, and confidence rating >= 90%) at least three separate times in its reasoning sequence.
+> It must sequentially check and match every parameter against the Falcon Rules (HTF Daily Bias, ERL/IRL zone, Daily Open vector relation, active Silver Bullet window, wick sweep, tight SL, close TP targets, news lockout, and confidence rating >= 85%) at least three separate times in its reasoning sequence.
 > If any check fails in any of the loops, the entry must be immediately suppressed and locked out.
 
 ## 10. High-Confluence Market-Price Confirmation Protocol (New Rule)

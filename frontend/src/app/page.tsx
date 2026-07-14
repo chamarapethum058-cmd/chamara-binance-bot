@@ -1771,7 +1771,7 @@ export default function Dashboard() {
                           <div className={`bg-[#141626]/40 border rounded-xl p-4 flex flex-col gap-2.5 transition-all ${
                             sbResult.news_lockout_active 
                               ? "border-rose-500/50 shadow-md shadow-rose-500/5"
-                              : sbResult.confidence && sbResult.confidence >= 90 
+                              : sbResult.confidence && sbResult.confidence >= 85 
                                 ? "border-indigo-500/50 shadow-md shadow-indigo-500/5" 
                                 : "border-[#1E2235]/60"
                           }`}>
@@ -1785,9 +1785,9 @@ export default function Dashboard() {
                                   </span>
                                 ) : sbResult.confidence !== undefined && sbResult.confidence !== null && (
                                   <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded font-mono flex items-center gap-1 ${
-                                    sbResult.confidence >= 90 ? "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20" : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                                    sbResult.confidence >= 85 ? "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20" : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
                                   }`}>
-                                    <span className={`w-1.5 h-1.5 rounded-full ${sbResult.confidence >= 90 ? "bg-indigo-400 animate-pulse" : "bg-rose-400"}`} />
+                                    <span className={`w-1.5 h-1.5 rounded-full ${sbResult.confidence >= 85 ? "bg-indigo-400 animate-pulse" : "bg-rose-400"}`} />
                                     {sbResult.confidence}% CONFIRMED
                                   </span>
                                 )}

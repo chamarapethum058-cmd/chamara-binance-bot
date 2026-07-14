@@ -372,11 +372,11 @@ USER'S TRADING STRATEGY RULES:
         else:
             sb_step_5_details = "Setup locked/pending: Premium zone, above daily open, or news lockout active. | රීති අවහිරය: මිල Premium/Daily Open එකට ඉහළින් හෝ පුවත් අවහිරය සක්‍රීයයි."
             
-        sb_step_6_risk_mgmt_ok = (setup_triggered and not ct_locked and rr_ratio >= 2.0 and conf_score >= 90)
+        sb_step_6_risk_mgmt_ok = (setup_triggered and not ct_locked and rr_ratio >= 2.0 and conf_score >= 85)
         if sb_step_6_risk_mgmt_ok:
             sb_step_6_details = f"Risk management verified: SL at swept boundary, TP set at 1:4.00 RR. | SL සහ TP 1:4.00 RR අනුපාතයකට සකසා ඇත."
         else:
-            sb_step_6_details = f"Risk management locked: RR profile insufficient ({rr_ratio:.2f} < 1:2 RR or confidence < 90%). | රීති අවහිරය: RR අනුපාතය හෝ තහවුරු කිරීමේ ප්‍රතිශතය ප්‍රමාණවත් නොවේ."
+            sb_step_6_details = f"Risk management locked: RR profile insufficient ({rr_ratio:.2f} < 1:2 RR or confidence < 85%). | රීති අවහිරය: RR අනුපාතය හෝ තහවුරු කිරීමේ ප්‍රතිශතය ප්‍රමාණවත් නොවේ."
 
         # New specific YouTube video rules (Steps 7-10)
         sb_step_7_london_asian_sweep_ok = (swept_pool != "NONE" or asian_sweep)
@@ -686,7 +686,7 @@ YOUR TASK:
 10. Check if the 9:00 AM Range filter setup is active (specifically for NY_AM when 9:00 AM high/low are provided). Set "is_advanced_setup" to true, and specify "advanced_setup_status" as "NONE", "9AM_LOW_SWEPT_MSS_PENDING" (if 9:00 AM low swept but no MSS trigger), "9AM_HIGH_SWEPT_MSS_PENDING" (if 9:00 AM high swept but no MSS trigger), or "TRIGGERED" (if swept and MSS trigger is active).
 11. Return bilingual explanations (English + Sinhala) for "market_structure_status", "reasoning", "invalidation", and "risk_notes".
 12. Enforce minimum Risk-to-Reward (RR) threshold: The reward-to-risk ratio from entry price area to the liquidity target relative to stop loss must be at least 1:2 (2.0). If it is less than 1:2, you MUST invalidate the setup (set is_valid=false), clear all execution parameters (set entry, SL, target to null), and return a status_message stating "Strategy Lockout: Risk-to-Reward ratio is less than 1:2 minimum threshold." and include its Sinhala translation.
-13. TRIPLE-VERIFICATION PROTOCOL: You MUST execute a strict sequential check of all setup parameters against the active rules (HTF Daily Bias, ERL/IRL zone, Daily Open vector relation, active Silver Bullet window, wick sweep, tight SL risk, close TP targets, news lockout, and confidence rating >= 90%) at least three separate times in a verification loop before returning a setup. If killzone is "ALL_TIME", the Silver Bullet time window check is bypassed/ignored and always passes. State clearly in your explanations that triple-verification has successfully passed to prevent configuration errors.
+13. TRIPLE-VERIFICATION PROTOCOL: You MUST execute a strict sequential check of all setup parameters against the active rules (HTF Daily Bias, ERL/IRL zone, Daily Open vector relation, active Silver Bullet window, wick sweep, tight SL risk, close TP targets, news lockout, and confidence rating >= 85%) at least three separate times in a verification loop before returning a setup. If killzone is "ALL_TIME", the Silver Bullet time window check is bypassed/ignored and always passes. State clearly in your explanations that triple-verification has successfully passed to prevent configuration errors.
 14. NO ARBITRARY ENTRY/SL PROTOCOL: You MUST analyze the market structure deeply. Do NOT recommend arbitrary entries or stop losses. Ensure that a valid, close lower-timeframe (1m/3m) confirmation structure (e.g. displacement shift, candle body close MSS, and unmitigated FVG/OB arrays) is active and confirmed in the immediate vicinity of the current price. If such proximity confirmations are missing, you MUST suppress the setup and return is_valid=false or daily_bias=NEUTRAL.
 
 
@@ -1132,22 +1132,22 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
             elif swept_pool != "NONE" or asian_sweep:
                 conf_score += 5
 
-            # Enforce 90% Minimum Filter lockout
-            if conf_score < 90:
+            # Enforce 85% Minimum Filter lockout
+            if conf_score < 85:
                 market_structure_status = (
-                    f"HTF Trend is {htf_trend}, but strategy confidence is below 90% ({conf_score}%). Setup Locked.\n\n"
+                    f"HTF Trend is {htf_trend}, but strategy confidence is below 85% ({conf_score}%). Setup Locked.\n\n"
                     f"---\n\n"
                     f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
-                    f"Trend එක {htf_trend} වුවත්, strategy තහවුරු කිරීමේ ප්‍රතිශතය 90% ට වඩා අඩුය ({conf_score}%). Setup අවහිර කර ඇත."
+                    f"Trend එක {htf_trend} වුවත්, strategy තහවුරු කිරීමේ ප්‍රතිශතය 85% ට වඩා අඩුය ({conf_score}%). Setup අවහිර කර ඇත."
                 )
                 
                 reasoning = (
-                    f"No Entry Triggered because confidence score ({conf_score}%) does not meet the 90% minimum threshold.\n"
-                    f"Wait for high-probability setups where all confluences align to yield >= 90% score.\n\n"
+                    f"No Entry Triggered because confidence score ({conf_score}%) does not meet the 85% minimum threshold.\n"
+                    f"Wait for high-probability setups where all confluences align to yield >= 85% score.\n\n"
                     f"---\n\n"
                     f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
-                    f"තහවුරු කිරීමේ ප්‍රතිශතය ({conf_score}%) 90% සීමාවට වඩා අඩු බැවින් entry එක ලබා දී නොමැත.\n"
-                    f"90% හෝ ඊට වැඩි සම්භාවිතාවක් ඇති Setup එකක් ලැබෙන තෙක් රැඳී සිටින්න."
+                    f"තහවුරු කිරීමේ ප්‍රතිශතය ({conf_score}%) 85% සීමාවට වඩා අඩු බැවින් entry එක ලබා දී නොමැත.\n"
+                    f"85% හෝ ඊට වැඩි සම්භාවිතාවක් ඇති Setup එකක් ලැබෙන තෙක් රැඳී සිටින්න."
                 )
                 
                 invalidation = (
@@ -1198,11 +1198,11 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
 
                 return {
                     "is_valid": True,
-                    "status_message": f"Strategy Lockout: Confidence score ({conf_score}%) is below 90% minimum threshold.",
+                    "status_message": f"Strategy Lockout: Confidence score ({conf_score}%) is below 85% minimum threshold.",
                     "market_structure_status": market_structure_status,
                     "daily_bias": "NEUTRAL",
                     "liquidity_target": None,
-                    "entry_price_area": "No Entry (Confidence < 90%)",
+                    "entry_price_area": "No Entry (Confidence < 85%)",
                     "stop_loss_level": None,
                     "target_reward_ratio": "N/A",
                     "reasoning": reasoning,
@@ -1636,13 +1636,13 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
             elif swept_pool != "NONE" or asian_sweep:
                 conf_score += 5
 
-            if conf_score < 90:
-                pot_entry = "No Entry (Confidence < 90%)"
+            if conf_score < 85:
+                pot_entry = "No Entry (Confidence < 85%)"
                 pot_sl = None
                 pot_target = None
                 pot_rr = "N/A"
-                if "Strategy confidence score is below 90%" not in reasons:
-                    reasons.append(f"Strategy confidence score ({conf_score}%) is below 90% minimum confluence threshold")
+                if "Strategy confidence score is below 85%" not in reasons:
+                    reasons.append(f"Strategy confidence score ({conf_score}%) is below 85% minimum confluence threshold")
 
             if reasons:
                 reason_str = ", ".join(reasons)
