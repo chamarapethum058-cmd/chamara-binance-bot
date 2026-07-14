@@ -745,7 +745,25 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
             # Save computed confidence score
             result["confidence"] = conf_score
             
-            # Parse entry price from entry_price_area string
+            # Enforce strict tight scalp parameters on valid signals
+            if result.get("is_valid") and result.get("daily_bias") in ["BULLISH", "BEARISH"]:
+                bias = result["daily_bias"]
+                min_risk = cls._get_tight_scalp_risk(current_price or 2320.0, symbol)
+                entry_price_val = current_price or 0.0
+                if bias == "BULLISH":
+                    stop_loss_val = entry_price_val - min_risk
+                    target_val = entry_price_val + (min_risk * 4.0)
+                else:
+                    stop_loss_val = entry_price_val + min_risk
+                    target_val = entry_price_val - (min_risk * 4.0)
+                
+                action_type = "Buy Limit" if bias == "BULLISH" else "Sell Limit"
+                result["entry_price_area"] = f"{action_type} at {entry_price_val:.2f}"
+                result["stop_loss_level"] = round(stop_loss_val, 2)
+                result["liquidity_target"] = round(target_val, 2)
+                result["target_reward_ratio"] = "1:4.00"
+            
+            # Parse entry price from entry_price_area string for steps checklist
             entry_price_val = 0.0
             try:
                 import re

@@ -58,6 +58,84 @@ export default function Dashboard() {
   const [news, setNews] = useState<any[]>([]);
   const [newsLoading, setNewsLoading] = useState(false);
   const [activeView, setActiveView] = useState<"dashboard" | "news" | "silverbullet">("dashboard");
+  const [trackers, setTrackers] = useState<any[]>([]);
+
+  const fetchTrackersStatus = async () => {
+    try {
+      const res = await fetch("http://127.0.0.1:8000/api/tracker/status");
+      if (res.ok) {
+        const data = await res.json();
+        setTrackers(data);
+      }
+    } catch (err) {
+      console.error("Error fetching trackers status:", err);
+    }
+  };
+
+  const handleTrackSetup = async (symbol: string) => {
+    try {
+      const res = await fetch("http://127.0.0.1:8000/api/tracker/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          symbol: symbol,
+          timeframe: "1m",
+          scenario_text: sbScenarioText,
+          htf_trend: sbHtfTrend,
+          pullback_days: sbPullbackDays ? Number(sbPullbackDays) : null,
+          pdh: sbPdh ? Number(sbPdh) : null,
+          pdl: sbPdl ? Number(sbPdl) : null,
+          daily_open: sbOpen ? Number(sbOpen) : null,
+          daily_close: sbClose ? Number(sbClose) : null,
+          asian_sweep: sbAsianSweep,
+          demand_mitigation: sbDemandMitigation,
+          ltf_shift: sbLtfShift,
+          current_price: sbCurrentPrice ? Number(sbCurrentPrice) : null,
+          dealing_range_high: sbDealingRangeHigh ? Number(sbDealingRangeHigh) : null,
+          dealing_range_low: sbDealingRangeLow ? Number(sbDealingRangeLow) : null,
+          killzone: sbKillzone,
+          discount_pd_array: sbDiscountPdArray,
+          premium_pd_array: sbPremiumPdArray,
+          ltf_trigger: sbLtfTrigger,
+          has_fresh_fvg: sbHasFreshFvg,
+          high_impact_news: sbHighImpactNews,
+          candle_9am_high: sbCandle9amHigh ? Number(sbCandle9amHigh) : null,
+          candle_9am_low: sbCandle9amLow ? Number(sbCandle9amLow) : null
+        })
+      });
+      if (res.ok) {
+        alert(`Started tracking ${symbol} successfully! Check the Active Live Scanners panel on the right.`);
+        fetchTrackersStatus();
+      }
+    } catch (err) {
+      console.error("Error starting tracker:", err);
+    }
+  };
+
+  const handleStopTracking = async (symbol: string) => {
+    try {
+      const res = await fetch("http://127.0.0.1:8000/api/tracker/stop", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ symbol: symbol })
+      });
+      if (res.ok) {
+        fetchTrackersStatus();
+      }
+    } catch (err) {
+      console.error("Error stopping tracker:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchTrackersStatus();
+  }, []);
+
+  useEffect(() => {
+    if (trackers.length === 0) return;
+    const interval = setInterval(fetchTrackersStatus, 5000);
+    return () => clearInterval(interval);
+  }, [trackers.length]);
 
   // Chat interface state
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -1425,6 +1503,65 @@ export default function Dashboard() {
                     })()}
                   </div>
                 </div>
+
+                {/* Active Live Scanners Block */}
+                <div className="bg-[#11131F]/90 border border-[#1E2235] rounded-2xl p-6 shadow-xl flex flex-col gap-5 mt-6">
+                  <h2 className="text-md font-semibold tracking-wide text-white flex items-center gap-2">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </span>
+                    Active Live Scanners (Running Setups)
+                  </h2>
+                  <div className="flex flex-col gap-2.5 max-h-[300px] overflow-y-auto pr-1">
+                    {trackers.length === 0 ? (
+                      <p className="text-xs text-gray-500 text-center py-6 font-mono">No active scanners running currently. Set a trade setup above and click "Track Setup" to monitor it here.</p>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {trackers.map((tracker) => (
+                          <div key={tracker.symbol} className="bg-[#141626]/60 border border-[#1E2235] rounded-xl p-4 flex flex-col gap-2 transition-all hover:border-[#6366F1]/30">
+                            <div className="flex justify-between items-center">
+                              <span className="font-bold text-sm text-white font-mono">{tracker.symbol}</span>
+                              <div className="flex items-center gap-1.5">
+                                <span className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded font-mono ${
+                                  tracker.status === "ENTRY READY" ? "bg-emerald-500/20 text-emerald-400 animate-pulse" : "bg-[#1E2235] text-indigo-400"
+                                }`}>
+                                  {tracker.status}
+                                </span>
+                                <button
+                                  onClick={() => handleStopTracking(tracker.symbol)}
+                                  className="text-gray-500 hover:text-rose-400 text-xs transition-colors cursor-pointer"
+                                  title="Stop tracking"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            </div>
+                            <div className="flex justify-between items-center text-xs">
+                              <span className="text-gray-400 font-mono">Confluences:</span>
+                              <span className={`font-mono font-bold ${
+                                tracker.confluences >= 9 ? "text-emerald-400" : tracker.confluences >= 6 ? "text-indigo-400" : "text-gray-400"
+                              }`}>{tracker.confluences}/10</span>
+                            </div>
+                            {/* Progress Bar */}
+                            <div className="w-full bg-[#1E2235] h-1.5 rounded-full overflow-hidden">
+                              <div 
+                                className={`h-full transition-all duration-500 ${
+                                  tracker.confluences >= 9 ? "bg-emerald-400" : tracker.confluences >= 6 ? "bg-indigo-400" : "bg-gray-500"
+                                }`}
+                                style={{ width: `${tracker.confluences * 10}%` }}
+                              />
+                            </div>
+                            <div className="flex justify-between items-center text-[10px] text-gray-500 font-mono mt-0.5">
+                              <span>Price:</span>
+                              <span>${tracker.current_price?.toFixed(2)}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
 
               {/* OUTPUT PANEL */}
@@ -1455,12 +1592,21 @@ export default function Dashboard() {
                 {sbResult && (
                   <div className="flex flex-col gap-6">
                     {!sbResult.is_valid ? (
-                      <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-5 flex items-start gap-3 shadow-[0_0_15px_rgba(245,158,11,0.05)]">
+                      <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-5 flex items-start gap-3 shadow-[0_0_15px_rgba(245,158,11,0.05)] w-full">
                         <svg className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                         </svg>
-                        <div className="flex flex-col gap-1">
-                          <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider">Incomplete Information Warning</h4>
+                        <div className="flex flex-col gap-1 w-full">
+                          <div className="flex items-center justify-between w-full">
+                            <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider">Incomplete Information Warning</h4>
+                            <button
+                              type="button"
+                              onClick={() => handleTrackSetup(sbSymbol)}
+                              className="bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-400 border border-indigo-500/30 text-[10px] font-bold py-1.5 px-3 rounded-lg transition-all cursor-pointer active:scale-95 flex items-center gap-1"
+                            >
+                              Track Setup 🛰️
+                            </button>
+                          </div>
                           <p className="text-xs text-gray-300 font-mono leading-relaxed mt-1">{sbResult.status_message}</p>
                         </div>
                       </div>
@@ -1673,6 +1819,14 @@ export default function Dashboard() {
                             <h4 className="text-[10px] font-bold text-[#8B5CF6] uppercase tracking-wider font-mono">Target Reward Ratio</h4>
                             <span className="text-xs font-semibold text-[#8B5CF6] font-mono">{sbResult.target_reward_ratio || "1:3 Minimum"}</span>
                           </div>
+                          
+                          <button
+                            type="button"
+                            onClick={() => handleTrackSetup(sbSymbol)}
+                            className="bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/30 text-indigo-400 text-xs font-bold py-3 px-4 rounded-xl transition-all shadow-md flex items-center justify-center gap-1.5 md:col-span-2 cursor-pointer active:scale-95"
+                          >
+                            Track Setup 🛰️
+                          </button>
                         </div>
 
                         {/* Interactive SVG Diagram Visualizer */}

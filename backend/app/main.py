@@ -15,6 +15,7 @@ from .schemas import (
 )
 from .services import BinanceService, AIService, NewsService
 from .config import settings
+from .tracker import start_tracking, stop_tracking, get_trackers_status
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -453,6 +454,29 @@ async def silverbullet_analyze(req: SilverBulletRequest, db: Session = Depends(g
         active_news_event=result.get("active_news_event"),
         upcoming_news_events=result.get("upcoming_news_events")
     )
+
+
+@app.post("/api/tracker/start")
+async def tracker_start(req: SilverBulletRequest, db: Session = Depends(get_db)):
+    pref = db.query(PreferenceModel).filter(PreferenceModel.key == "gemini_api_key").first()
+    api_key = pref.value if pref else None
+    if not req.symbol:
+        raise HTTPException(status_code=400, detail="Symbol is required")
+    start_tracking(req.symbol, req.dict(), api_key=api_key)
+    return {"status": "SUCCESS", "message": f"Started tracking {req.symbol}"}
+
+@app.post("/api/tracker/stop")
+async def tracker_stop(req: dict):
+    symbol = req.get("symbol")
+    if not symbol:
+        raise HTTPException(status_code=400, detail="Symbol is required")
+    stop_tracking(symbol)
+    return {"status": "SUCCESS", "message": f"Stopped tracking {symbol}"}
+
+@app.get("/api/tracker/status")
+async def tracker_status():
+    return get_trackers_status()
+
 
 
 import httpx
