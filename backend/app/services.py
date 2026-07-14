@@ -654,6 +654,8 @@ YOUR TASK:
 10. Check if the 9:00 AM Range filter setup is active (specifically for NY_AM when 9:00 AM high/low are provided). Set "is_advanced_setup" to true, and specify "advanced_setup_status" as "NONE", "9AM_LOW_SWEPT_MSS_PENDING" (if 9:00 AM low swept but no MSS trigger), "9AM_HIGH_SWEPT_MSS_PENDING" (if 9:00 AM high swept but no MSS trigger), or "TRIGGERED" (if swept and MSS trigger is active).
 11. Return bilingual explanations (English + Sinhala) for "market_structure_status", "reasoning", "invalidation", and "risk_notes".
 12. Enforce minimum Risk-to-Reward (RR) threshold: The reward-to-risk ratio from entry price area to the liquidity target relative to stop loss must be at least 1:2 (2.0). If it is less than 1:2, you MUST invalidate the setup (set is_valid=false), clear all execution parameters (set entry, SL, target to null), and return a status_message stating "Strategy Lockout: Risk-to-Reward ratio is less than 1:2 minimum threshold." and include its Sinhala translation.
+13. TRIPLE-VERIFICATION PROTOCOL: You MUST execute a strict sequential check of all setup parameters against the active rules (HTF Daily Bias, ERL/IRL zone, Daily Open vector relation, active Silver Bullet window, wick sweep, tight SL risk, close TP targets, news lockout, and confidence rating >= 90%) at least three separate times in a verification loop before returning a setup. State clearly in your explanations that triple-verification has successfully passed to prevent configuration errors.
+
 
 -----------------------------------------
 OUTPUT FORMAT:
@@ -1028,7 +1030,7 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                         entry_price = swept_level + leg_size * 0.50
                     else:
                         entry_price = current_price or (swept_level + min_risk)
-                    stop_loss = min(swept_level, entry_price - min_risk)
+                    stop_loss = entry_price - min_risk
                     target = entry_price + (entry_price - stop_loss) * 4.0
                     bias = "BULLISH"
                 else:
@@ -1038,7 +1040,7 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                         entry_price = swept_level - leg_size * 0.50
                     else:
                         entry_price = current_price or (swept_level - min_risk)
-                    stop_loss = max(swept_level, entry_price + min_risk)
+                    stop_loss = entry_price + min_risk
                     target = entry_price - (stop_loss - entry_price) * 4.0
                     bias = "BEARISH"
             else:
@@ -1049,7 +1051,7 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                         entry_price = swept_level + leg_size * 0.50
                     else:
                         entry_price = current_price or (swept_level + min_risk)
-                    stop_loss = min(swept_level, entry_price - min_risk)
+                    stop_loss = entry_price - min_risk
                     target = entry_price + (entry_price - stop_loss) * 4.0
                     bias = "BULLISH"
                 else:
@@ -1059,7 +1061,7 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                         entry_price = swept_level - leg_size * 0.50
                     else:
                         entry_price = current_price or (swept_level - min_risk)
-                    stop_loss = max(swept_level, entry_price + min_risk)
+                    stop_loss = entry_price + min_risk
                     target = entry_price - (stop_loss - entry_price) * 4.0
                     bias = "BEARISH"
             
@@ -1515,7 +1517,7 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                         pe = swept_level + leg_size * 0.50
                     else:
                         pe = current_price or (swept_level + min_risk)
-                    psl = min(swept_level, pe - min_risk)
+                    psl = pe - min_risk
                     pt = pe + (pe - psl) * 4.0
                     pot_label = "Est. Buy Limit"
                 else:
@@ -1525,7 +1527,7 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                         pe = swept_level - leg_size * 0.50
                     else:
                         pe = current_price or (swept_level - min_risk)
-                    psl = max(swept_level, pe + min_risk)
+                    psl = pe + min_risk
                     pt = pe - (psl - pe) * 4.0
                     pot_label = "Est. Sell Limit"
                 
@@ -1551,7 +1553,7 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                         pe = swept_level + leg_size * 0.50
                     else:
                         pe = current_price or (swept_level + min_risk)
-                    psl = min(swept_level, pe - min_risk)
+                    psl = pe - min_risk
                     pt = pe + (pe - psl) * 4.0
                     pot_label = "Est. Buy Limit"
                 else:
@@ -1561,7 +1563,7 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                         pe = swept_level - leg_size * 0.50
                     else:
                         pe = current_price or (swept_level - min_risk)
-                    psl = max(swept_level, pe + min_risk)
+                    psl = pe + min_risk
                     pt = pe - (psl - pe) * 4.0
                     pot_label = "Est. Sell Limit"
                 

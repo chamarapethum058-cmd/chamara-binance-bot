@@ -59,4 +59,11 @@ The bot must strictly enforce the following high-impact news rules:
 > The frontend (`frontend/src/app/page.tsx`) must always display the confidence percentage inside the `% CONFIRMED` badge next to the Entry Price Area card, checking safely for null/undefined values to prevent empty labels. 
 > Any changes to these constraints require explicit user approval.
 
+## 9. Triple-Verification Strategy Protocol (New Rule)
+> [!IMPORTANT]
+> **TRIPLE-VERIFICATION LOOP:** Before returning any actionable trade setup, the backend/AI engine must execute a strict triple-verification process.
+> It must sequentially check and match every parameter against the Falcon Rules (HTF Daily Bias, ERL/IRL zone, Daily Open vector relation, active Silver Bullet window, wick sweep, tight SL, close TP targets, news lockout, and confidence rating >= 90%) at least three separate times in its reasoning sequence.
+> If any check fails in any of the loops, the entry must be immediately suppressed and locked out.
+
+
 
