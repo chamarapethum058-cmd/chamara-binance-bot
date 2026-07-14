@@ -951,7 +951,22 @@ export default function Dashboard() {
               {/* INPUT PANEL */}
               <div className="lg:col-span-5 bg-[#11131F]/90 border border-[#1E2235] rounded-2xl p-6 shadow-xl flex flex-col gap-5">
                 <div className="flex items-center justify-between border-b border-[#1E2235] pb-4">
-                  <h3 className="text-sm font-semibold tracking-wide text-white">Scenario Input</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-semibold tracking-wide text-white">Scenario Input</h3>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSbResult(null);
+                        setSbLoading(false);
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-[#141626] border border-[#1E2235] text-[10px] font-bold font-mono tracking-wider text-gray-400 hover:text-indigo-400 hover:border-[#6366F1]/50 transition-all flex items-center gap-1.5 shadow-sm active:scale-95"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 8H18.235" />
+                      </svg>
+                      <span>REFRESH</span>
+                    </button>
+                  </div>
                   <div className="flex bg-[#141626] border border-[#1E2235] rounded-lg p-0.5">
                     <button
                       onClick={() => setSbInputMode("form")}
