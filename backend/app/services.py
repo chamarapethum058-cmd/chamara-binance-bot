@@ -655,6 +655,8 @@ YOUR TASK:
 11. Return bilingual explanations (English + Sinhala) for "market_structure_status", "reasoning", "invalidation", and "risk_notes".
 12. Enforce minimum Risk-to-Reward (RR) threshold: The reward-to-risk ratio from entry price area to the liquidity target relative to stop loss must be at least 1:2 (2.0). If it is less than 1:2, you MUST invalidate the setup (set is_valid=false), clear all execution parameters (set entry, SL, target to null), and return a status_message stating "Strategy Lockout: Risk-to-Reward ratio is less than 1:2 minimum threshold." and include its Sinhala translation.
 13. TRIPLE-VERIFICATION PROTOCOL: You MUST execute a strict sequential check of all setup parameters against the active rules (HTF Daily Bias, ERL/IRL zone, Daily Open vector relation, active Silver Bullet window, wick sweep, tight SL risk, close TP targets, news lockout, and confidence rating >= 90%) at least three separate times in a verification loop before returning a setup. State clearly in your explanations that triple-verification has successfully passed to prevent configuration errors.
+14. NO ARBITRARY ENTRY/SL PROTOCOL: You MUST analyze the market structure deeply. Do NOT recommend arbitrary entries or stop losses. Ensure that a valid, close lower-timeframe (1m/3m) confirmation structure (e.g. displacement shift, candle body close MSS, and unmitigated FVG/OB arrays) is active and confirmed in the immediate vicinity of the current price. If such proximity confirmations are missing, you MUST suppress the setup and return is_valid=false or daily_bias=NEUTRAL.
+
 
 
 -----------------------------------------
@@ -1024,45 +1026,25 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
             
             if is_adv:
                 if swept_pool == "9AM_LOW_SSL":
-                    swept_level = candle_9am_low or (current_price - 6.0)
-                    leg_size = abs((current_price or (swept_level + 6.0)) - swept_level)
-                    if leg_size > min_risk * 2.0:
-                        entry_price = swept_level + leg_size * 0.50
-                    else:
-                        entry_price = current_price or (swept_level + min_risk)
+                    entry_price = current_price or ((candle_9am_low or 0.0) + min_risk)
                     stop_loss = entry_price - min_risk
-                    target = entry_price + (entry_price - stop_loss) * 4.0
+                    target = entry_price + (min_risk * 4.0)
                     bias = "BULLISH"
                 else:
-                    swept_level = candle_9am_high or (current_price + 6.0)
-                    leg_size = abs(swept_level - (current_price or (swept_level - 6.0)))
-                    if leg_size > min_risk * 2.0:
-                        entry_price = swept_level - leg_size * 0.50
-                    else:
-                        entry_price = current_price or (swept_level - min_risk)
+                    entry_price = current_price or ((candle_9am_high or 0.0) - min_risk)
                     stop_loss = entry_price + min_risk
-                    target = entry_price - (stop_loss - entry_price) * 4.0
+                    target = entry_price - (min_risk * 4.0)
                     bias = "BEARISH"
             else:
                 if setup_direction == "BULLISH":
-                    swept_level = pdl if pdl is not None else (current_price - 6.0) if current_price is not None else 2320.0
-                    leg_size = abs((current_price or (swept_level + 6.0)) - swept_level)
-                    if leg_size > min_risk * 2.0:
-                        entry_price = swept_level + leg_size * 0.50
-                    else:
-                        entry_price = current_price or (swept_level + min_risk)
+                    entry_price = current_price or ((pdl or 0.0) + min_risk)
                     stop_loss = entry_price - min_risk
-                    target = entry_price + (entry_price - stop_loss) * 4.0
+                    target = entry_price + (min_risk * 4.0)
                     bias = "BULLISH"
                 else:
-                    swept_level = pdh if pdh is not None else (current_price + 6.0) if current_price is not None else 2320.0
-                    leg_size = abs(swept_level - (current_price or (swept_level - 6.0)))
-                    if leg_size > min_risk * 2.0:
-                        entry_price = swept_level - leg_size * 0.50
-                    else:
-                        entry_price = current_price or (swept_level - min_risk)
+                    entry_price = current_price or ((pdh or 0.0) - min_risk)
                     stop_loss = entry_price + min_risk
-                    target = entry_price - (stop_loss - entry_price) * 4.0
+                    target = entry_price - (min_risk * 4.0)
                     bias = "BEARISH"
             
             # Calculate strategy confidence score based on confluences (out of 100%)
@@ -1511,24 +1493,14 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
 
             if is_adv and adv_status in ["9AM_LOW_SWEPT_MSS_PENDING", "9AM_HIGH_SWEPT_MSS_PENDING"] and candle_9am_high and candle_9am_low:
                 if adv_status == "9AM_LOW_SWEPT_MSS_PENDING":
-                    swept_level = candle_9am_low
-                    leg_size = abs((current_price or (swept_level + 6.0)) - swept_level)
-                    if leg_size > min_risk * 2.0:
-                        pe = swept_level + leg_size * 0.50
-                    else:
-                        pe = current_price or (swept_level + min_risk)
+                    pe = current_price or ((candle_9am_low or 0.0) + min_risk)
                     psl = pe - min_risk
-                    pt = pe + (pe - psl) * 4.0
+                    pt = pe + (min_risk * 4.0)
                     pot_label = "Est. Buy Limit"
                 else:
-                    swept_level = candle_9am_high
-                    leg_size = abs(swept_level - (current_price or (swept_level - 6.0)))
-                    if leg_size > min_risk * 2.0:
-                        pe = swept_level - leg_size * 0.50
-                    else:
-                        pe = current_price or (swept_level - min_risk)
+                    pe = current_price or ((candle_9am_high or 0.0) - min_risk)
                     psl = pe + min_risk
-                    pt = pe - (psl - pe) * 4.0
+                    pt = pe - (min_risk * 4.0)
                     pot_label = "Est. Sell Limit"
                 
                 risk = abs(pe - psl)
@@ -1547,24 +1519,14 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                     pot_rr = f"1:{pot_rr_val:.2f} (Est.)"
             elif not is_adv and swept_pool != "NONE":
                 if setup_direction == "BULLISH":
-                    swept_level = pdl if pdl is not None else (current_price - 6.0) if current_price is not None else 2320.0
-                    leg_size = abs((current_price or (swept_level + 6.0)) - swept_level)
-                    if leg_size > min_risk * 2.0:
-                        pe = swept_level + leg_size * 0.50
-                    else:
-                        pe = current_price or (swept_level + min_risk)
+                    pe = current_price or ((pdl or 0.0) + min_risk)
                     psl = pe - min_risk
-                    pt = pe + (pe - psl) * 4.0
+                    pt = pe + (min_risk * 4.0)
                     pot_label = "Est. Buy Limit"
                 else:
-                    swept_level = pdh if pdh is not None else (current_price + 6.0) if current_price is not None else 2320.0
-                    leg_size = abs(swept_level - (current_price or (swept_level - 6.0)))
-                    if leg_size > min_risk * 2.0:
-                        pe = swept_level - leg_size * 0.50
-                    else:
-                        pe = current_price or (swept_level - min_risk)
+                    pe = current_price or ((pdh or 0.0) - min_risk)
                     psl = pe + min_risk
-                    pt = pe - (psl - pe) * 4.0
+                    pt = pe - (min_risk * 4.0)
                     pot_label = "Est. Sell Limit"
                 
                 risk = abs(pe - psl)

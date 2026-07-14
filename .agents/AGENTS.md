@@ -65,5 +65,12 @@ The bot must strictly enforce the following high-impact news rules:
 > It must sequentially check and match every parameter against the Falcon Rules (HTF Daily Bias, ERL/IRL zone, Daily Open vector relation, active Silver Bullet window, wick sweep, tight SL, close TP targets, news lockout, and confidence rating >= 90%) at least three separate times in its reasoning sequence.
 > If any check fails in any of the loops, the entry must be immediately suppressed and locked out.
 
+## 10. High-Confluence Market-Price Confirmation Protocol (New Rule)
+> [!IMPORTANT]
+> **NO ARBITRARY ENTRIES/STOP LOSSES:** The system must never output arbitrary entry or stop loss parameters. 
+> To authorize an entry near the market price, there must be active, confirmed lower-timeframe (1m/3m) confirmations (e.g. valid structural displacement, candle body close MSS, and unmitigated FVG/OB arrays) located directly within the immediate vicinity of the current price.
+> If these specific close-proximity confirmations do not exist, the entry must be suppressed and locked out to prevent arbitrary trade execution.
+
+
 
 
