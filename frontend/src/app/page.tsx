@@ -1192,6 +1192,7 @@ export default function Dashboard() {
                             <option value="NY_PM_SB">PM Session Silver Bullet (2PM - 3PM NY / 11:30PM - 12:30AM LK)</option>
                             <option value="LONDON">London Killzone (2AM - 5AM NY / 11:30AM - 2:30PM LK)</option>
                             <option value="NY_AM">New York AM Killzone (7AM - 10AM NY / 4:30PM - 7:30PM LK)</option>
+                            <option value="ALL_TIME">All Time Analysis (24/7 Active)</option>
                             <option value="NONE">Outside Killzones (Inactive)</option>
                           </select>
                         </div>

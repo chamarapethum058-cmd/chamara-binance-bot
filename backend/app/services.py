@@ -334,11 +334,14 @@ USER'S TRADING STRATEGY RULES:
         timeframe: str = "1m"
     ) -> Dict[str, Any]:
         sb_step_1_time_window_ok = kz_valid
-        sb_step_1_details = (
-            f"Designated {killzone} Silver Bullet Session active. | වලංගු {killzone} Silver Bullet කාලසීමාව සක්‍රීයයි."
-            if kz_valid else
-            "Outside of standard Silver Bullet hours (Any-Time active). | සම්මත Silver Bullet කාලසීමාවෙන් බැහැරයි (ඕනෑම වේලාවක සක්‍රීයයි)."
-        )
+        if killzone == "ALL_TIME":
+            sb_step_1_details = "All-Time Trading Session active (24/7). | පැය 24 පුරාම සක්‍රීය ඕනෑම වේලාවක වෙළඳ සැසිය සක්‍රීයයි."
+        else:
+            sb_step_1_details = (
+                f"Designated {killzone} Silver Bullet Session active. | වලංගු {killzone} Silver Bullet කාලසීමාව සක්‍රීයයි."
+                if kz_valid else
+                "Outside of standard Silver Bullet hours (Any-Time active). | සම්මත Silver Bullet කාලසීමාවෙන් බැහැරයි (ඕනෑම වේලාවක සක්‍රීයයි)."
+            )
         
         sb_step_2_liquidity_sweep_ok = (swept_pool != "NONE" or asian_sweep)
         sb_step_2_details = (
@@ -895,7 +898,7 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
         # AM Session SB: 10-11AM NY / 7:30-8:30 PM LK
         # PM Session SB: 2-3PM NY / 11:30 PM-12:30 AM LK
         # Strategy confirmations are strictly evaluated on the 1m chart timeframe.
-        kz_valid = killzone in ["LONDON", "LONDON_SB", "NY_AM", "NY_AM_SB", "NY_PM", "NY_PM_SB"]
+        kz_valid = killzone in ["LONDON", "LONDON_SB", "NY_AM", "NY_AM_SB", "NY_PM", "NY_PM_SB", "ALL_TIME"]
 
         # Initialize default values to prevent unbound variable errors
         entry_price = current_price or 0.0
@@ -925,7 +928,7 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                 killzone = "NY_AM_SB"
             elif "ny pm" in text_lower or "ny_pm" in text_lower:
                 killzone = "NY_PM_SB"
-            kz_valid = killzone in ["LONDON", "LONDON_SB", "NY_AM", "NY_AM_SB", "NY_PM", "NY_PM_SB"]
+            kz_valid = killzone in ["LONDON", "LONDON_SB", "NY_AM", "NY_AM_SB", "NY_PM", "NY_PM_SB", "ALL_TIME"]
 
         # Advanced 9:00 AM Candlestick Range Filter
         is_adv = False
