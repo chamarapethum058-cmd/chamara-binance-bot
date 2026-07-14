@@ -2333,7 +2333,7 @@ export default function Dashboard() {
                           </div>
                         )}
 
-                        {/* Detailed ICT Silver Bullet 6-Step Confirmation Pipeline */}
+                        {/* Detailed ICT Silver Bullet 12-Step Confirmation Pipeline */}
                         {sbResult && (
                           <div className="bg-[#11131F]/90 border border-[#1E2235] rounded-2xl p-5 shadow-xl flex flex-col gap-4">
                             <div className="flex justify-between items-center border-b border-[#1E2235]/40 pb-3">
@@ -2341,7 +2341,7 @@ export default function Dashboard() {
                                 <svg className="w-4 h-4 text-[#8B5CF6] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
                                 </svg>
-                                ICT Silver Bullet 10-Step Confirmation Pipeline
+                                ICT Silver Bullet & PO3 12-Step Confirmation Pipeline
                               </h4>
                               {sbResult.sb_step_1_time_window_ok && 
                                sbResult.sb_step_2_liquidity_sweep_ok && 
@@ -2352,9 +2352,9 @@ export default function Dashboard() {
                                sbResult.sb_step_7_london_asian_sweep_ok && 
                                sbResult.sb_step_8_htf_pd_mitigation_ok && 
                                sbResult.sb_step_9_ltf_choch_ok && 
-                               sbResult.sb_step_10_fvg_limit_ok && (
+                               sbResult.sb_step_10_fvg_limit_ok && sbResult.sb_step_11_equilibrium_ok && sbResult.sb_step_12_po3_align_ok && (
                                  <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[9px] font-bold px-1.5 py-0.5 rounded font-mono animate-pulse flex items-center gap-1">
-                                   <span>✓</span> 10/10 CONFLUENCES VERIFIED
+                                    <span>✓</span> 12/12 CONFLUENCES VERIFIED
                                  </span>
                               )}
                               <span className="text-[10px] text-gray-400 font-mono">1m Execution Timeframe</span>
@@ -2627,6 +2627,60 @@ export default function Dashboard() {
                                   </p>
                                   <span className="text-[10px] text-indigo-300/80 font-sans">
                                     {sbResult.sb_step_10_details ? (sbResult.sb_step_10_details.split("|")[1]?.trim() || "Limit entry ඕඩරය පිහිටුවීම.") : "Limit entry ඕඩරය පිහිටුවීම."}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Step 11: Equilibrium Zone Verification (50% Rule) */}
+                              <div className="bg-[#07080E]/40 border border-[#1E2235]/40 rounded-xl p-3.5 flex items-start gap-3.5 hover:border-indigo-500/20 transition-all">
+                                <div className={`w-6 h-6 rounded-full shrink-0 flex items-center justify-center font-bold text-xs font-mono border ${
+                                  sbResult.sb_step_11_equilibrium_ok 
+                                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" 
+                                    : "bg-[#1E2235]/30 text-gray-500 border-[#1E2235]"
+                                }`}>
+                                  {sbResult.sb_step_11_equilibrium_ok ? "✓" : "11"}
+                                </div>
+                                <div className="flex flex-col gap-1 w-full">
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider font-mono">Step 11: Equilibrium Verification</span>
+                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded font-mono ${
+                                      sbResult.sb_step_11_equilibrium_ok ? "bg-emerald-500/10 text-emerald-400" : "bg-[#1E2235]/30 text-gray-400"
+                                    }`}>
+                                      {sbResult.sb_step_11_equilibrium_ok ? "DISCOUNT/PREMIUM OK" : "LOCKED"}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-white leading-relaxed mt-0.5">
+                                    {sbResult.sb_step_11_details ? sbResult.sb_step_11_details.split("|")[0].trim() : "Discount/Premium 50% zone check."}
+                                  </p>
+                                  <span className="text-[10px] text-indigo-300/80 font-sans">
+                                    {sbResult.sb_step_11_details ? (sbResult.sb_step_11_details.split("|")[1]?.trim() || "Discount/Premium 50% කලාපය පරීක්ෂාව.") : "Discount/Premium 50% කලාපය පරීක්ෂාව."}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Step 12: PO3 Open Bias Alignment */}
+                              <div className="bg-[#07080E]/40 border border-[#1E2235]/40 rounded-xl p-3.5 flex items-start gap-3.5 hover:border-indigo-500/20 transition-all">
+                                <div className={`w-6 h-6 rounded-full shrink-0 flex items-center justify-center font-bold text-xs font-mono border ${
+                                  sbResult.sb_step_12_po3_align_ok 
+                                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" 
+                                    : "bg-[#1E2235]/30 text-gray-500 border-[#1E2235]"
+                                }`}>
+                                  {sbResult.sb_step_12_po3_align_ok ? "✓" : "12"}
+                                </div>
+                                <div className="flex flex-col gap-1 w-full">
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider font-mono">Step 12: PO3 Open Bias Alignment</span>
+                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded font-mono ${
+                                      sbResult.sb_step_12_po3_align_ok ? "bg-emerald-500/10 text-emerald-400" : "bg-[#1E2235]/30 text-gray-400"
+                                    }`}>
+                                      {sbResult.sb_step_12_po3_align_ok ? "ALIGNED" : "MISMATCH"}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-white leading-relaxed mt-0.5">
+                                    {sbResult.sb_step_12_details ? sbResult.sb_step_12_details.split("|")[0].trim() : "Daily open vector relation check."}
+                                  </p>
+                                  <span className="text-[10px] text-indigo-300/80 font-sans">
+                                    {sbResult.sb_step_12_details ? (sbResult.sb_step_12_details.split("|")[1]?.trim() || "දෛනික ආරම්භක මිලට සාපේක්ෂව දිශාව පරීක්ෂාව.") : "දෛනික ආරම්භක මිලට සාපේක්ෂව දිශාව පරීක්ෂාව."}
                                   </span>
                                 </div>
                               </div>

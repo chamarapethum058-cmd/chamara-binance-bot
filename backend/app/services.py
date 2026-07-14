@@ -331,7 +331,10 @@ USER'S TRADING STRATEGY RULES:
         entry_price: float,
         rr_ratio: float,
         conf_score: int,
-        timeframe: str = "1m"
+        timeframe: str = "1m",
+        zone: str = "EQUILIBRIUM",
+        daily_bias: str = "NEUTRAL",
+        daily_open_relation: str = "N/A"
     ) -> Dict[str, Any]:
         sb_step_1_time_window_ok = kz_valid
         if killzone == "ALL_TIME":
@@ -400,6 +403,28 @@ USER'S TRADING STRATEGY RULES:
         else:
             sb_step_10_details = f"Awaiting valid entry trigger conditions at 1 Min FVG 50% CE level. | 1 Min FVG 50% CE මට්ටමේ ලිමිට් ඕඩරය සක්‍රීය වීමට කොන්දේසි සපුරා නැත."
 
+        # Step 11: Equilibrium Zone Verification (50% Rule)
+        sb_step_11_equilibrium_ok = (
+            (daily_bias == "BULLISH" and zone == "DISCOUNT") or
+            (daily_bias == "BEARISH" and zone == "PREMIUM") or
+            (daily_bias == "NEUTRAL")
+        )
+        if sb_step_11_equilibrium_ok:
+            sb_step_11_details = f"Equilibrium check: Price in optimal {zone} zone below/above midpoint. | Equilibrium පරීක්ෂාව: මිල {zone} කලාපයේ පවතී."
+        else:
+            sb_step_11_details = f"Equilibrium locked: Entry is in {zone} zone (Long requires Discount, Short Premium). | Equilibrium අවහිරය: මිල පවතින්නේ {zone} කලාපයේය (Long සඳහා Discount, Short සඳහා Premium)."
+
+        # Step 12: PO3 Open Bias Alignment
+        sb_step_12_po3_align_ok = (
+            (daily_bias == "BULLISH" and daily_open_relation == "BELOW_OPEN") or
+            (daily_bias == "BEARISH" and daily_open_relation == "ABOVE_OPEN") or
+            (daily_bias == "NEUTRAL")
+        )
+        if sb_step_12_po3_align_ok:
+            sb_step_12_details = f"PO3 Open Bias aligned: Manipulation swept below/above open price ({daily_open_relation}). | PO3 පෙළගැස්ම: Manipulation wick සීමාව {daily_open_relation} වේ."
+        else:
+            sb_step_12_details = f"PO3 Open Bias mismatch: Entry violates Open price vector ({daily_open_relation}). | PO3 දෛනික ආරම්භක මිලට සාපේක්ෂව දිශාව ගැලපීමක් සිදු වී නැත ({daily_open_relation})."
+
         return {
             "sb_step_1_time_window_ok": sb_step_1_time_window_ok,
             "sb_step_1_details": sb_step_1_details,
@@ -420,7 +445,11 @@ USER'S TRADING STRATEGY RULES:
             "sb_step_9_ltf_choch_ok": sb_step_9_ltf_choch_ok,
             "sb_step_9_details": sb_step_9_details,
             "sb_step_10_fvg_limit_ok": sb_step_10_fvg_limit_ok,
-            "sb_step_10_details": sb_step_10_details
+            "sb_step_10_details": sb_step_10_details,
+            "sb_step_11_equilibrium_ok": sb_step_11_equilibrium_ok,
+            "sb_step_11_details": sb_step_11_details,
+            "sb_step_12_po3_align_ok": sb_step_12_po3_align_ok,
+            "sb_step_12_details": sb_step_12_details
         }
 
     @classmethod
@@ -798,7 +827,10 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                 entry_price=entry_price_val or current_price or 0.0,
                 rr_ratio=rr_val,
                 conf_score=conf_score,
-                timeframe=timeframe
+                timeframe=timeframe,
+                zone=result.get("zone_type", "EQUILIBRIUM"),
+                daily_bias=result.get("daily_bias", "NEUTRAL"),
+                daily_open_relation=result.get("daily_open_relation", "N/A")
             )
             
             # Merge steps into result
@@ -1146,7 +1178,10 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                     entry_price=entry_price,
                     rr_ratio=rr_ratio,
                     conf_score=conf_score,
-                    timeframe=timeframe
+                    timeframe=timeframe,
+                    zone=zone,
+                    daily_bias="NEUTRAL",
+                    daily_open_relation=open_relation
                 )
                 sb_step_1_time_window_ok = steps["sb_step_1_time_window_ok"]
                 sb_step_1_details = steps["sb_step_1_details"]
@@ -1203,6 +1238,10 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                     "sb_step_9_details": steps["sb_step_9_details"],
                     "sb_step_10_fvg_limit_ok": steps["sb_step_10_fvg_limit_ok"],
                     "sb_step_10_details": steps["sb_step_10_details"],
+                    "sb_step_11_equilibrium_ok": steps["sb_step_11_equilibrium_ok"],
+                    "sb_step_11_details": steps["sb_step_11_details"],
+                    "sb_step_12_po3_align_ok": steps["sb_step_12_po3_align_ok"],
+                    "sb_step_12_details": steps["sb_step_12_details"],
                     "confidence": conf_score
                 }
 
@@ -1263,7 +1302,10 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                     entry_price=entry_price,
                     rr_ratio=natural_rr,
                     conf_score=conf_score,
-                    timeframe=timeframe
+                    timeframe=timeframe,
+                    zone=zone,
+                    daily_bias=bias,
+                    daily_open_relation=open_relation
                 )
                 sb_step_1_time_window_ok = steps["sb_step_1_time_window_ok"]
                 sb_step_1_details = steps["sb_step_1_details"]
@@ -1322,6 +1364,10 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                     "sb_step_9_details": steps["sb_step_9_details"],
                     "sb_step_10_fvg_limit_ok": steps["sb_step_10_fvg_limit_ok"],
                     "sb_step_10_details": steps["sb_step_10_details"],
+                    "sb_step_11_equilibrium_ok": steps["sb_step_11_equilibrium_ok"],
+                    "sb_step_11_details": steps["sb_step_11_details"],
+                    "sb_step_12_po3_align_ok": steps["sb_step_12_po3_align_ok"],
+                    "sb_step_12_details": steps["sb_step_12_details"],
                     "confidence": conf_score
                 }
             
@@ -1388,7 +1434,10 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                 entry_price=entry_price,
                 rr_ratio=rr_ratio,
                 conf_score=conf_score,
-                timeframe=timeframe
+                timeframe=timeframe,
+                zone=zone,
+                daily_bias=bias,
+                daily_open_relation=open_relation
             )
             sb_step_1_time_window_ok = steps["sb_step_1_time_window_ok"]
             sb_step_1_details = steps["sb_step_1_details"]
@@ -1450,7 +1499,11 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                 "sb_step_9_ltf_choch_ok": steps["sb_step_9_ltf_choch_ok"],
                 "sb_step_9_details": steps["sb_step_9_details"],
                 "sb_step_10_fvg_limit_ok": steps["sb_step_10_fvg_limit_ok"],
-                "sb_step_10_details": steps["sb_step_10_details"]
+                "sb_step_10_details": steps["sb_step_10_details"],
+                "sb_step_11_equilibrium_ok": steps["sb_step_11_equilibrium_ok"],
+                "sb_step_11_details": steps["sb_step_11_details"],
+                "sb_step_12_po3_align_ok": steps["sb_step_12_po3_align_ok"],
+                "sb_step_12_details": steps["sb_step_12_details"]
             }
         else:
             reasons = []
@@ -1624,7 +1677,10 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                 entry_price=pot_entry if isinstance(pot_entry, (int, float)) else (current_price or 0.0),
                 rr_ratio=4.0 if setup_triggered else 0.0,
                 conf_score=conf_score,
-                timeframe=timeframe
+                timeframe=timeframe,
+                zone=zone,
+                daily_bias="NEUTRAL",
+                daily_open_relation=open_relation
             )
             sb_step_1_time_window_ok = steps["sb_step_1_time_window_ok"]
             sb_step_1_details = steps["sb_step_1_details"]
@@ -1686,7 +1742,11 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                 "sb_step_9_ltf_choch_ok": steps["sb_step_9_ltf_choch_ok"],
                 "sb_step_9_details": steps["sb_step_9_details"],
                 "sb_step_10_fvg_limit_ok": steps["sb_step_10_fvg_limit_ok"],
-                "sb_step_10_details": steps["sb_step_10_details"]
+                "sb_step_10_details": steps["sb_step_10_details"],
+                "sb_step_11_equilibrium_ok": steps["sb_step_11_equilibrium_ok"],
+                "sb_step_11_details": steps["sb_step_11_details"],
+                "sb_step_12_po3_align_ok": steps["sb_step_12_po3_align_ok"],
+                "sb_step_12_details": steps["sb_step_12_details"]
             }
 
 

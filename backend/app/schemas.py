@@ -149,6 +149,10 @@ class SilverBulletResponse(BaseModel):
     sb_step_9_details: Optional[str] = None
     sb_step_10_fvg_limit_ok: Optional[bool] = None
     sb_step_10_details: Optional[str] = None
+    sb_step_11_equilibrium_ok: Optional[bool] = None
+    sb_step_11_details: Optional[str] = None
+    sb_step_12_po3_align_ok: Optional[bool] = None
+    sb_step_12_details: Optional[str] = None
     
     # Confidence/Confirmation Rate field
     confidence: Optional[int] = None
