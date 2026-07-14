@@ -2327,7 +2327,7 @@ export default function Dashboard() {
                                     {sbResult.sb_step_7_details ? sbResult.sb_step_7_details.split("|")[0].trim() : "Asian session liquidity filter."}
                                   </p>
                                   <span className="text-[10px] text-indigo-300/80 font-sans">
-                                    {sbResult.sb_step_7_details ? sbResult.sb_step_7_details.split("|")[1]?.trim() : ""}
+                                    {sbResult.sb_step_7_details ? (sbResult.sb_step_7_details.split("|")[1]?.trim() || "ආසියානු සෙෂන් ද්‍රවශීලතා පෙරහන.") : "ආසියානු සෙෂන් ද්‍රවශීලතා පෙරහන."}
                                   </span>
                                 </div>
                               </div>
@@ -2354,7 +2354,7 @@ export default function Dashboard() {
                                     {sbResult.sb_step_8_details ? sbResult.sb_step_8_details.split("|")[0].trim() : "HTF PD array check."}
                                   </p>
                                   <span className="text-[10px] text-indigo-300/80 font-sans">
-                                    {sbResult.sb_step_8_details ? sbResult.sb_step_8_details.split("|")[1]?.trim() : ""}
+                                    {sbResult.sb_step_8_details ? (sbResult.sb_step_8_details.split("|")[1]?.trim() || "HTF PD array පරීක්ෂාව.") : "HTF PD array පරීක්ෂාව."}
                                   </span>
                                 </div>
                               </div>
@@ -2381,7 +2381,7 @@ export default function Dashboard() {
                                     {sbResult.sb_step_9_details ? sbResult.sb_step_9_details.split("|")[0].trim() : "LTF Choch validation."}
                                   </p>
                                   <span className="text-[10px] text-indigo-300/80 font-sans">
-                                    {sbResult.sb_step_9_details ? sbResult.sb_step_9_details.split("|")[1]?.trim() : ""}
+                                    {sbResult.sb_step_9_details ? (sbResult.sb_step_9_details.split("|")[1]?.trim() || "LTF Choch තහවුරු කිරීම.") : "LTF Choch තහවුරු කිරීම."}
                                   </span>
                                 </div>
                               </div>
@@ -2408,7 +2408,7 @@ export default function Dashboard() {
                                     {sbResult.sb_step_10_details ? sbResult.sb_step_10_details.split("|")[0].trim() : "Limit entry placement."}
                                   </p>
                                   <span className="text-[10px] text-indigo-300/80 font-sans">
-                                    {sbResult.sb_step_10_details ? sbResult.sb_step_10_details.split("|")[1]?.trim() : ""}
+                                    {sbResult.sb_step_10_details ? (sbResult.sb_step_10_details.split("|")[1]?.trim() || "Limit entry ඕඩරය පිහිටුවීම.") : "Limit entry ඕඩරය පිහිටුවීම."}
                                   </span>
                                 </div>
                               </div>
