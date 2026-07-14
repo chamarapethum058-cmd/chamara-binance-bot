@@ -3200,6 +3200,14 @@ export default function Dashboard() {
                 <p className="text-[10px] text-gray-500 leading-normal mt-1">
                   This key is stored securely in the database preferences and used by the AI Brain for technical analysis.
                 </p>
+                <a
+                  href="https://aistudio.google.com/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[10px] text-indigo-400 hover:text-indigo-300 font-semibold mt-1.5 self-start flex items-center gap-1 font-mono transition-colors"
+                >
+                  Check API Limits & Usage ↗
+                </a>
               </div>
               
               <div className="flex justify-end gap-3 mt-2 border-t border-[#1E2235] pt-4">
