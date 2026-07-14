@@ -2173,7 +2173,12 @@ export default function Dashboard() {
                                      sbResult.daily_bias === "BEARISH" ? "Bearish Institutional Order Flow" :
                                      "Consolidating / Strategy Neutral State"}
                                   </span>
-                                  <span className="text-[10px] text-gray-500 font-mono mt-0.5 block">HTF Context Mapped</span>
+                                  <span className="text-[10px] text-indigo-300/80 font-sans mt-0.5 block">
+                                    {sbResult.daily_bias === "BULLISH" ? "ගොන් (Bullish) ආයතනික ඇණවුම් ප්‍රවාහය" :
+                                     sbResult.daily_bias === "BEARISH" ? "වලස් (Bearish) ආයතනික ඇණවුම් ප්‍රවාහය" :
+                                     "ඒකාබද්ධ වෙළඳපල / උදාසීන තත්ත්වය"}
+                                  </span>
+                                  <span className="text-[9px] text-gray-500 font-mono mt-1 block">HTF Context Mapped</span>
                                 </div>
                               </div>
 
@@ -2196,6 +2201,13 @@ export default function Dashboard() {
                                              sbKillzone === "LONDON" ? "London Killzone (2-5 AM NY)" :
                                              sbKillzone === "NY_AM" ? "New York AM Killzone (7-10 AM NY)" : "None (Outside Designated Windows)"}
                                   </span>
+                                  <span className="text-[10px] text-indigo-300/80 font-sans mt-0.5 block">
+                                    {sbKillzone === "LONDON_SB" ? "ලන්ඩන් ආරම්භක සැසිය (ප.ව. 12:30 - ප.ව. 1:30 ලංකා වේලාවෙන්)" :
+                                     sbKillzone === "NY_AM_SB" ? "AM සැසිය (ප.ව. 7:30 - ප.ව. 8:30 ලංකා වේලාවෙන්)" :
+                                     sbKillzone === "NY_PM_SB" ? "PM සැසිය (රාත්‍රී 11:30 - පෙ.ව. 12:30 ලංකා වේලාවෙන්)" :
+                                     sbKillzone === "LONDON" ? "ලන්ඩන් කිල්සෝන් (ප.ව. 11:30 - පෙ.ව. 2:30 ලංකා වේලාවෙන්)" :
+                                     sbKillzone === "NY_AM" ? "නිව් යෝර්ක් පෙරවරු කිල්සෝන් (ප.ව. 4:30 - ප.ව. 7:30 ලංකා වේලාවෙන්)" : "කිසිවක් නැත (නියමිත වේලාවෙන් බැහැර)"}
+                                  </span>
                                 </div>
                               </div>
 
@@ -2212,6 +2224,10 @@ export default function Dashboard() {
                                   <span className="text-xs font-semibold text-white mt-1 block">
                                     Price relation is {sbResult.daily_open_relation === "BELOW_OPEN" ? "BELOW DAILY OPEN (Discount Pricing Vector)" :
                                                        sbResult.daily_open_relation === "ABOVE_OPEN" ? "ABOVE DAILY OPEN (Premium Pricing Vector)" : "N/A"}
+                                  </span>
+                                  <span className="text-[10px] text-indigo-300/80 font-sans mt-0.5 block">
+                                    {sbResult.daily_open_relation === "BELOW_OPEN" ? "මිල දෛනික ආරම්භක මිලට වඩා පහළින් පවතී (ඩිස්කවුන්ට් කලාපය)" :
+                                     sbResult.daily_open_relation === "ABOVE_OPEN" ? "මිල දෛනික ආරම්භක මිලට වඩා ඉහළින් පවතී (ප්‍රීමියම් කලාපය)" : "නොමැත"}
                                   </span>
                                 </div>
                               </div>
@@ -2234,6 +2250,13 @@ export default function Dashboard() {
                                      sbResult.swept_liquidity_pool === "PDL_SSL" ? "Previous Daily Low (PDL/SSL) Swept" :
                                      sbResult.swept_liquidity_pool === "PDH_BSL" ? "Previous Daily High (PDH/BSL) Swept" :
                                      "Waiting for retail stop raid / liquidity sweep"}
+                                  </span>
+                                  <span className="text-[10px] text-indigo-300/80 font-sans mt-0.5 block">
+                                    {sbResult.swept_liquidity_pool === "9AM_LOW_SSL" ? "පෙ.ව. 9:00 ඉටිපන්දමේ පහළ සීමාවේ (SSL) ද්‍රවශීලතාවය බිඳ දැමීම" :
+                                     sbResult.swept_liquidity_pool === "9AM_HIGH_BSL" ? "පෙ.ව. 9:00 ඉටිපන්දමේ ඉහළ සීමාවේ (BSL) ද්‍රවශීලතාවය බිඳ දැමීම" :
+                                     sbResult.swept_liquidity_pool === "PDL_SSL" ? "පෙර දින අවම සීමාවේ (PDL/SSL) ද්‍රවශීලතාවය බිඳ දැමීම" :
+                                     sbResult.swept_liquidity_pool === "PDH_BSL" ? "පෙර දින උපරිම සීමාවේ (PDH/BSL) ද්‍රවශීලතාවය බිඳ දැමීම" :
+                                     "retail stop raid / ද්‍රවශීලතාවය බිඳ දමන තෙක් බලා සිටී"}
                                   </span>
                                 </div>
                               </div>
@@ -2258,7 +2281,15 @@ export default function Dashboard() {
                                                sbResult.mitigated_pd_array_type === "REJECTION" ? "Rejection Block Mitigated" :
                                                "No active mitigated array matched"}
                                   </span>
-                                  <span className="text-[10px] text-gray-500 font-mono mt-0.5 block">State tracking: ERL vs IRL State is {sbResult.erl_irl_state || "NONE"}</span>
+                                  <span className="text-[10px] text-indigo-300/80 font-sans mt-0.5 block">
+                                    {sbResult.mitigated_pd_array_type === "FVG" ? "Fair Value Gap (අසමතුලිතතාවය නැවත තුලනය විය)" :
+                                     sbResult.mitigated_pd_array_type === "OB" ? "Order Block (ආයතනික මිල කලාපය ස්පර්ශ විය)" :
+                                     sbResult.mitigated_pd_array_type === "BREAKER" ? "Breaker Block ස්පර්ශ විය" :
+                                     sbResult.mitigated_pd_array_type === "MITIGATION" ? "Mitigation Block ස්පර්ශ විය" :
+                                     sbResult.mitigated_pd_array_type === "REJECTION" ? "Rejection Block ස්පර්ශ විය" :
+                                     "වලංගු සක්‍රීය PD Array එකක් හමු නොවීය"}
+                                  </span>
+                                  <span className="text-[9px] text-gray-500 font-mono mt-1 block">State tracking: ERL vs IRL State is {sbResult.erl_irl_state || "NONE"}</span>
                                 </div>
                               </div>
 
@@ -2291,6 +2322,9 @@ export default function Dashboard() {
                                   ) : (
                                     <div className="mt-2 bg-rose-950/20 border border-rose-500/30 p-3 rounded-lg text-rose-400 text-xs font-bold font-mono">
                                       {sbResult.counter_trend_locked ? "STRATEGY RULE LOCKOUT / COUNTER-BIAS SETUP IGNORED" : "LOCKED / INACTIVE - Setup criteria not fully met"}
+                                      <div className="text-[10px] text-rose-300/80 font-sans font-normal mt-1 leading-relaxed">
+                                        {sbResult.counter_trend_locked ? "උපායමාර්ගික නීති අවහිරය / දෛනික නැඹුරුවට පටහැනි සැකසුම ප්‍රතික්ෂේප විය" : "අවහිර කර ඇත / අක්‍රීයයි - අවශ්‍ය නිර්ණායක සම්පූර්ණ වී නොමැත"}
+                                      </div>
                                     </div>
                                   )}
                                 </div>
