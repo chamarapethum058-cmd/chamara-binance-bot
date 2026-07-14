@@ -695,7 +695,8 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
         # AM Session SB: 10-11AM NY / 7:30-8:30 PM LK
         # PM Session SB: 2-3PM NY / 11:30 PM-12:30 AM LK
         # Strategy confirmations are strictly evaluated on the 1m chart timeframe.
-        kz_valid = killzone in ["LONDON", "LONDON_SB", "NY_AM", "NY_AM_SB", "NY_PM", "NY_PM_SB"]
+        # Session hour restriction relaxed: Allow any time/session window
+        kz_valid = True
 
         # Parse text-based parameters if present
         is_htf_bullish = htf_trend.upper() == "BULLISH" or (pullback_days is not None and pullback_days >= 3)
@@ -717,7 +718,7 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                 killzone = "NY_AM_SB"
             elif "ny pm" in text_lower or "ny_pm" in text_lower:
                 killzone = "NY_PM_SB"
-            kz_valid = killzone in ["LONDON", "LONDON_SB", "NY_AM", "NY_AM_SB", "NY_PM", "NY_PM_SB"]
+            kz_valid = True
 
         # Advanced 9:00 AM Candlestick Range Filter
         is_adv = False
