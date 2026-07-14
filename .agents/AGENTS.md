@@ -31,12 +31,14 @@ The following execution boundaries must be strictly enforced for all actionable 
 2. **Close Take Profit (Tighter TP):** Set target prices close to the entry price based strictly on 1:2 to 1:4 Risk-to-Reward (RR) ratios. Do not target distant higher timeframe levels (like major PDH/PDL ranges) if they are too far from the entry price and cannot be reasonably filled within a short session.
 3. **10-15 Minutes Max Hold Limit:** All setups must be designed as high-velocity scalping entries meant to complete (either hitting SL or TP) within a maximum holding time of 10 to 15 Minutes. Reflect this holding warning in Risk Notes and Sinhala translations.
 
-## 5. Sri Lankan Time-Window Mappings and 1m Chart Confirmation Constraints
-The bot must strictly enforce the following session hours mapped between New York Time and Sri Lankan Time, and validate confirmations strictly on the M1 (1-minute) chart:
+## 5. Sri Lankan Time-Window Mappings and 1m/3m Chart Confirmation Constraints
+The bot must track the following session hours mapped between New York Time and Sri Lankan Time in Step 1 of the checklist, but bypass the lockout to allow execution at any time of day:
 1. **London Open Silver Bullet Session:** 03:00 AM - 04:00 AM NY Time / 12:30 PM - 01:30 PM Sri Lankan Time.
 2. **NY AM Silver Bullet Session:** 10:00 AM - 11:00 AM NY Time / 07:30 PM - 08:30 PM Sri Lankan Time.
 3. **NY PM Silver Bullet Session:** 02:00 PM - 03:00 PM NY Time / 11:30 PM - 12:30 AM Sri Lankan Time.
-4. **M1 Timeframe Constraint:** The entry detection and strategy confirmations (Liquidity Sweep, Displacement, MSS, FVG/BPR, limit order placement) must occur strictly on the 1-minute (1m) chart. No other timeframe confirmation is permitted.
+4. **M1/M3 Timeframe Constraints:** The entry detection and strategy confirmations (Liquidity Sweep, Displacement, MSS/Choch, FVG/BPR, limit order placement) must occur strictly on the selected 1-minute (1m) or 3-minute (3m) chart.
+5. **Asian Liquidity Sweep & HTF Array:** Confirm that Asian Session liquidity is swept during the London Open window, and HTF PD Array (PDL, PDH, PWH, PWL, HTF-FVG, HTF-OB, HTF-BB) is mitigated.
+6. **Checklist Validation:** All 6 steps must evaluate individually and dynamically in the Validation Tree.
 
 ## 6. 90% Minimum Confirmation Rate Constraint
 The bot must strictly enforce the following confidence scoring boundaries:

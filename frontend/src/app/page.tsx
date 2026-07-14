@@ -190,6 +190,7 @@ export default function Dashboard() {
     try {
       const payload: any = {
         symbol: sbSymbol,
+        timeframe: selectedTimeframe,
         scenario_text: sbInputMode === "text" ? sbScenarioText : null,
         htf_trend: sbInputMode === "form" ? sbHtfTrend : null,
         pullback_days: sbInputMode === "form" ? Number(sbPullbackDays) : null,
@@ -2306,6 +2307,114 @@ export default function Dashboard() {
                                   </span>
                                 </div>
                               </div>
+
+                              {/* Step 7: Asian Session Liquidity Sweep */}
+                              <div className="bg-[#07080E]/40 border border-[#1E2235]/40 rounded-xl p-3.5 flex items-start gap-3.5 hover:border-indigo-500/20 transition-all">
+                                <div className={`w-6 h-6 rounded-full shrink-0 flex items-center justify-center font-bold text-xs font-mono border ${
+                                  sbResult.sb_step_7_london_asian_sweep_ok 
+                                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" 
+                                    : "bg-[#1E2235]/30 text-gray-500 border-[#1E2235]"
+                                }`}>
+                                  {sbResult.sb_step_7_london_asian_sweep_ok ? "✓" : "7"}
+                                </div>
+                                <div className="flex flex-col gap-1 w-full">
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider font-mono">Step 7: Asian Liquidity Sweep</span>
+                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded font-mono ${
+                                      sbResult.sb_step_7_london_asian_sweep_ok ? "bg-emerald-500/10 text-emerald-400" : "bg-[#1E2235]/30 text-gray-400"
+                                    }`}>
+                                      {sbResult.sb_step_7_london_asian_sweep_ok ? "SWEPT" : "AWAITING"}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-white leading-relaxed mt-0.5">
+                                    {sbResult.sb_step_7_details ? sbResult.sb_step_7_details.split("|")[0].trim() : "Asian session liquidity filter."}
+                                  </p>
+                                  <span className="text-[10px] text-indigo-300/80 font-sans">
+                                    {sbResult.sb_step_7_details ? sbResult.sb_step_7_details.split("|")[1]?.trim() : ""}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Step 8: HTF PD Array Mitigation */}
+                              <div className="bg-[#07080E]/40 border border-[#1E2235]/40 rounded-xl p-3.5 flex items-start gap-3.5 hover:border-indigo-500/20 transition-all">
+                                <div className={`w-6 h-6 rounded-full shrink-0 flex items-center justify-center font-bold text-xs font-mono border ${
+                                  sbResult.sb_step_8_htf_pd_mitigation_ok 
+                                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" 
+                                    : "bg-[#1E2235]/30 text-gray-500 border-[#1E2235]"
+                                }`}>
+                                  {sbResult.sb_step_8_htf_pd_mitigation_ok ? "✓" : "8"}
+                                </div>
+                                <div className="flex flex-col gap-1 w-full">
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider font-mono">Step 8: HTF PD Array Mitigation</span>
+                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded font-mono ${
+                                      sbResult.sb_step_8_htf_pd_mitigation_ok ? "bg-emerald-500/10 text-emerald-400" : "bg-[#1E2235]/30 text-gray-400"
+                                    }`}>
+                                      {sbResult.sb_step_8_htf_pd_mitigation_ok ? "MITIGATED" : "AWAITING"}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-white leading-relaxed mt-0.5">
+                                    {sbResult.sb_step_8_details ? sbResult.sb_step_8_details.split("|")[0].trim() : "HTF PD array check."}
+                                  </p>
+                                  <span className="text-[10px] text-indigo-300/80 font-sans">
+                                    {sbResult.sb_step_8_details ? sbResult.sb_step_8_details.split("|")[1]?.trim() : ""}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Step 9: LTF Choch Confirmation */}
+                              <div className="bg-[#07080E]/40 border border-[#1E2235]/40 rounded-xl p-3.5 flex items-start gap-3.5 hover:border-indigo-500/20 transition-all">
+                                <div className={`w-6 h-6 rounded-full shrink-0 flex items-center justify-center font-bold text-xs font-mono border ${
+                                  sbResult.sb_step_9_ltf_choch_ok 
+                                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" 
+                                    : "bg-[#1E2235]/30 text-gray-500 border-[#1E2235]"
+                                }`}>
+                                  {sbResult.sb_step_9_ltf_choch_ok ? "✓" : "9"}
+                                </div>
+                                <div className="flex flex-col gap-1 w-full">
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider font-mono">Step 9: 1m Choch Confirmation</span>
+                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded font-mono ${
+                                      sbResult.sb_step_9_ltf_choch_ok ? "bg-emerald-500/10 text-emerald-400" : "bg-[#1E2235]/30 text-gray-400"
+                                    }`}>
+                                      {sbResult.sb_step_9_ltf_choch_ok ? "CONFIRMED" : "AWAITING"}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-white leading-relaxed mt-0.5">
+                                    {sbResult.sb_step_9_details ? sbResult.sb_step_9_details.split("|")[0].trim() : "LTF Choch validation."}
+                                  </p>
+                                  <span className="text-[10px] text-indigo-300/80 font-sans">
+                                    {sbResult.sb_step_9_details ? sbResult.sb_step_9_details.split("|")[1]?.trim() : ""}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Step 10: 1m FVG Limit Entry Placement */}
+                              <div className="bg-[#07080E]/40 border border-[#1E2235]/40 rounded-xl p-3.5 flex items-start gap-3.5 hover:border-indigo-500/20 transition-all">
+                                <div className={`w-6 h-6 rounded-full shrink-0 flex items-center justify-center font-bold text-xs font-mono border ${
+                                  sbResult.sb_step_10_fvg_limit_ok 
+                                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" 
+                                    : "bg-[#1E2235]/30 text-gray-500 border-[#1E2235]"
+                                }`}>
+                                  {sbResult.sb_step_10_fvg_limit_ok ? "✓" : "10"}
+                                </div>
+                                <div className="flex flex-col gap-1 w-full">
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider font-mono">Step 10: 1m FVG Limit Entry</span>
+                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded font-mono ${
+                                      sbResult.sb_step_10_fvg_limit_ok ? "bg-indigo-500/10 text-indigo-400" : "bg-[#1E2235]/30 text-gray-400"
+                                    }`}>
+                                      {sbResult.sb_step_10_fvg_limit_ok ? "ORDER READY" : "INACTIVE"}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-white leading-relaxed mt-0.5">
+                                    {sbResult.sb_step_10_details ? sbResult.sb_step_10_details.split("|")[0].trim() : "Limit entry placement."}
+                                  </p>
+                                  <span className="text-[10px] text-indigo-300/80 font-sans">
+                                    {sbResult.sb_step_10_details ? sbResult.sb_step_10_details.split("|")[1]?.trim() : ""}
+                                  </span>
+                                </div>
+                              </div>
                             </div>
                           </div>
                         )}
@@ -2593,22 +2702,23 @@ export default function Dashboard() {
               <div className="flex flex-col gap-1.5">
                 <div className="flex justify-between items-center">
                   <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Timeframe</label>
-                  <span className="text-[8px] bg-indigo-500/10 text-indigo-400 font-bold font-mono px-1.5 py-0.5 rounded border border-indigo-500/20">
-                    MULTI-TIMEFRAME ACTIVE
+                  <span className="text-[8px] bg-indigo-500/10 text-indigo-400 font-bold font-mono px-1.5 py-0.5 rounded border border-indigo-500/20 animate-pulse">
+                    M1 LOCKED (STRATEGY RULE)
                   </span>
                 </div>
                 <div className="flex bg-[#141626] border border-[#1E2235] rounded-xl p-1 gap-1">
                   {timeframes.map((tf) => {
-                    const isSelected = selectedTimeframe === tf;
+                    const isSelected = selectedTimeframe === tf || tf === "1m";
                     return (
                       <button
                         key={tf}
                         id={`tf-${tf}`}
+                        disabled={tf !== "1m"}
                         onClick={() => setSelectedTimeframe(tf)}
                         className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                          isSelected
+                          tf === "1m"
                             ? "bg-[#6366F1] text-white shadow-md shadow-indigo-500/10"
-                            : "text-gray-400 hover:text-gray-200 hover:bg-[#1C1F37]"
+                            : "text-gray-600 cursor-not-allowed opacity-35"
                         }`}
                       >
                         {tf}

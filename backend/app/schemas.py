@@ -72,6 +72,7 @@ class TranslateRequest(BaseModel):
 # Silver Bullet analysis schemas
 class SilverBulletRequest(BaseModel):
     symbol: Optional[str] = None
+    timeframe: Optional[str] = "1m"
     scenario_text: Optional[str] = None
     htf_trend: Optional[str] = None
     pullback_days: Optional[int] = None
@@ -140,6 +141,14 @@ class SilverBulletResponse(BaseModel):
     sb_step_5_details: Optional[str] = None
     sb_step_6_risk_mgmt_ok: Optional[bool] = None
     sb_step_6_details: Optional[str] = None
+    sb_step_7_london_asian_sweep_ok: Optional[bool] = None
+    sb_step_7_details: Optional[str] = None
+    sb_step_8_htf_pd_mitigation_ok: Optional[bool] = None
+    sb_step_8_details: Optional[str] = None
+    sb_step_9_ltf_choch_ok: Optional[bool] = None
+    sb_step_9_details: Optional[str] = None
+    sb_step_10_fvg_limit_ok: Optional[bool] = None
+    sb_step_10_details: Optional[str] = None
     
     # Confidence/Confirmation Rate field
     confidence: Optional[int] = None
