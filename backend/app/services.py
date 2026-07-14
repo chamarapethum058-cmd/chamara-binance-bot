@@ -590,13 +590,17 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
             return cls._get_mock_silver_bullet(req, upcoming_news_events=upcoming_news_events)
 
     @classmethod
-    def _get_tight_scalp_risk(cls, entry_price: float) -> float:
-        if entry_price > 10000.0:
-            return round(entry_price * 0.0015, 2)  # BTC-like assets (0.15% of price)
-        elif entry_price > 1000.0:
-            return 0.40  # Gold-like assets
+    def _get_tight_scalp_risk(cls, entry_price: float, symbol: str = "") -> float:
+        symbol_upper = symbol.upper()
+        if "XAU" in symbol_upper or "GOLD" in symbol_upper:
+            return 1.8  # Gold-like assets
         else:
-            return round(entry_price * 0.0016, 4)  # General crypto coins (e.g. ETH, SOL, XRP, DOGE: 0.16% of price)
+            # Dynamic scaling for all other crypto coins (ETH, BTC, SOL, DOGE etc. at 0.16% of price)
+            val = entry_price * 0.0016
+            if entry_price > 1000.0:
+                return round(val, 2)
+            else:
+                return round(val, 4)
 
     @classmethod
     def _get_mock_silver_bullet(cls, req: Dict[str, Any], upcoming_news_events: List[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -811,27 +815,49 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
             erl_irl = "IRL_TO_ERL"
 
         if setup_triggered:
+            min_risk = cls._get_tight_scalp_risk(current_price or pdl or pdh or 2320.0, symbol)
+            
             if is_adv:
                 if swept_pool == "9AM_LOW_SSL":
-                    entry_price = candle_9am_low + ((current_price or candle_9am_high) - candle_9am_low) * 0.60
-                    stop_loss = entry_price - cls._get_tight_scalp_risk(entry_price)
-                    target = candle_9am_high
+                    swept_level = candle_9am_low or (current_price - 6.0)
+                    leg_size = abs((current_price or (swept_level + 6.0)) - swept_level)
+                    if leg_size > min_risk * 2.0:
+                        entry_price = swept_level + leg_size * 0.50
+                    else:
+                        entry_price = current_price or (swept_level + min_risk)
+                    stop_loss = min(swept_level, entry_price - min_risk)
+                    target = entry_price + (entry_price - stop_loss) * 4.0
                     bias = "BULLISH"
                 else:
-                    entry_price = candle_9am_high - (candle_9am_high - (current_price or candle_9am_low)) * 0.60
-                    stop_loss = entry_price + cls._get_tight_scalp_risk(entry_price)
-                    target = candle_9am_low
+                    swept_level = candle_9am_high or (current_price + 6.0)
+                    leg_size = abs(swept_level - (current_price or (swept_level - 6.0)))
+                    if leg_size > min_risk * 2.0:
+                        entry_price = swept_level - leg_size * 0.50
+                    else:
+                        entry_price = current_price or (swept_level - min_risk)
+                    stop_loss = max(swept_level, entry_price + min_risk)
+                    target = entry_price - (stop_loss - entry_price) * 4.0
                     bias = "BEARISH"
             else:
                 if setup_direction == "BULLISH":
-                    entry_price = pdl + ((current_price or (pdl + 6.0)) - pdl) * 0.60 if pdl else (current_price or 2320.0)
-                    stop_loss = entry_price - cls._get_tight_scalp_risk(entry_price)
-                    target = pdh if pdh else (entry_price + 6.0)
+                    swept_level = pdl if pdl is not None else (current_price - 6.0) if current_price is not None else 2320.0
+                    leg_size = abs((current_price or (swept_level + 6.0)) - swept_level)
+                    if leg_size > min_risk * 2.0:
+                        entry_price = swept_level + leg_size * 0.50
+                    else:
+                        entry_price = current_price or (swept_level + min_risk)
+                    stop_loss = min(swept_level, entry_price - min_risk)
+                    target = entry_price + (entry_price - stop_loss) * 4.0
                     bias = "BULLISH"
                 else:
-                    entry_price = pdh - (pdh - (current_price or (pdh - 6.0))) * 0.60 if pdh else (current_price or 2320.0)
-                    stop_loss = entry_price + cls._get_tight_scalp_risk(entry_price)
-                    target = pdl if pdl else (entry_price - 6.0)
+                    swept_level = pdh if pdh is not None else (current_price + 6.0) if current_price is not None else 2320.0
+                    leg_size = abs(swept_level - (current_price or (swept_level - 6.0)))
+                    if leg_size > min_risk * 2.0:
+                        entry_price = swept_level - leg_size * 0.50
+                    else:
+                        entry_price = current_price or (swept_level - min_risk)
+                    stop_loss = max(swept_level, entry_price + min_risk)
+                    target = entry_price - (stop_loss - entry_price) * 4.0
                     bias = "BEARISH"
             
             # Calculate strategy confidence score based on confluences (out of 100%)
@@ -955,7 +981,11 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
 
             # Calculate Risk-to-Reward ratio based on natural target before strict 1:3 RR expansion
             natural_risk = abs(entry_price - stop_loss)
-            natural_reward = abs(target - entry_price)
+            if bias == "BULLISH":
+                natural_target = pdh if pdh is not None else candle_9am_high if candle_9am_high is not None else target
+            else:
+                natural_target = pdl if pdl is not None else candle_9am_low if candle_9am_low is not None else target
+            natural_reward = abs(natural_target - entry_price)
             natural_rr = natural_reward / natural_risk if natural_risk > 0 else 0.0
             
             if natural_rr < 2.0:
@@ -1218,16 +1248,28 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
             pot_target = pdh
             pot_rr = "N/A"
 
+            min_risk = cls._get_tight_scalp_risk(current_price or pdl or pdh or 2320.0, symbol)
+
             if is_adv and adv_status in ["9AM_LOW_SWEPT_MSS_PENDING", "9AM_HIGH_SWEPT_MSS_PENDING"] and candle_9am_high and candle_9am_low:
                 if adv_status == "9AM_LOW_SWEPT_MSS_PENDING":
-                    pe = candle_9am_low + ((current_price or candle_9am_high) - candle_9am_low) * 0.60
-                    psl = pe - cls._get_tight_scalp_risk(pe)
-                    pt = candle_9am_high
+                    swept_level = candle_9am_low
+                    leg_size = abs((current_price or (swept_level + 6.0)) - swept_level)
+                    if leg_size > min_risk * 2.0:
+                        pe = swept_level + leg_size * 0.50
+                    else:
+                        pe = current_price or (swept_level + min_risk)
+                    psl = min(swept_level, pe - min_risk)
+                    pt = pe + (pe - psl) * 4.0
                     pot_label = "Est. Buy Limit"
                 else:
-                    pe = candle_9am_high - (candle_9am_high - (current_price or candle_9am_low)) * 0.60
-                    psl = pe + cls._get_tight_scalp_risk(pe)
-                    pt = candle_9am_low
+                    swept_level = candle_9am_high
+                    leg_size = abs(swept_level - (current_price or (swept_level - 6.0)))
+                    if leg_size > min_risk * 2.0:
+                        pe = swept_level - leg_size * 0.50
+                    else:
+                        pe = current_price or (swept_level - min_risk)
+                    psl = max(swept_level, pe + min_risk)
+                    pt = pe - (psl - pe) * 4.0
                     pot_label = "Est. Sell Limit"
                 
                 risk = abs(pe - psl)
@@ -1246,14 +1288,24 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                     pot_rr = f"1:{pot_rr_val:.2f} (Est.)"
             elif not is_adv and swept_pool != "NONE":
                 if setup_direction == "BULLISH":
-                    pe = pdl + ((current_price or (pdl + 6.0)) - pdl) * 0.60 if pdl else (current_price or 2320.0)
-                    psl = pe - cls._get_tight_scalp_risk(pe)
-                    pt = pdh if pdh else (pe + 6.0)
+                    swept_level = pdl if pdl is not None else (current_price - 6.0) if current_price is not None else 2320.0
+                    leg_size = abs((current_price or (swept_level + 6.0)) - swept_level)
+                    if leg_size > min_risk * 2.0:
+                        pe = swept_level + leg_size * 0.50
+                    else:
+                        pe = current_price or (swept_level + min_risk)
+                    psl = min(swept_level, pe - min_risk)
+                    pt = pe + (pe - psl) * 4.0
                     pot_label = "Est. Buy Limit"
                 else:
-                    pe = pdh - (pdh - (current_price or (pdh - 6.0))) * 0.60 if pdh else (current_price or 2320.0)
-                    psl = pe + cls._get_tight_scalp_risk(pe)
-                    pt = pdl if pdl else (pe - 6.0)
+                    swept_level = pdh if pdh is not None else (current_price + 6.0) if current_price is not None else 2320.0
+                    leg_size = abs(swept_level - (current_price or (swept_level - 6.0)))
+                    if leg_size > min_risk * 2.0:
+                        pe = swept_level - leg_size * 0.50
+                    else:
+                        pe = current_price or (swept_level - min_risk)
+                    psl = max(swept_level, pe + min_risk)
+                    pt = pe - (psl - pe) * 4.0
                     pot_label = "Est. Sell Limit"
                 
                 risk = abs(pe - psl)
