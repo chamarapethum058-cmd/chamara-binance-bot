@@ -130,10 +130,7 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, [sbAutoDetectSession]);
 
-  // Initial trigger to load economic news list
-  useEffect(() => {
-    triggerSilverBulletAnalysis();
-  }, []);
+
 
   const [sbDiscountPdArray, setSbDiscountPdArray] = useState(true);
   const [sbPremiumPdArray, setSbPremiumPdArray] = useState(false);
