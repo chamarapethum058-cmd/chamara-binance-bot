@@ -779,7 +779,8 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                 "killzone_valid": False,
                 "counter_trend_locked": False,
                 "is_advanced_setup": False,
-                "advanced_setup_status": "NONE"
+                "advanced_setup_status": "NONE",
+                "confidence": 0
             }
 
         # Calculate Equilibrium line (using dealing range boundaries, fall back to PDH/PDL)
@@ -1235,7 +1236,8 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                     "sb_step_9_ltf_choch_ok": steps["sb_step_9_ltf_choch_ok"],
                     "sb_step_9_details": steps["sb_step_9_details"],
                     "sb_step_10_fvg_limit_ok": steps["sb_step_10_fvg_limit_ok"],
-                    "sb_step_10_details": steps["sb_step_10_details"]
+                    "sb_step_10_details": steps["sb_step_10_details"],
+                    "confidence": conf_score
                 }
             
             # Recalculate strict 1:4 Risk-to-Reward parameters if needed

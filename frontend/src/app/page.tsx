@@ -1636,7 +1636,7 @@ export default function Dashboard() {
                                     <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
                                     NEWS LOCKOUT
                                   </span>
-                                ) : sbResult.confidence !== undefined && (
+                                ) : sbResult.confidence !== undefined && sbResult.confidence !== null && (
                                   <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded font-mono flex items-center gap-1 ${
                                     sbResult.confidence >= 90 ? "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20" : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
                                   }`}>
