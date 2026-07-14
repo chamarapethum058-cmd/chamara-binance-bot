@@ -62,6 +62,32 @@ class BinanceService:
                 raise Exception(f"Failed to fetch current price for {symbol}: {str(e)}")
 
 class AIService:
+    _cached_news = None
+    _last_news_fetch = None
+
+    @classmethod
+    async def _fetch_economic_calendar(cls) -> List[Dict[str, Any]]:
+        import time
+        now = time.time()
+        if cls._cached_news is not None and cls._last_news_fetch is not None:
+            if now - cls._last_news_fetch < 3600:
+                return cls._cached_news
+                
+        url = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(url, timeout=10.0, headers={'User-Agent': 'Mozilla/5.0'})
+                if response.status_code == 200:
+                    events = response.json()
+                    cls._cached_news = events
+                    cls._last_news_fetch = now
+                    return events
+        except Exception as e:
+            logger.error(f"Error fetching economic calendar: {e}")
+            if cls._cached_news is not None:
+                return cls._cached_news
+        return []
+
     @staticmethod
     def _format_klines(klines: List[List[Any]]) -> str:
         """Format klines into a readable string text format for the LLM."""
@@ -325,6 +351,97 @@ USER'S TRADING STRATEGY RULES:
         candle_9am_high = req.get("candle_9am_high")
         candle_9am_low = req.get("candle_9am_low")
 
+        # Fetch news and check lockout
+        news_lockout_active = False
+        active_news_event = None
+        upcoming_news_events = []
+        
+        try:
+            events = await cls._fetch_economic_calendar()
+            from datetime import datetime, timezone, timedelta
+            now_utc = datetime.now(timezone.utc)
+            
+            for event in events:
+                if event.get("impact") == "High" and event.get("country") == "USD":
+                    try:
+                        event_dt = datetime.fromisoformat(event["date"])
+                        event_utc = event_dt.astimezone(timezone.utc)
+                        diff_sec = (event_utc - now_utc).total_seconds()
+                        
+                        if abs(diff_sec) <= 3600:
+                            news_lockout_active = True
+                            active_news_event = event.get("title")
+                            
+                        if -14400 <= diff_sec <= 43200:
+                            slst_dt = event_utc.astimezone(timezone(timedelta(hours=5, minutes=30)))
+                            upcoming_news_events.append({
+                                "title": event.get("title"),
+                                "country": event.get("country"),
+                                "impact": event.get("impact"),
+                                "time_slst": slst_dt.strftime("%I:%M %p"),
+                                "time_utc": event_utc.isoformat(),
+                                "seconds_remaining": int(diff_sec)
+                            })
+                    except Exception as ex:
+                        logger.error(f"Error parsing news event: {ex}")
+            upcoming_news_events.sort(key=lambda x: x["time_utc"])
+        except Exception as e:
+            logger.error(f"Error evaluating news lockout: {e}")
+
+        if news_lockout_active:
+            reasoning = (
+                f"No Entry (High-Impact News Lockout): {active_news_event} scheduled within +/- 60 minutes. Trade signals suppressed for risk management.\n\n"
+                f"---\n\n"
+                f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
+                f"ප්‍රධාන ආර්ථික පුවත් (High-Impact News) Lockout: {active_news_event} ප්‍රවෘත්තිය නිකුත් වීමට ආසන්න බැවින් අවදානම කළමනාකරණය සඳහා trading සංඥා අත්හිටුවා ඇත."
+            )
+            return {
+                "is_valid": False,
+                "status_message": f"No Entry (High-Impact News Lockout: {active_news_event})",
+                "market_structure_status": "News Lockout\n\n---\n\n**සිංහල පරිවර්තනය (Sinhala Translation):**\nපුවත් අවහිරතාවය",
+                "daily_bias": "NEUTRAL",
+                "liquidity_target": None,
+                "entry_price_area": "No Entry (High-Impact News Lockout)",
+                "stop_loss_level": None,
+                "target_reward_ratio": None,
+                "reasoning": reasoning,
+                "invalidation": "High-Impact News Lockout active.\n\n---\n\n**සිංහල පරිවර්තනය (Sinhala Translation):**\nප්‍රධාන ආර්ථික පුවත් අවහිරතාවය සක්‍රීයයි.",
+                "risk_notes": (
+                    f"News event: {active_news_event} scheduled today. Per strategy rules, do not execute new positions during high-impact USD events.\n\n"
+                    f"---\n\n"
+                    f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
+                    f"ප්‍රධාන USD පුවත්: {active_news_event} අද දිනට නියමිතයි. උපායමාර්ගික නීති අනුව, ඉහළ උච්චාවචනයක් ඇති පුවත් වේලාවන්හිදී නව positions ලබා නොගන්න."
+                ),
+                "equilibrium_price": None,
+                "zone_type": "NEUTRAL",
+                "daily_open_relation": "N/A",
+                "killzone_valid": False,
+                "counter_trend_locked": False,
+                "erl_irl_state": "NONE",
+                "swept_liquidity_pool": "NONE",
+                "mitigated_pd_array_type": "NONE",
+                "is_advanced_setup": False,
+                "advanced_setup_status": "NONE",
+                "confidence": 0,
+                
+                "sb_step_1_time_window_ok": False,
+                "sb_step_1_details": "Blocked by economic news lockout. | ආර්ථික පුවත් අවහිරතාවය නිසා අවහිර කර ඇත.",
+                "sb_step_2_liquidity_sweep_ok": False,
+                "sb_step_2_details": "Blocked by economic news lockout. | ආර්ථික පුවත් අවහිරතාවය නිසා අවහිර කර ඇත.",
+                "sb_step_3_displacement_mss_ok": False,
+                "sb_step_3_details": "Blocked by economic news lockout. | ආර්ථික පුවත් අවහිරතාවය නිසා අවහිර කර ඇත.",
+                "sb_step_4_fvg_bpr_ok": False,
+                "sb_step_4_details": "Blocked by economic news lockout. | ආර්ථික පුවත් අවහිරතාවය නිසා අවහිර කර ඇත.",
+                "sb_step_5_entry_exec_ok": False,
+                "sb_step_5_details": "Blocked by economic news lockout. | ආර්ථික පුවත් අවහිරතාවය නිසා අවහිර කර ඇත.",
+                "sb_step_6_risk_mgmt_ok": False,
+                "sb_step_6_details": "Blocked by economic news lockout. | ආර්ථික පුවත් අවහිරතාවය නිසා අවහිර කර ඇත.",
+                
+                "news_lockout_active": True,
+                "active_news_event": active_news_event,
+                "upcoming_news_events": upcoming_news_events
+            }
+
         # Programmatic sanity check for incomplete details
         if not scenario_text and (pdh is None or pdl is None):
             return {
@@ -455,7 +572,7 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
         active_key = api_key or settings.GEMINI_API_KEY
         if not active_key:
             logger.warning("GEMINI_API_KEY not configured. Falling back to rule-based Silver Bullet analysis.")
-            return cls._get_mock_silver_bullet(req)
+            return cls._get_mock_silver_bullet(req, upcoming_news_events=upcoming_news_events)
 
         try:
             client = genai.Client(api_key=active_key)
@@ -470,7 +587,7 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
             return result
         except Exception as e:
             logger.error(f"Gemini API Silver Bullet analysis failed: {e}. Falling back to mock analysis.")
-            return cls._get_mock_silver_bullet(req)
+            return cls._get_mock_silver_bullet(req, upcoming_news_events=upcoming_news_events)
 
     @classmethod
     def _get_tight_scalp_risk(cls, entry_price: float) -> float:
@@ -482,8 +599,10 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
             return round(entry_price * 0.0016, 4)  # General crypto coins (e.g. ETH, SOL, XRP, DOGE: 0.16% of price)
 
     @classmethod
-    def _get_mock_silver_bullet(cls, req: Dict[str, Any]) -> Dict[str, Any]:
+    def _get_mock_silver_bullet(cls, req: Dict[str, Any], upcoming_news_events: List[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Provides a structured mock analysis for Silver Bullet strategy if API key fails."""
+        if upcoming_news_events is None:
+            upcoming_news_events = []
         symbol = req.get("symbol") or "XAUUSD"
         scenario_text = req.get("scenario_text") or ""
         htf_trend = req.get("htf_trend") or "UNKNOWN"
@@ -1023,6 +1142,9 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                 "is_advanced_setup": is_adv,
                 "advanced_setup_status": adv_status,
                 "confidence": conf_score,
+                "news_lockout_active": False,
+                "active_news_event": None,
+                "upcoming_news_events": upcoming_news_events,
                 
                 # Detailed 6-Step Silver Bullet fields
                 "sb_step_1_time_window_ok": sb_step_1_time_window_ok,
@@ -1235,6 +1357,9 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                 "is_advanced_setup": is_adv,
                 "advanced_setup_status": adv_status,
                 "confidence": conf_score,
+                "news_lockout_active": False,
+                "active_news_event": None,
+                "upcoming_news_events": upcoming_news_events,
                 
                 # Detailed 6-Step Silver Bullet fields
                 "sb_step_1_time_window_ok": sb_step_1_time_window_ok,

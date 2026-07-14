@@ -43,3 +43,10 @@ The bot must strictly enforce the following confidence scoring boundaries:
 1. **Confidence Score Calculation:** Calculate a strategy confidence score out of 100% based on rule confluences (Trend alignment: 20%, Optimal matrix zone discount/premium: 20%, Daily Open alignment: 15%, Active Silver Bullet window: 15%, Wick Liquidity sweep: 15%, and LTF Shift/MSS with FVG: 15%).
 2. **90% Minimum Filter:** Only deliver trade setups that achieve a confidence score of 90% or higher.
 3. **Low-Confidence Entry Lockout:** If confidence is below 90%, the bot must suppress and lockout the setup, returning "No Entry (Confidence < 90%)" to prevent low-probability trades and shield the user from unnecessary stop losses. Display this confirmation percentage on the frontend page next to the Entry Price Area card.
+
+## 7. Automated Economic News Lockout Constraint
+The bot must strictly enforce the following high-impact news rules:
+1. **Economic News Parser:** The backend must dynamically fetch economic calendar events.
+2. **USD High-Impact Focus:** Only focus on USD "High" impact news events (such as CPI, NFP, FOMC Interest Rate, PPI, GDP).
+3. **Lockout window (+/- 60 Minutes):** If any high-impact USD news is scheduled within 60 minutes before or 60 minutes after the current time, the bot must automatically block all entries, returning "No Entry (High-Impact News Lockout)" to prevent trading during high volatility news spikes.
+

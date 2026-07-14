@@ -438,7 +438,12 @@ async def silverbullet_analyze(req: SilverBulletRequest, db: Session = Depends(g
         sb_step_6_risk_mgmt_ok=result.get("sb_step_6_risk_mgmt_ok"),
         sb_step_6_details=result.get("sb_step_6_details"),
         
-        confidence=result.get("confidence")
+        confidence=result.get("confidence"),
+        
+        # Economic news fields
+        news_lockout_active=result.get("news_lockout_active", False),
+        active_news_event=result.get("active_news_event"),
+        upcoming_news_events=result.get("upcoming_news_events")
     )
 
 

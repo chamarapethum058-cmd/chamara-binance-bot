@@ -129,6 +129,12 @@ export default function Dashboard() {
     const interval = setInterval(detectSession, 30000); // Check every 30 seconds
     return () => clearInterval(interval);
   }, [sbAutoDetectSession]);
+
+  // Initial trigger to load economic news list
+  useEffect(() => {
+    triggerSilverBulletAnalysis();
+  }, []);
+
   const [sbDiscountPdArray, setSbDiscountPdArray] = useState(true);
   const [sbPremiumPdArray, setSbPremiumPdArray] = useState(false);
   const [sbLtfTrigger, setSbLtfTrigger] = useState("MSS");
@@ -870,6 +876,79 @@ export default function Dashboard() {
               <p className="text-xs text-gray-400">Evaluate Daily Bias and Liquidity Sweeps programmatically or via AI scenario logic.</p>
             </div>
 
+            {/* Economic News Alerts Widget */}
+            <div className="bg-[#11131F]/90 border border-[#1E2235] rounded-2xl p-4 shadow-xl flex flex-col gap-3 relative overflow-hidden">
+              {sbResult?.news_lockout_active && (
+                <div className="absolute -inset-0.5 bg-rose-500/10 rounded-2xl blur-md pointer-events-none animate-pulse" />
+              )}
+              
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 relative z-10">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-2 w-2 relative">
+                    <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${sbResult?.news_lockout_active ? "bg-rose-400" : "bg-emerald-400"}`} />
+                    <span className={`relative inline-flex rounded-full h-2 w-2 ${sbResult?.news_lockout_active ? "bg-rose-500" : "bg-emerald-500"}`} />
+                  </span>
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest font-mono">Dynamic Economic Calendar (USD High-Impact)</span>
+                </div>
+                
+                {sbResult?.news_lockout_active && (
+                  <span className="bg-rose-500/10 border border-rose-500/20 text-rose-400 text-[10px] font-bold px-2.5 py-1 rounded-lg font-mono flex items-center gap-1.5 animate-pulse animate-duration-1000">
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-ping" />
+                    ⚠️ NEWS LOCKOUT ACTIVE: {sbResult.active_news_event} (+/- 60m)
+                  </span>
+                )}
+              </div>
+
+              {sbResult?.upcoming_news_events && sbResult.upcoming_news_events.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mt-1 relative z-10">
+                  {sbResult.upcoming_news_events.map((event: any, i: number) => {
+                    const isUpcoming = event.seconds_remaining > 0;
+                    const isWithinLockout = Math.abs(event.seconds_remaining) <= 3600;
+                    
+                    let countdownLabel = "";
+                    if (isUpcoming) {
+                      const minutes = Math.floor(event.seconds_remaining / 60);
+                      if (minutes < 60) countdownLabel = `in ${minutes}m`;
+                      else countdownLabel = `in ${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+                    } else {
+                      const minutes = Math.floor(Math.abs(event.seconds_remaining) / 60);
+                      countdownLabel = `${minutes}m ago`;
+                    }
+
+                    return (
+                      <div 
+                        key={i} 
+                        className={`border rounded-xl p-3 flex flex-col gap-1 transition-all ${
+                          isWithinLockout 
+                            ? "bg-rose-500/5 border-rose-500/30 text-rose-200 shadow-md shadow-rose-500/5 animate-pulse" 
+                            : "bg-[#141626]/40 border-[#1E2235]/60 hover:border-gray-700/60"
+                        }`}
+                      >
+                        <div className="flex justify-between items-center">
+                          <span className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded font-mono ${
+                            isWithinLockout ? "bg-rose-500/20 text-rose-300" : "bg-[#1E2235] text-gray-300"
+                          }`}>
+                            {event.country}
+                          </span>
+                          <span className={`text-[9px] font-bold font-mono ${
+                            isWithinLockout ? "text-rose-400 animate-pulse" : isUpcoming ? "text-indigo-400" : "text-gray-500"
+                          }`}>
+                            {countdownLabel}
+                          </span>
+                        </div>
+                        <span className="text-xs font-semibold truncate text-white leading-relaxed">{event.title}</span>
+                        <span className="text-[9px] font-medium text-gray-400 font-mono mt-0.5">{event.time_slst} SLST</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-4 bg-[#141626]/20 border border-[#1E2235]/40 rounded-xl relative z-10">
+                  <span className="text-xs text-gray-500 font-mono">No upcoming high-impact USD economic events scheduled for today.</span>
+                </div>
+              )}
+            </div>
+
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
               {/* INPUT PANEL */}
               <div className="lg:col-span-5 bg-[#11131F]/90 border border-[#1E2235] rounded-2xl p-6 shadow-xl flex flex-col gap-5">
@@ -1530,12 +1609,21 @@ export default function Dashboard() {
                           </div>
 
                           <div className={`bg-[#141626]/40 border rounded-xl p-4 flex flex-col gap-2.5 transition-all ${
-                            sbResult.confidence && sbResult.confidence >= 90 ? "border-indigo-500/50 shadow-md shadow-indigo-500/5" : "border-[#1E2235]/60"
+                            sbResult.news_lockout_active 
+                              ? "border-rose-500/50 shadow-md shadow-rose-500/5"
+                              : sbResult.confidence && sbResult.confidence >= 90 
+                                ? "border-indigo-500/50 shadow-md shadow-indigo-500/5" 
+                                : "border-[#1E2235]/60"
                           }`}>
                             <div className="flex justify-between items-center">
                               <h4 className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider font-mono">Entry Price Area</h4>
                               <div className="flex items-center gap-1.5">
-                                {sbResult.confidence !== undefined && (
+                                {sbResult.news_lockout_active ? (
+                                  <span className="bg-rose-500/10 text-rose-400 border border-rose-500/20 text-[9px] font-bold px-1.5 py-0.5 rounded font-mono flex items-center gap-1">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
+                                    NEWS LOCKOUT
+                                  </span>
+                                ) : sbResult.confidence !== undefined && (
                                   <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded font-mono flex items-center gap-1 ${
                                     sbResult.confidence >= 90 ? "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20" : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
                                   }`}>

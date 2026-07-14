@@ -143,6 +143,11 @@ class SilverBulletResponse(BaseModel):
     
     # Confidence/Confirmation Rate field
     confidence: Optional[int] = None
+    
+    # Economic news fields
+    news_lockout_active: bool = False
+    active_news_event: Optional[str] = None
+    upcoming_news_events: Optional[List[dict]] = None
 
 
 
