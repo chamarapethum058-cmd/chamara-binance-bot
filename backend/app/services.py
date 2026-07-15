@@ -774,23 +774,57 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
             # Save computed confidence score
             result["confidence"] = conf_score
             
-            # Enforce strict tight scalp parameters on valid signals
-            if result.get("is_valid") and result.get("daily_bias") in ["BULLISH", "BEARISH"]:
-                bias = result["daily_bias"]
-                min_risk = cls._get_tight_scalp_risk(current_price or 2320.0, symbol)
-                entry_price_val = current_price or 0.0
-                if bias == "BULLISH":
-                    stop_loss_val = entry_price_val - min_risk
-                    target_val = entry_price_val + (min_risk * 4.0)
-                else:
-                    stop_loss_val = entry_price_val + min_risk
-                    target_val = entry_price_val - (min_risk * 4.0)
-                
-                action_type = "Buy Limit" if bias == "BULLISH" else "Sell Limit"
-                result["entry_price_area"] = f"{action_type} at {entry_price_val:.2f}"
-                result["stop_loss_level"] = round(stop_loss_val, 2)
-                result["liquidity_target"] = round(target_val, 2)
-                result["target_reward_ratio"] = "1:4.00"
+            # Enforce 70% Minimum Filter lockout for Gemini response
+            if conf_score < 70:
+                result["daily_bias"] = "NEUTRAL"
+                result["entry_price_area"] = "No Entry (Confidence < 70%)"
+                result["stop_loss_level"] = None
+                result["liquidity_target"] = None
+                result["target_reward_ratio"] = "N/A"
+                result["market_structure_status"] = (
+                    f"HTF Trend is {htf_trend}, but strategy confidence is below 70% ({conf_score}%). Setup Locked.\n\n"
+                    f"---\n\n"
+                    f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
+                    f"Trend එක {htf_trend} වුවත්, strategy තහවුරු කිරීමේ ප්‍රතිශතය 70% ට වඩා අඩුය ({conf_score}%). Setup අවහිර කර ඇත."
+                )
+                result["reasoning"] = (
+                    f"No Entry Triggered because confidence score ({conf_score}%) does not meet the 70% minimum threshold.\n"
+                    f"Wait for high-probability setups where all confluences align to yield >= 70% score.\n\n"
+                    f"---\n\n"
+                    f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
+                    f"තහවුරු කිරීමේ ප්‍රතිශතය ({conf_score}%) 70% සීමාවට වඩා අඩු බැවින් entry එක ලබා දී නොමැත.\n"
+                    f"70% හෝ ඊට වැඩි සම්භාවිතාවක් ඇති Setup එකක් ලැබෙන තෙක් රැඳී සිටින්න."
+                )
+                result["invalidation"] = (
+                    f"Setup is locked out due to low confidence rating ({conf_score}%).\n\n"
+                    f"---\n\n"
+                    f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
+                    f"අඩු තහවුරු කිරීමේ මට්ටම ({conf_score}%) නිසා setup එක වලංගු නොවේ."
+                )
+                result["risk_notes"] = (
+                    f"Execution locked due to low confidence score ({conf_score}%). Do not enter trades.\n\n"
+                    f"---\n\n"
+                    f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
+                    f"අඩු තහවුරු කිරීමේ මට්ටම ({conf_score}%) නිසා ගනුදෙනුව අවහිර කර ඇත. Trade එකට ඇතුල් නොවන්න."
+                )
+            else:
+                # Enforce strict tight scalp parameters on valid signals
+                if result.get("is_valid") and result.get("daily_bias") in ["BULLISH", "BEARISH"]:
+                    bias = result["daily_bias"]
+                    min_risk = cls._get_tight_scalp_risk(current_price or 2320.0, symbol)
+                    entry_price_val = current_price or 0.0
+                    if bias == "BULLISH":
+                        stop_loss_val = entry_price_val - min_risk
+                        target_val = entry_price_val + (min_risk * 4.0)
+                    else:
+                        stop_loss_val = entry_price_val + min_risk
+                        target_val = entry_price_val - (min_risk * 4.0)
+                    
+                    action_type = "Buy Limit" if bias == "BULLISH" else "Sell Limit"
+                    result["entry_price_area"] = f"{action_type} at {entry_price_val:.2f}"
+                    result["stop_loss_level"] = round(stop_loss_val, 2)
+                    result["liquidity_target"] = round(target_val, 2)
+                    result["target_reward_ratio"] = "1:4.00"
             
             # Parse entry price from entry_price_area string for steps checklist
             entry_price_val = 0.0
