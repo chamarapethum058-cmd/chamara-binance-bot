@@ -407,6 +407,47 @@ export default function Dashboard() {
     }
   };
 
+  const handleSelectTracker = (tracker: any) => {
+    if (!tracker) return;
+    
+    // Switch to Silver Bullet tab view to show details
+    setActiveView("silverbullet");
+    
+    // Populate form fields with the tracked parameters
+    setSbSymbol(tracker.symbol);
+    const p = tracker.req_payload || {};
+    
+    if (p.htf_trend !== undefined) setSbHtfTrend(p.htf_trend || "BULLISH");
+    if (p.pullback_days !== undefined) setSbPullbackDays(Number(p.pullback_days) || 3);
+    if (p.pdh !== undefined) setSbPdh(p.pdh ?? "");
+    if (p.pdl !== undefined) setSbPdl(p.pdl ?? "");
+    if (p.daily_open !== undefined) setSbOpen(p.daily_open ?? "");
+    if (p.daily_close !== undefined) setSbClose(p.daily_close ?? "");
+    if (tracker.current_price !== undefined) setSbCurrentPrice(tracker.current_price ?? "");
+    
+    if (p.dealing_range_high !== undefined) setSbDealingRangeHigh(p.dealing_range_high ?? "");
+    if (p.dealing_range_low !== undefined) setSbDealingRangeLow(p.dealing_range_low ?? "");
+    if (p.killzone !== undefined) setSbKillzone(p.killzone || "LONDON_SB");
+    
+    if (p.asian_sweep !== undefined) setSbAsianSweep(!!p.asian_sweep);
+    if (p.demand_mitigation !== undefined) setSbDemandMitigation(!!p.demand_mitigation);
+    if (p.ltf_shift !== undefined) setSbLtfShift(!!p.ltf_shift);
+    
+    if (p.discount_pd_array !== undefined) setSbDiscountPdArray(!!p.discount_pd_array);
+    if (p.premium_pd_array !== undefined) setSbPremiumPdArray(!!p.premium_pd_array);
+    if (p.ltf_trigger !== undefined) setSbLtfTrigger(p.ltf_trigger || "MSS");
+    if (p.has_fresh_fvg !== undefined) setSbHasFreshFvg(!!p.has_fresh_fvg);
+    if (p.high_impact_news !== undefined) setSbHighImpactNews(!!p.high_impact_news);
+    
+    if (p.candle_9am_high !== undefined) setSbCandle9amHigh(p.candle_9am_high ?? "");
+    if (p.candle_9am_low !== undefined) setSbCandle9amLow(p.candle_9am_low ?? "");
+    
+    // Load the tracker's live computed results into the main detail view panel
+    if (tracker.last_result) {
+      setSbResult(tracker.last_result);
+    }
+  };
+
   // Fetch initial data
   useEffect(() => {
     checkHealth();
@@ -1681,7 +1722,12 @@ export default function Dashboard() {
                     ) : (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {trackers.map((tracker) => (
-                          <div key={tracker.symbol} className="bg-[#141626]/60 border border-[#1E2235] rounded-xl p-4 flex flex-col gap-2 transition-all hover:border-[#6366F1]/30">
+                          <div 
+                            key={tracker.symbol} 
+                            onClick={() => handleSelectTracker(tracker)}
+                            className="bg-[#141626]/60 border border-[#1E2235] hover:border-[#6366F1]/50 rounded-xl p-4 flex flex-col gap-2 transition-all cursor-pointer hover:bg-[#1c1f35]/80 hover:shadow-lg hover:shadow-indigo-500/5 select-none"
+                            title={`Click to view ${tracker.symbol} setup details`}
+                          >
                             <div className="flex justify-between items-center">
                               <span className="font-bold text-sm text-white font-mono">{tracker.symbol}</span>
                               <div className="flex items-center gap-1.5">
@@ -1691,8 +1737,11 @@ export default function Dashboard() {
                                   {tracker.status}
                                 </span>
                                 <button
-                                  onClick={() => handleStopTracking(tracker.symbol)}
-                                  className="text-gray-500 hover:text-rose-400 text-xs transition-colors cursor-pointer"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleStopTracking(tracker.symbol);
+                                  }}
+                                  className="text-gray-500 hover:text-rose-400 text-xs transition-colors cursor-pointer p-1"
                                   title="Stop tracking"
                                 >
                                   ✕
