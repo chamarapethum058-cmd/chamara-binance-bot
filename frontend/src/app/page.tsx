@@ -52,6 +52,7 @@ export default function Dashboard() {
   // Settings & preferences states
   const [geminiApiKey, setGeminiApiKey] = useState("");
   const [tempApiKey, setTempApiKey] = useState("");
+  const [geminiStatus, setGeminiStatus] = useState<{ status: string; details: string }>({ status: "UNKNOWN", details: "Checking key status..." });
   const [showSettings, setShowSettings] = useState(false);
 
   // News states
@@ -415,6 +416,26 @@ export default function Dashboard() {
     fetchPreferences();
   }, []);
 
+  const fetchGeminiStatus = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/preferences/gemini-status`);
+      if (res.ok) {
+        const data = await res.json();
+        setGeminiStatus(data);
+      } else {
+        setGeminiStatus({ status: "ERROR", details: "Failed to retrieve status from backend." });
+      }
+    } catch {
+      setGeminiStatus({ status: "ERROR", details: "Could not connect to backend to check status." });
+    }
+  };
+
+  useEffect(() => {
+    fetchGeminiStatus();
+    const interval = setInterval(fetchGeminiStatus, 20000); // Poll status every 20 seconds
+    return () => clearInterval(interval);
+  }, [geminiApiKey]);
+
   const fetchPreferences = async () => {
     try {
       const res = await fetch(`${API_BASE}/preferences`);
@@ -444,6 +465,7 @@ export default function Dashboard() {
         setShowSettings(false);
         alert("API Key saved successfully!");
         checkHealth();
+        fetchGeminiStatus();
       } else {
         alert("Failed to save API key.");
       }
@@ -925,6 +947,47 @@ export default function Dashboard() {
         </div>
 
         <div className="flex items-center gap-4">
+          {/* Gemini API Status Badge */}
+          <div 
+            className="flex items-center gap-2 bg-[#161924] border px-3.5 py-1.5 rounded-lg text-sm select-none transition-all duration-300"
+            title={geminiStatus.details}
+            style={{
+              borderColor: 
+                geminiStatus.status === "VALID" ? "rgba(16, 185, 129, 0.2)" :
+                geminiStatus.status === "INVALID" ? "rgba(239, 68, 68, 0.3)" :
+                geminiStatus.status === "HIGH_DEMAND" ? "rgba(245, 158, 11, 0.3)" :
+                geminiStatus.status === "MISSING" ? "rgba(107, 114, 128, 0.2)" :
+                "rgba(59, 130, 246, 0.2)"
+            }}
+          >
+            <span className={`w-2.5 h-2.5 rounded-full ${
+              geminiStatus.status === "VALID" ? "bg-emerald-500 animate-pulse" :
+              geminiStatus.status === "INVALID" ? "bg-rose-500" :
+              geminiStatus.status === "HIGH_DEMAND" ? "bg-amber-500 animate-bounce" :
+              geminiStatus.status === "MISSING" ? "bg-gray-500" :
+              "bg-blue-500 animate-ping"
+            }`}></span>
+            <span 
+              className="font-semibold text-xs tracking-wider uppercase font-mono"
+              style={{
+                color: 
+                  geminiStatus.status === "VALID" ? "#34D399" :
+                  geminiStatus.status === "INVALID" ? "#F87171" :
+                  geminiStatus.status === "HIGH_DEMAND" ? "#FBBF24" :
+                  geminiStatus.status === "MISSING" ? "#9CA3AF" :
+                  "#60A5FA"
+              }}
+            >
+              {
+                geminiStatus.status === "VALID" ? "GEMINI ACTIVE" :
+                geminiStatus.status === "INVALID" ? "GEMINI INVALID" :
+                geminiStatus.status === "HIGH_DEMAND" ? "GEMINI BUSY" :
+                geminiStatus.status === "MISSING" ? "NO GEMINI KEY" :
+                "CHECKING GEMINI"
+              }
+            </span>
+          </div>
+
           <div className="flex items-center gap-2 bg-[#161924] border border-[#242736] px-3.5 py-1.5 rounded-lg text-sm">
             <span className={`w-2.5 h-2.5 rounded-full ${backendHealth === "online" ? "bg-emerald-500 animate-pulse" : "bg-rose-500"}`}></span>
             <span className="font-medium text-xs tracking-wider uppercase text-gray-300">
@@ -3537,6 +3600,45 @@ export default function Dashboard() {
                 >
                   Check API Limits & Usage ↗
                 </a>
+
+                {/* API Key Status Feedback */}
+                <div 
+                  className="border rounded-xl p-3 flex flex-col gap-1 text-[11px] font-mono mt-3"
+                  style={{
+                    borderColor: 
+                      geminiStatus.status === "VALID" ? "rgba(16, 185, 129, 0.2)" :
+                      geminiStatus.status === "INVALID" ? "rgba(239, 68, 68, 0.3)" :
+                      geminiStatus.status === "HIGH_DEMAND" ? "rgba(245, 158, 11, 0.3)" :
+                      geminiStatus.status === "MISSING" ? "rgba(107, 114, 128, 0.2)" :
+                      "rgba(59, 130, 246, 0.2)",
+                    backgroundColor: 
+                      geminiStatus.status === "VALID" ? "rgba(16, 185, 129, 0.05)" :
+                      geminiStatus.status === "INVALID" ? "rgba(239, 68, 68, 0.05)" :
+                      geminiStatus.status === "HIGH_DEMAND" ? "rgba(245, 158, 11, 0.05)" :
+                      geminiStatus.status === "MISSING" ? "rgba(107, 114, 128, 0.05)" :
+                      "rgba(59, 130, 246, 0.05)",
+                    color: 
+                      geminiStatus.status === "VALID" ? "#34D399" :
+                      geminiStatus.status === "INVALID" ? "#F87171" :
+                      geminiStatus.status === "HIGH_DEMAND" ? "#FBBF24" :
+                      geminiStatus.status === "MISSING" ? "#9CA3AF" :
+                      "#60A5FA"
+                  }}
+                >
+                  <div className="flex items-center gap-1.5 font-bold uppercase text-[10px]">
+                    <span className={`w-1.5 h-1.5 rounded-full ${
+                      geminiStatus.status === "VALID" ? "bg-emerald-500 animate-pulse" :
+                      geminiStatus.status === "INVALID" ? "bg-rose-500" :
+                      geminiStatus.status === "HIGH_DEMAND" ? "bg-amber-500 animate-bounce" :
+                      geminiStatus.status === "MISSING" ? "bg-gray-500" :
+                      "bg-blue-500"
+                    }`}></span>
+                    Connection Status: {geminiStatus.status}
+                  </div>
+                  <p className="text-[10px] text-gray-300 font-medium leading-normal mt-0.5">
+                    {geminiStatus.details}
+                  </p>
+                </div>
               </div>
               
               <div className="flex justify-end gap-3 mt-2 border-t border-[#1E2235] pt-4">

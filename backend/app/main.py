@@ -246,6 +246,47 @@ def delete_strategy(strategy_id: int, db: Session = Depends(get_db)):
 def get_preferences(db: Session = Depends(get_db)):
     return db.query(PreferenceModel).all()
 
+# Cache for Gemini status to avoid rate limits
+_gemini_status_cache = {"status": "UNKNOWN", "details": "", "timestamp": 0.0}
+
+@app.get("/api/preferences/gemini-status")
+async def get_gemini_status(db: Session = Depends(get_db)):
+    import time
+    now = time.time()
+    # Return cached status if it's less than 30 seconds old
+    if now - _gemini_status_cache["timestamp"] < 30.0:
+        return _gemini_status_cache
+
+    pref = db.query(PreferenceModel).filter(PreferenceModel.key == "gemini_api_key").first()
+    if not pref or not pref.value or not pref.value.strip():
+        status_res = {"status": "MISSING", "details": "Gemini API Key is not configured."}
+        _gemini_status_cache.update(status_res)
+        _gemini_status_cache["timestamp"] = now
+        return status_res
+
+    api_key = pref.value.strip()
+    try:
+        from google import genai
+        # Test Gemini API using this key
+        client = genai.Client(api_key=api_key)
+        client.models.generate_content(
+            model='gemini-3.5-flash',
+            contents="ping"
+        )
+        status_res = {"status": "VALID", "details": "Gemini API is online and fully authenticated."}
+    except Exception as e:
+        err_msg = str(e)
+        if "401" in err_msg or "UNAUTHENTICATED" in err_msg:
+            status_res = {"status": "INVALID", "details": "Invalid authentication credentials (401 Unauthenticated)."}
+        elif "503" in err_msg or "UNAVAILABLE" in err_msg:
+            status_res = {"status": "HIGH_DEMAND", "details": "Gemini is online but experiencing high demand (503 Temporary Spikes)."}
+        else:
+            status_res = {"status": "ERROR", "details": f"Connection error: {err_msg[:80]}"}
+            
+    _gemini_status_cache.update(status_res)
+    _gemini_status_cache["timestamp"] = now
+    return status_res
+
 @app.post("/api/preferences", response_model=PreferenceResponse)
 def set_preference(pref: PreferenceCreate, db: Session = Depends(get_db)):
     db_pref = db.query(PreferenceModel).filter(PreferenceModel.key == pref.key).first()
@@ -256,6 +297,12 @@ def set_preference(pref: PreferenceCreate, db: Session = Depends(get_db)):
         db.add(db_pref)
     db.commit()
     db.refresh(db_pref)
+    
+    # Invalidate cache if key was updated
+    if pref.key == "gemini_api_key":
+        global _gemini_status_cache
+        _gemini_status_cache["timestamp"] = 0.0 # Force recheck
+        
     return db_pref
 
 # TRANSLATION ENDPOINTS
