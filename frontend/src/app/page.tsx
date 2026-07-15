@@ -1635,21 +1635,31 @@ export default function Dashboard() {
                             <div className="flex justify-between items-center text-xs">
                               <span className="text-gray-400 font-mono">Confluences:</span>
                               <span className={`font-mono font-bold ${
-                                tracker.confluences >= 9 ? "text-emerald-400" : tracker.confluences >= 6 ? "text-indigo-400" : "text-gray-400"
-                              }`}>{tracker.confluences}/10</span>
+                                tracker.confluences >= 10 ? "text-emerald-400" : tracker.confluences >= 7 ? "text-indigo-400" : "text-gray-400"
+                              }`}>{tracker.confluences}/12</span>
                             </div>
                             {/* Progress Bar */}
                             <div className="w-full bg-[#1E2235] h-1.5 rounded-full overflow-hidden">
                               <div 
                                 className={`h-full transition-all duration-500 ${
-                                  tracker.confluences >= 9 ? "bg-emerald-400" : tracker.confluences >= 6 ? "bg-indigo-400" : "bg-gray-500"
+                                  tracker.confluences >= 10 ? "bg-emerald-400" : tracker.confluences >= 7 ? "bg-indigo-400" : "bg-gray-500"
                                 }`}
-                                style={{ width: `${tracker.confluences * 10}%` }}
+                                style={{ width: `${(tracker.confluences / 12) * 100}%` }}
                               />
                             </div>
                             <div className="flex justify-between items-center text-[10px] text-gray-500 font-mono mt-0.5">
                               <span>Price:</span>
                               <span>${tracker.current_price?.toFixed(2)}</span>
+                            </div>
+                            
+                            {/* Confidence Rate Display */}
+                            <div className="flex justify-between items-center text-[10px] border-t border-[#1E2235]/40 pt-1.5 mt-1 font-mono">
+                              <span className="text-gray-400">Confidence:</span>
+                              <span className={`font-bold ${
+                                (tracker.confidence || 0) >= 70 ? "text-emerald-400 font-extrabold" : "text-gray-400"
+                              }`}>
+                                {tracker.confidence || 0}% {(tracker.confidence || 0) >= 70 ? "🔥 (READY)" : ""}
+                              </span>
                             </div>
                           </div>
                         ))}

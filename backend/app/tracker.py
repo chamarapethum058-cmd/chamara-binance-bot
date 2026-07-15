@@ -51,9 +51,9 @@ async def run_tracker_loop():
                     result = await AIService.analyze_silver_bullet(tracker["req_payload"], api_key=tracker.get("api_key"))
                     tracker["last_result"] = result
                     
-                    # Count confluences out of 10 steps
+                    # Count confluences out of 12 steps
                     steps_confirmed = 0
-                    for i in range(1, 11):
+                    for i in range(1, 13):
                         # Count sb_step_x_time_window_ok, etc.
                         key_name = f"sb_step_{i}_time_window_ok"
                         if i == 2:
@@ -74,15 +74,20 @@ async def run_tracker_loop():
                             key_name = "sb_step_9_ltf_choch_ok"
                         elif i == 10:
                             key_name = "sb_step_10_fvg_limit_ok"
+                        elif i == 11:
+                            key_name = "sb_step_11_equilibrium_ok"
+                        elif i == 12:
+                            key_name = "sb_step_12_po3_align_ok"
                             
                         if result.get(key_name):
                             steps_confirmed += 1
                     
                     tracker["confluences"] = steps_confirmed
+                    tracker["confidence"] = result.get("confidence", 0)
                     tracker["current_price"] = new_price or tracker["req_payload"].get("current_price") or 0.0
                     
                     # Determine status
-                    if steps_confirmed >= 9:
+                    if steps_confirmed >= 10:
                         tracker["status"] = "ENTRY READY"
                     else:
                         tracker["status"] = "RUNNING"
@@ -123,6 +128,7 @@ def get_trackers_status() -> List[Dict[str, Any]]:
             "symbol": sym,
             "status": tracker["status"],
             "confluences": tracker["confluences"],
+            "confidence": tracker.get("confidence", 0),
             "current_price": tracker["current_price"],
             "last_result": tracker["last_result"]
         })
