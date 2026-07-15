@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean
+from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Float
 from datetime import datetime
 from .database import Base
 
@@ -33,3 +33,15 @@ class PreferenceModel(Base):
     id = Column(Integer, primary_key=True, index=True)
     key = Column(String, unique=True, index=True)
     value = Column(String)
+
+class LoggedTradeModel(Base):
+    __tablename__ = "logged_trades"
+
+    id = Column(Integer, primary_key=True, index=True)
+    symbol = Column(String, index=True)
+    direction = Column(String)  # BULLISH, BEARISH
+    entry_price = Column(Float)
+    stop_loss = Column(Float)
+    take_profit = Column(Float)
+    status = Column(String, default="PENDING")  # PENDING, WIN, LOSS
+    timestamp = Column(DateTime, default=datetime.utcnow)

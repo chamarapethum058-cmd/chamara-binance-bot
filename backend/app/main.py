@@ -5,13 +5,14 @@ from typing import List, Dict, Any
 import json
 
 from .database import engine, Base, get_db
-from .models import StrategyModel, AnalysisModel, PreferenceModel
+from .models import StrategyModel, AnalysisModel, PreferenceModel, LoggedTradeModel
 from .schemas import (
     StrategyCreate, StrategyResponse, 
     AnalysisRequest, AnalysisResponse,
     PreferenceCreate, PreferenceResponse,
     ChatRequest, TranslateRequest,
-    SilverBulletRequest, SilverBulletResponse
+    SilverBulletRequest, SilverBulletResponse,
+    LoggedTradeCreate, LoggedTradeResponse
 )
 from .services import BinanceService, AIService, NewsService
 from .config import settings
@@ -586,5 +587,98 @@ async def get_market_price(symbol: str):
                 return await fetch_yahoo_finance(symbol_upper)
             except Exception as e:
                 raise HTTPException(status_code=400, detail=f"Failed to fetch market data for {symbol}: {str(e)}")
+
+async def fetch_current_price_for_symbol(symbol: str) -> float:
+    symbol_upper = symbol.upper()
+    yahoo_symbol = SYMBOL_MAP.get(symbol_upper)
+    if yahoo_symbol:
+        try:
+            data = await fetch_yahoo_finance(yahoo_symbol)
+            return data["current_price"]
+        except Exception:
+            pass
+            
+    binance_symbol = symbol_upper
+    if not binance_symbol.endswith("USDT") and len(binance_symbol) <= 5:
+        binance_symbol = f"{binance_symbol}USDT"
+        
+    try:
+        price = await BinanceService.fetch_ticker_price(binance_symbol)
+        return price
+    except Exception:
+        pass
+        
+    try:
+        data = await fetch_yahoo_finance(f"{symbol_upper}-USD")
+        return data["current_price"]
+    except Exception:
+        try:
+            data = await fetch_yahoo_finance(symbol_upper)
+            return data["current_price"]
+        except Exception:
+            return 0.0
+
+@app.post("/api/trades/log", response_model=LoggedTradeResponse)
+def log_trade(trade: LoggedTradeCreate, db: Session = Depends(get_db)):
+    db_trade = LoggedTradeModel(
+        symbol=trade.symbol,
+        direction=trade.direction,
+        entry_price=trade.entry_price,
+        stop_loss=trade.stop_loss,
+        take_profit=trade.take_profit,
+        status="PENDING"
+    )
+    db.add(db_trade)
+    db.commit()
+    db.refresh(db_trade)
+    return db_trade
+
+@app.get("/api/trades/history", response_model=List[LoggedTradeResponse])
+async def get_trade_history(db: Session = Depends(get_db)):
+    trades = db.query(LoggedTradeModel).all()
+    for trade in trades:
+        if trade.status == "PENDING":
+            try:
+                current_price = await fetch_current_price_for_symbol(trade.symbol)
+                if current_price > 0:
+                    if trade.direction == "BULLISH":
+                        if current_price >= trade.take_profit:
+                            trade.status = "WIN"
+                            db.commit()
+                        elif current_price <= trade.stop_loss:
+                            trade.status = "LOSS"
+                            db.commit()
+                    elif trade.direction == "BEARISH":
+                        if current_price <= trade.take_profit:
+                            trade.status = "WIN"
+                            db.commit()
+                        elif current_price >= trade.stop_loss:
+                            trade.status = "LOSS"
+                            db.commit()
+            except Exception:
+                pass
+    return trades
+
+@app.post("/api/trades/{trade_id}/status", response_model=LoggedTradeResponse)
+def update_trade_status(trade_id: int, status_update: Dict[str, str], db: Session = Depends(get_db)):
+    db_trade = db.query(LoggedTradeModel).filter(LoggedTradeModel.id == trade_id).first()
+    if not db_trade:
+        raise HTTPException(status_code=404, detail="Trade not found")
+    new_status = status_update.get("status")
+    if new_status in ["PENDING", "WIN", "LOSS"]:
+        db_trade.status = new_status
+        db.commit()
+        db.refresh(db_trade)
+    return db_trade
+
+@app.delete("/api/trades/{trade_id}")
+def delete_trade(trade_id: int, db: Session = Depends(get_db)):
+    db_trade = db.query(LoggedTradeModel).filter(LoggedTradeModel.id == trade_id).first()
+    if not db_trade:
+        raise HTTPException(status_code=404, detail="Trade not found")
+    db.delete(db_trade)
+    db.commit()
+    return {"message": "Trade deleted successfully"}
+
 
 

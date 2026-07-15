@@ -59,6 +59,95 @@ export default function Dashboard() {
   const [newsLoading, setNewsLoading] = useState(false);
   const [activeView, setActiveView] = useState<"dashboard" | "news" | "silverbullet">("dashboard");
   const [trackers, setTrackers] = useState<any[]>([]);
+  const [tradeHistory, setTradeHistory] = useState<any[]>([]);
+  const [logLoading, setLogLoading] = useState(false);
+
+  const fetchTradeHistory = async () => {
+    try {
+      const res = await fetch("http://127.0.0.1:8000/api/trades/history");
+      if (res.ok) {
+        const data = await res.json();
+        setTradeHistory(data);
+      }
+    } catch (err) {
+      console.error("Error fetching trade history:", err);
+    }
+  };
+
+  const handleLogTrade = async () => {
+    if (!sbResult || !sbResult.is_valid) return;
+    
+    const parsePrice = (valStr: string | null | undefined) => {
+      if (!valStr) return 0.0;
+      const matches = valStr.match(/\d+(?:\.\d+)?/g);
+      return matches ? Number(matches[0]) : 0.0;
+    };
+
+    const entry = parsePrice(sbResult.entry_price_area);
+    const sl = parsePrice(sbResult.stop_loss_level);
+    const target = parsePrice(sbResult.liquidity_target) || (sbResult.daily_bias === "BULLISH" ? entry + (entry - sl) * 3 : entry - (sl - entry) * 3);
+
+    if (entry <= 0) {
+      alert("Invalid entry price level detected. Cannot log trade.");
+      return;
+    }
+
+    setLogLoading(true);
+    try {
+      const res = await fetch("http://127.0.0.1:8000/api/trades/log", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          symbol: sbSymbol,
+          direction: sbResult.daily_bias,
+          entry_price: entry,
+          stop_loss: sl,
+          take_profit: target
+        })
+      });
+      if (res.ok) {
+        alert("Trade logged to history successfully! 📈");
+        fetchTradeHistory();
+      } else {
+        const errData = await res.json();
+        alert(`Failed to log trade: ${errData.detail || "Unknown error"}`);
+      }
+    } catch (err) {
+      console.error("Error logging trade:", err);
+      alert("Error connecting to server to log trade.");
+    } finally {
+      setLogLoading(false);
+    }
+  };
+
+  const handleDeleteTrade = async (tradeId: number) => {
+    if (!confirm("Are you sure you want to delete this trade from history?")) return;
+    try {
+      const res = await fetch(`http://127.0.0.1:8000/api/trades/${tradeId}`, {
+        method: "DELETE"
+      });
+      if (res.ok) {
+        fetchTradeHistory();
+      }
+    } catch (err) {
+      console.error("Error deleting trade:", err);
+    }
+  };
+
+  const handleUpdateTradeStatus = async (tradeId: number, newStatus: string) => {
+    try {
+      const res = await fetch(`http://127.0.0.1:8000/api/trades/${tradeId}/status`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus })
+      });
+      if (res.ok) {
+        fetchTradeHistory();
+      }
+    } catch (err) {
+      console.error("Error updating trade status:", err);
+    }
+  };
 
   const fetchTrackersStatus = async () => {
     try {
@@ -129,6 +218,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchTrackersStatus();
+    fetchTradeHistory();
   }, []);
 
   useEffect(() => {
@@ -136,6 +226,11 @@ export default function Dashboard() {
     const interval = setInterval(fetchTrackersStatus, 5000);
     return () => clearInterval(interval);
   }, [trackers.length]);
+
+  useEffect(() => {
+    const interval = setInterval(fetchTradeHistory, 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Chat interface state
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -1823,9 +1918,18 @@ export default function Dashboard() {
                           <button
                             type="button"
                             onClick={() => handleTrackSetup(sbSymbol)}
-                            className="bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/30 text-indigo-400 text-xs font-bold py-3 px-4 rounded-xl transition-all shadow-md flex items-center justify-center gap-1.5 md:col-span-2 cursor-pointer active:scale-95"
+                            className="bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/30 text-indigo-400 text-xs font-bold py-3 px-4 rounded-xl transition-all shadow-md flex items-center justify-center gap-1.5 md:col-span-2 cursor-pointer active:scale-95 animate-pulse"
                           >
                             Track Setup 🛰️
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={handleLogTrade}
+                            disabled={logLoading || !sbResult || !sbResult.is_valid || (sbResult.daily_bias !== "BULLISH" && sbResult.daily_bias !== "BEARISH")}
+                            className="bg-emerald-600/20 hover:bg-emerald-600/30 disabled:opacity-40 disabled:hover:bg-emerald-600/20 border border-emerald-500/30 text-emerald-400 text-xs font-bold py-3 px-4 rounded-xl transition-all shadow-md flex items-center justify-center gap-1.5 md:col-span-2 cursor-pointer active:scale-95"
+                          >
+                            {logLoading ? "Logging Trade..." : "Log Trade 📈"}
                           </button>
                         </div>
 
@@ -2775,7 +2879,134 @@ export default function Dashboard() {
                     )}
                   </div>
                 )}
+            </div>
+            </div>
+
+            {/* Trade History & Strategy Performance Dashboard */}
+            <div className="bg-[#11131F]/90 border border-[#1E2235] rounded-2xl p-6 shadow-xl flex flex-col gap-6 mt-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#1E2235] pb-4">
+                <div className="flex flex-col gap-1">
+                  <h3 className="text-base font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                    Trade Performance Journal 📈
+                  </h3>
+                  <p className="text-xs text-gray-400">
+                    Track executing setup performance. Outcomes auto-resolve via Binance market price.
+                    <br />
+                    <span className="text-[10px] text-indigo-400/80 font-mono">
+                      සිංහල පරිවර්තනය: ගනුදෙනු ලොගය සහ ප්‍රතිඵල ස්වයංක්‍රීයව Binance මිල මඟින් යාවත්කාලීන වේ.
+                    </span>
+                  </p>
+                </div>
+                
+                {/* Glow Win Rate Badge */}
+                {(() => {
+                  const completedTrades = tradeHistory.filter(t => t.status === "WIN" || t.status === "LOSS");
+                  const winsCount = tradeHistory.filter(t => t.status === "WIN").length;
+                  const winRate = completedTrades.length > 0 
+                    ? ((winsCount / completedTrades.length) * 100).toFixed(1) + "%" 
+                    : "0.0%";
+                  return (
+                    <div className="bg-indigo-500/10 border border-indigo-500/30 rounded-xl p-3.5 flex flex-col items-center gap-1 min-w-[140px] shadow-[0_0_15px_rgba(99,102,241,0.1)]">
+                      <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest font-mono">Win Rate</span>
+                      <span className="text-2xl font-bold text-white font-mono">{winRate}</span>
+                    </div>
+                  );
+                })()}
               </div>
+
+              {/* Stats Grid */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-[#141626]/40 border border-[#1E2235]/60 rounded-xl p-4 flex flex-col gap-1.5 items-center">
+                  <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wider font-mono">Total Logged</span>
+                  <span className="text-lg font-bold text-white font-mono">{tradeHistory.length}</span>
+                </div>
+                <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-4 flex flex-col gap-1.5 items-center">
+                  <span className="text-[9px] font-bold text-emerald-400 uppercase tracking-wider font-mono">Wins 🏆</span>
+                  <span className="text-lg font-bold text-emerald-400 font-mono">{tradeHistory.filter(t => t.status === "WIN").length}</span>
+                </div>
+                <div className="bg-rose-500/5 border border-rose-500/20 rounded-xl p-4 flex flex-col gap-1.5 items-center">
+                  <span className="text-[9px] font-bold text-rose-400 uppercase tracking-wider font-mono">Losses ❌</span>
+                  <span className="text-lg font-bold text-rose-400 font-mono">{tradeHistory.filter(t => t.status === "LOSS").length}</span>
+                </div>
+                <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-4 flex flex-col gap-1.5 items-center">
+                  <span className="text-[9px] font-bold text-amber-400 uppercase tracking-wider font-mono">Pending ⏳</span>
+                  <span className="text-lg font-bold text-amber-400 font-mono">{tradeHistory.filter(t => t.status === "PENDING").length}</span>
+                </div>
+              </div>
+
+              {/* Logged Trades Table */}
+              {tradeHistory.length === 0 ? (
+                <div className="bg-[#141626]/20 border border-[#1E2235]/40 rounded-xl p-8 text-center text-xs text-gray-500 font-mono">
+                  No trades logged in the journal yet. Click "Log Trade" on active setups above to record them.
+                </div>
+              ) : (
+                <div className="overflow-x-auto border border-[#1E2235]/60 rounded-xl bg-black/20">
+                  <table className="w-full text-left border-collapse text-xs font-mono">
+                    <thead>
+                      <tr className="border-b border-[#1E2235] bg-[#141626]/60 text-gray-400">
+                        <th className="p-3 text-[10px] uppercase font-bold tracking-wider">Date & Time</th>
+                        <th className="p-3 text-[10px] uppercase font-bold tracking-wider">Symbol</th>
+                        <th className="p-3 text-[10px] uppercase font-bold tracking-wider">Type</th>
+                        <th className="p-3 text-[10px] uppercase font-bold tracking-wider">Entry</th>
+                        <th className="p-3 text-[10px] uppercase font-bold tracking-wider">SL</th>
+                        <th className="p-3 text-[10px] uppercase font-bold tracking-wider">TP</th>
+                        <th className="p-3 text-[10px] uppercase font-bold tracking-wider">Status</th>
+                        <th className="p-3 text-[10px] uppercase font-bold tracking-wider text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {tradeHistory.map((trade: any) => (
+                        <tr key={trade.id} className="border-b border-[#1E2235]/40 hover:bg-[#141626]/20 transition-all">
+                          <td className="p-3 text-gray-400">{new Date(trade.timestamp).toLocaleString()}</td>
+                          <td className="p-3 text-white font-bold">{trade.symbol}</td>
+                          <td className="p-3">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                              trade.direction === "BULLISH" ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400"
+                            }`}>
+                              {trade.direction === "BULLISH" ? "LONG" : "SHORT"}
+                            </span>
+                          </td>
+                          <td className="p-3 text-gray-300">${trade.entry_price.toFixed(2)}</td>
+                          <td className="p-3 text-rose-400">${trade.stop_loss.toFixed(2)}</td>
+                          <td className="p-3 text-indigo-400">${trade.take_profit.toFixed(2)}</td>
+                          <td className="p-3">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                              trade.status === "WIN"
+                                ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                                : trade.status === "LOSS"
+                                  ? "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                                  : "bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse"
+                            }`}>
+                              {trade.status}
+                            </span>
+                          </td>
+                          <td className="p-3 text-right flex items-center justify-end gap-2">
+                            <select
+                              value={trade.status}
+                              onChange={(e) => handleUpdateTradeStatus(trade.id, e.target.value)}
+                              className="bg-[#141626] border border-[#1E2235] text-[10px] text-gray-300 rounded px-1 py-0.5 focus:outline-none focus:border-[#6366F1] font-mono cursor-pointer"
+                            >
+                              <option value="PENDING">PENDING</option>
+                              <option value="WIN">WIN 🏆</option>
+                              <option value="LOSS">LOSS ❌</option>
+                            </select>
+                            
+                            <button
+                              onClick={() => handleDeleteTrade(trade.id)}
+                              className="text-rose-400/70 hover:text-rose-400 transition-colors p-1"
+                              title="Delete from journal"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </section>
         ) : (

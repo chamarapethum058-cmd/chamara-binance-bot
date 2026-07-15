@@ -162,6 +162,26 @@ class SilverBulletResponse(BaseModel):
     active_news_event: Optional[str] = None
     upcoming_news_events: Optional[List[dict]] = None
 
+class LoggedTradeCreate(BaseModel):
+    symbol: str
+    direction: str
+    entry_price: float
+    stop_loss: float
+    take_profit: float
+
+class LoggedTradeResponse(BaseModel):
+    id: int
+    symbol: str
+    direction: str
+    entry_price: float
+    stop_loss: float
+    take_profit: float
+    status: str
+    timestamp: datetime
+
+    class Config:
+        from_attributes = True
+
 
 
 
