@@ -719,10 +719,9 @@ Return a JSON object with these exact keys:
 OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formatting.
 """
 
-        active_key = api_key or settings.GEMINI_API_KEY
-        if not active_key:
-            logger.warning("GEMINI_API_KEY not configured. Falling back to rule-based Silver Bullet analysis.")
-            return cls._get_mock_silver_bullet(req, upcoming_news_events=upcoming_news_events)
+        # ALWAYS fallback to rule-based mock Silver Bullet analysis locally to bypass Gemini API key limits
+        logger.info("Executing rule-based local Silver Bullet analysis...")
+        return cls._get_mock_silver_bullet(req, upcoming_news_events=upcoming_news_events)
 
         try:
             client = genai.Client(api_key=active_key)

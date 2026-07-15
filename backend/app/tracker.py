@@ -46,6 +46,24 @@ async def run_tracker_loop():
                 if new_price is not None:
                     tracker["req_payload"]["current_price"] = new_price
                 
+                # Fetch daily candles to extract asset-specific levels
+                try:
+                    sym = symbol.upper()
+                    if not sym.endswith("USDT") and not sym.endswith("USD") and sym not in ["BTC", "ETH", "SOL", "XAUUSD"]:
+                        sym = f"{sym}USDT"
+                    elif sym in ["BTC", "ETH", "SOL"]:
+                        sym = f"{sym}USDT"
+                    
+                    daily_candles = get_candles(sym, "1d", limit=5)
+                    if len(daily_candles) >= 2:
+                        tracker["req_payload"]["daily_open"] = daily_candles[-1]["open"]
+                        tracker["req_payload"]["pdh"] = daily_candles[-2]["high"]
+                        tracker["req_payload"]["pdl"] = daily_candles[-2]["low"]
+                        tracker["req_payload"]["dealing_range_high"] = max(c["high"] for c in daily_candles)
+                        tracker["req_payload"]["dealing_range_low"] = min(c["low"] for c in daily_candles)
+                except Exception as dex:
+                    logger.error(f"Error fetching dynamic daily levels for {symbol}: {dex}")
+
                 # Run strategy analysis
                 try:
                     result = await AIService.calculate_programmatic_silver_bullet(
