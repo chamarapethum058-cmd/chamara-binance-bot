@@ -957,6 +957,7 @@ export default function Dashboard() {
                 geminiStatus.status === "INVALID" ? "rgba(239, 68, 68, 0.3)" :
                 geminiStatus.status === "HIGH_DEMAND" ? "rgba(245, 158, 11, 0.3)" :
                 geminiStatus.status === "MISSING" ? "rgba(107, 114, 128, 0.2)" :
+                geminiStatus.status === "ERROR" ? "rgba(239, 68, 68, 0.3)" :
                 "rgba(59, 130, 246, 0.2)"
             }}
           >
@@ -965,6 +966,7 @@ export default function Dashboard() {
               geminiStatus.status === "INVALID" ? "bg-rose-500" :
               geminiStatus.status === "HIGH_DEMAND" ? "bg-amber-500 animate-bounce" :
               geminiStatus.status === "MISSING" ? "bg-gray-500" :
+              geminiStatus.status === "ERROR" ? "bg-rose-500" :
               "bg-blue-500 animate-ping"
             }`}></span>
             <span 
@@ -975,6 +977,7 @@ export default function Dashboard() {
                   geminiStatus.status === "INVALID" ? "#F87171" :
                   geminiStatus.status === "HIGH_DEMAND" ? "#FBBF24" :
                   geminiStatus.status === "MISSING" ? "#9CA3AF" :
+                  geminiStatus.status === "ERROR" ? "#F87171" :
                   "#60A5FA"
               }}
             >
@@ -983,6 +986,7 @@ export default function Dashboard() {
                 geminiStatus.status === "INVALID" ? "GEMINI INVALID" :
                 geminiStatus.status === "HIGH_DEMAND" ? "GEMINI BUSY" :
                 geminiStatus.status === "MISSING" ? "NO GEMINI KEY" :
+                geminiStatus.status === "ERROR" ? "GEMINI ERROR" :
                 "CHECKING GEMINI"
               }
             </span>
