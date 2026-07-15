@@ -78,8 +78,10 @@ export default function Dashboard() {
   const handleLogTrade = async () => {
     if (!sbResult || !sbResult.is_valid) return;
     
-    const parsePrice = (valStr: string | null | undefined) => {
-      if (!valStr) return 0.0;
+    const parsePrice = (val: any) => {
+      if (val === null || val === undefined) return 0.0;
+      if (typeof val === "number") return val;
+      const valStr = String(val);
       const matches = valStr.match(/\d+(?:\.\d+)?/g);
       return matches ? Number(matches[0]) : 0.0;
     };
@@ -455,6 +457,7 @@ export default function Dashboard() {
     fetchHistory();
     fetchNews();
     fetchPreferences();
+    fetchTradeHistory();
   }, []);
 
   const fetchGeminiStatus = async () => {
