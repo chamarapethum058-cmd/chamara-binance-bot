@@ -48,7 +48,10 @@ async def run_tracker_loop():
                 
                 # Run strategy analysis
                 try:
-                    result = await AIService.analyze_silver_bullet(tracker["req_payload"], api_key=tracker.get("api_key"))
+                    result = await AIService.calculate_programmatic_silver_bullet(
+                        tracker["req_payload"],
+                        current_price=(new_price or tracker["req_payload"].get("current_price") or 0.0)
+                    )
                     tracker["last_result"] = result
                     
                     # Count confluences out of 12 steps

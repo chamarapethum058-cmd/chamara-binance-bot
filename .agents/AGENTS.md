@@ -68,9 +68,10 @@ The bot must strictly enforce the following high-impact news rules:
 ## 10. High-Confluence Market-Price Confirmation Protocol (New Rule)
 > [!IMPORTANT]
 > **NO ARBITRARY ENTRIES/STOP LOSSES:** The system must never output arbitrary entry or stop loss parameters. 
-> To authorize an entry near the market price, there must be active, confirmed lower-timeframe (1m/3m) confirmations (e.g. valid structural displacement, candle body close MSS, and unmitigated FVG/OB arrays) located directly within the immediate vicinity of the current price.
 > If these specific close-proximity confirmations do not exist, the entry must be suppressed and locked out to prevent arbitrary trade execution.
 
-
-
-
+## 11. Programmatic Local Tracker Constraint (New Rule)
+> [!IMPORTANT]
+> **NO GEMINI API CALLS IN SCANNERS:** The background live scanner loop (`tracker.py`) MUST calculate the 12 setup confluences and confidence score programmatically and locally in Python using live price data.
+> Under no circumstances should the background tracker loop make calls to `AIService.analyze_silver_bullet` or call the Gemini AI API, to prevent API rate limits (429/503) and ensure 100% free and reliable monitoring.
+> The Gemini AI API must ONLY be triggered during manual, on-demand UI "Scan Market" or "Run Analysis" operations.

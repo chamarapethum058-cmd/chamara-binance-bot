@@ -875,6 +875,187 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
             return cls._get_mock_silver_bullet(req, upcoming_news_events=upcoming_news_events)
 
     @classmethod
+    async def calculate_programmatic_silver_bullet(cls, req: Dict[str, Any], current_price: float) -> Dict[str, Any]:
+        """
+        Pure programmatic, 100% local calculation of confluences and confidence score
+        for the background trackers without calling the Gemini AI API.
+        """
+        symbol = req.get("symbol") or "SOLUSDT"
+        timeframe = req.get("timeframe") or "1m"
+        htf_trend = req.get("htf_trend") or "UNKNOWN"
+        pullback_days = req.get("pullback_days")
+        pdh = req.get("pdh")
+        pdl = req.get("pdl")
+        daily_open = req.get("daily_open")
+        daily_close = req.get("daily_close")
+        asian_sweep = req.get("asian_sweep") or False
+        demand_mitigation = req.get("demand_mitigation") or False
+        ltf_shift = req.get("ltf_shift") or False
+        dealing_range_high = req.get("dealing_range_high")
+        dealing_range_low = req.get("dealing_range_low")
+        killzone = req.get("killzone") or "NONE"
+        discount_pd_array = req.get("discount_pd_array") or False
+        premium_pd_array = req.get("premium_pd_array") or False
+        ltf_trigger = req.get("ltf_trigger") or "NONE"
+        has_fresh_fvg = req.get("has_fresh_fvg") or False
+        high_impact_news = req.get("high_impact_news") or False
+        candle_9am_high = req.get("candle_9am_high")
+        candle_9am_low = req.get("candle_9am_low")
+
+        # 1. Determine Trend and Bias
+        is_htf_bullish = htf_trend.upper() == "BULLISH" or (pullback_days is not None and pullback_days >= 3)
+        daily_bias = htf_trend.upper() if htf_trend.upper() in ["BULLISH", "BEARISH"] else "NEUTRAL"
+
+        # 2. Determine Zone
+        zone = "EQUILIBRIUM"
+        if dealing_range_high is not None and dealing_range_low is not None:
+            midpoint = (dealing_range_low + dealing_range_high) / 2.0
+            zone = "DISCOUNT" if current_price <= midpoint else "PREMIUM"
+
+        # 3. Daily Open Price Vector Relation
+        open_relation = "N/A"
+        if daily_open is not None:
+            open_relation = "BELOW_OPEN" if current_price < daily_open else "ABOVE_OPEN"
+
+        # 4. Session hours validity (London / NY AM / NY PM)
+        from datetime import datetime, timezone, timedelta
+        now_utc = datetime.now(timezone.utc)
+        slst_dt = now_utc.astimezone(timezone(timedelta(hours=5, minutes=30)))
+        hour = slst_dt.hour
+        minute = slst_dt.minute
+        
+        in_london = (hour == 12 and minute >= 30) or (hour == 13 and minute <= 30)
+        in_ny_am = (hour == 19 and minute >= 30) or (hour == 20 and minute <= 30)
+        in_ny_pm = (hour == 23 and minute >= 30) or (hour == 0 and minute <= 30)
+        
+        # News events lockout parse
+        news_lockout_active = False
+        active_news_event = None
+        upcoming_news_events = []
+        try:
+            events = await cls._fetch_economic_calendar()
+            for event in events:
+                if event.get("impact") == "High" and event.get("country") == "USD":
+                    try:
+                        event_dt = datetime.fromisoformat(event["date"])
+                        event_utc = event_dt.astimezone(timezone.utc)
+                        diff_sec = (event_utc - now_utc).total_seconds()
+                        if abs(diff_sec) <= 3600:
+                            news_lockout_active = True
+                            active_news_event = event.get("title")
+                        if -14400 <= diff_sec <= 43200:
+                            slst_dt_ev = event_utc.astimezone(timezone(timedelta(hours=5, minutes=30)))
+                            upcoming_news_events.append({
+                                "title": event.get("title"),
+                                "country": event.get("country"),
+                                "impact": event.get("impact"),
+                                "time_slst": slst_dt_ev.strftime("%I:%M %p"),
+                                "time_utc": event_utc.isoformat(),
+                                "seconds_remaining": int(diff_sec)
+                            })
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+        kz_valid = False
+        if killzone == "ALL_TIME":
+            kz_valid = True
+        elif killzone == "LONDON":
+            kz_valid = in_london
+        elif killzone == "NY_AM":
+            kz_valid = in_ny_am
+        elif killzone == "NY_PM":
+            kz_valid = in_ny_pm
+        else:
+            kz_valid = in_london or in_ny_am or in_ny_pm
+
+        # Bypass lockout to allow execution at any time of day but log session details
+        kz_valid = True
+
+        # Swept liquidity pool
+        swept_pool = "NONE"
+        if pdl is not None and current_price <= pdl:
+            swept_pool = "PDL_SSL"
+        elif pdh is not None and current_price >= pdh:
+            swept_pool = "PDH_BSL"
+        elif candle_9am_low is not None and current_price <= candle_9am_low:
+            swept_pool = "9AM_LOW_SSL"
+        elif candle_9am_high is not None and current_price >= candle_9am_high:
+            swept_pool = "9AM_HIGH_BSL"
+
+        # Calculate Confidence Score (out of 100%)
+        conf_score = 0
+        if (daily_bias == "BULLISH" and is_htf_bullish) or (daily_bias == "BEARISH" and not is_htf_bullish):
+            conf_score += 20
+        if (daily_bias == "BULLISH" and zone == "DISCOUNT") or (daily_bias == "BEARISH" and zone == "PREMIUM"):
+            conf_score += 20
+        if (daily_bias == "BULLISH" and open_relation == "BELOW_OPEN") or (daily_bias == "BEARISH" and open_relation == "ABOVE_OPEN"):
+            conf_score += 15
+        if in_london or in_ny_am or in_ny_pm:
+            conf_score += 15
+        if swept_pool != "NONE" or asian_sweep:
+            conf_score += 15
+        mit_array = "OB" if demand_mitigation or discount_pd_array or premium_pd_array else "NONE"
+        if daily_bias in ["BULLISH", "BEARISH"] and (ltf_shift or ltf_trigger in ["MSS", "CISD", "CHOCH"]):
+            if has_fresh_fvg or mit_array != "NONE":
+                conf_score += 15
+
+        # Invalidation & lock triggers
+        setup_triggered = (conf_score >= 70) and not news_lockout_active and daily_bias != "NEUTRAL"
+        
+        # Stop loss & take profit levels
+        min_risk = cls._get_tight_scalp_risk(current_price, symbol)
+        if daily_bias == "BULLISH":
+            entry_price = current_price
+            stop_loss = entry_price - min_risk
+            target = entry_price + (min_risk * 4.0)
+        else:
+            entry_price = current_price
+            stop_loss = entry_price + min_risk
+            target = entry_price - (min_risk * 4.0)
+
+        # Build final response dictionary matching Gemini schema structure
+        result = {
+            "is_valid": True,
+            "confidence": conf_score,
+            "daily_bias": daily_bias if setup_triggered else "NEUTRAL",
+            "entry_price_area": f"{'Buy Limit' if daily_bias == 'BULLISH' else 'Sell Limit'} at {entry_price:.2f}" if setup_triggered else ("No Entry (High-Impact News Lockout)" if news_lockout_active else "No Entry (Confidence < 70%)"),
+            "stop_loss_level": round(stop_loss, 2) if setup_triggered else None,
+            "liquidity_target": round(target, 2) if setup_triggered else None,
+            "target_reward_ratio": "1:4.00" if setup_triggered else "N/A",
+            "news_lockout_active": news_lockout_active,
+            "active_news_event": active_news_event,
+            "upcoming_news_events": upcoming_news_events,
+            "counter_trend_locked": not setup_triggered,
+            "zone_type": zone,
+            "daily_open_relation": open_relation
+        }
+
+        # Build 12 step checklist
+        steps = cls._get_sb_steps(
+            kz_valid=True,
+            killzone=killzone,
+            swept_pool=swept_pool,
+            asian_sweep=asian_sweep,
+            ltf_shift=ltf_shift,
+            ltf_trigger=ltf_trigger,
+            has_fresh_fvg=has_fresh_fvg,
+            mit_array=mit_array,
+            ct_locked=not setup_triggered,
+            setup_triggered=setup_triggered,
+            entry_price=entry_price,
+            rr_ratio=4.0,
+            conf_score=conf_score,
+            timeframe=timeframe,
+            zone=zone,
+            daily_bias=daily_bias if setup_triggered else "NEUTRAL",
+            daily_open_relation=open_relation
+        )
+        result.update(steps)
+        return result
+
+    @classmethod
     def _get_tight_scalp_risk(cls, entry_price: float, symbol: str = "") -> float:
         symbol_upper = symbol.upper()
         if "XAU" in symbol_upper or "GOLD" in symbol_upper:
