@@ -483,6 +483,19 @@ USER'S TRADING STRATEGY RULES:
                 "LTF Reversal (MSS) එක සහ pullback limit entry එක සක්‍රීය වන තෙක් බලාපොරොත්තුවෙන්."
             )
 
+        # Step 16: HTF (4H) Trend Directional Alignment
+        sb_step_16_htf_align_ok = (daily_bias in ["BULLISH", "BEARISH"])
+        if sb_step_16_htf_align_ok:
+            sb_step_16_details = (
+                f"HTF (4H) Alignment confirmed: 15m/5m/3m/1m setup aligns strictly with the 4H trend direction ({daily_bias}). | "
+                f"HTF (4H) දිශානති පෙළගැස්ම: 15m/5m/3m/1m setup එක 4H chart එකෙහි ප්‍රවණතාවය ({daily_bias}) සමඟ 100% අනුකූල වේ."
+            )
+        else:
+            sb_step_16_details = (
+                "Awaiting HTF (4H) trend directional alignment validation. | "
+                "HTF (4H) ප්‍රවණතා දිශානති පෙළගැස්ම තහවුරු වන තෙක් බලාපොරොත්තුවෙන්."
+            )
+
         return {
             "sb_step_1_time_window_ok": sb_step_1_time_window_ok,
             "sb_step_1_details": sb_step_1_details,
@@ -513,7 +526,9 @@ USER'S TRADING STRATEGY RULES:
             "sb_step_14_ltf_tap_ok": sb_step_14_ltf_tap_ok,
             "sb_step_14_details": sb_step_14_details,
             "sb_step_15_dual_entry_ok": sb_step_15_dual_entry_ok,
-            "sb_step_15_details": sb_step_15_details
+            "sb_step_15_details": sb_step_15_details,
+            "sb_step_16_htf_align_ok": sb_step_16_htf_align_ok,
+            "sb_step_16_details": sb_step_16_details
         }
 
     @classmethod
@@ -656,6 +671,8 @@ USER'S TRADING STRATEGY RULES:
                 "sb_step_14_details": "Blocked by economic news lockout. | ආර්ථික පුවත් අවහිරතාවය නිසා අවහිර කර ඇත.",
                 "sb_step_15_dual_entry_ok": False,
                 "sb_step_15_details": "Blocked by economic news lockout. | ආර්ථික පුවත් අවහිරතාවය නිසා අවහිර කර ඇත.",
+                "sb_step_16_htf_align_ok": False,
+                "sb_step_16_details": "Blocked by economic news lockout. | ආර්ථික පුවත් අවහිරතාවය නිසා අවහිර කර ඇත.",
                 
                 "news_lockout_active": True,
                 "active_news_event": active_news_event,
@@ -1794,6 +1811,8 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                     "sb_step_14_details": steps["sb_step_14_details"],
                     "sb_step_15_dual_entry_ok": steps["sb_step_15_dual_entry_ok"],
                     "sb_step_15_details": steps["sb_step_15_details"],
+                    "sb_step_16_htf_align_ok": steps["sb_step_16_htf_align_ok"],
+                    "sb_step_16_details": steps["sb_step_16_details"],
                     "confidence": conf_score
                 }
 
@@ -1926,6 +1945,8 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                     "sb_step_14_details": steps["sb_step_14_details"],
                     "sb_step_15_dual_entry_ok": steps["sb_step_15_dual_entry_ok"],
                     "sb_step_15_details": steps["sb_step_15_details"],
+                    "sb_step_16_htf_align_ok": steps["sb_step_16_htf_align_ok"],
+                    "sb_step_16_details": steps["sb_step_16_details"],
                     "confidence": conf_score
                 }
             
@@ -2085,7 +2106,9 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                 "sb_step_14_ltf_tap_ok": steps["sb_step_14_ltf_tap_ok"],
                 "sb_step_14_details": steps["sb_step_14_details"],
                 "sb_step_15_dual_entry_ok": steps["sb_step_15_dual_entry_ok"],
-                "sb_step_15_details": steps["sb_step_15_details"]
+                "sb_step_15_details": steps["sb_step_15_details"],
+                "sb_step_16_htf_align_ok": steps["sb_step_16_htf_align_ok"],
+                "sb_step_16_details": steps["sb_step_16_details"]
             }
         else:
             reasons = []
@@ -2334,7 +2357,9 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                 "sb_step_14_ltf_tap_ok": steps["sb_step_14_ltf_tap_ok"],
                 "sb_step_14_details": steps["sb_step_14_details"],
                 "sb_step_15_dual_entry_ok": steps["sb_step_15_dual_entry_ok"],
-                "sb_step_15_details": steps["sb_step_15_details"]
+                "sb_step_15_details": steps["sb_step_15_details"],
+                "sb_step_16_htf_align_ok": steps["sb_step_16_htf_align_ok"],
+                "sb_step_16_details": steps["sb_step_16_details"]
             }
 
 

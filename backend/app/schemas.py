@@ -163,6 +163,8 @@ class SilverBulletResponse(BaseModel):
     sb_step_14_details: Optional[str] = None
     sb_step_15_dual_entry_ok: Optional[bool] = None
     sb_step_15_details: Optional[str] = None
+    sb_step_16_htf_align_ok: Optional[bool] = None
+    sb_step_16_details: Optional[str] = None
     
     # Confidence/Confirmation Rate field
     confidence: Optional[int] = None

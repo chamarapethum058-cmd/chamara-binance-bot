@@ -3101,6 +3101,33 @@ export default function Dashboard() {
                                   </span>
                                 </div>
                               </div>
+
+                              {/* Step 16: HTF (4H) Trend Directional Alignment */}
+                              <div className="bg-[#07080E]/40 border border-[#1E2235]/40 rounded-xl p-3.5 flex items-start gap-3.5 hover:border-indigo-500/20 transition-all">
+                                <div className={`w-6 h-6 rounded-full shrink-0 flex items-center justify-center font-bold text-xs font-mono border ${
+                                  sbResult.sb_step_16_htf_align_ok 
+                                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" 
+                                    : "bg-[#1E2235]/30 text-gray-500 border-[#1E2235]"
+                                }`}>
+                                  {sbResult.sb_step_16_htf_align_ok ? "✓" : "16"}
+                                </div>
+                                <div className="flex flex-col gap-1 w-full">
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider font-mono">Step 16: HTF (4H) Trend Directional Alignment</span>
+                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded font-mono ${
+                                      sbResult.sb_step_16_htf_align_ok ? "bg-emerald-500/10 text-emerald-400" : "bg-[#1E2235]/30 text-gray-400"
+                                    }`}>
+                                      {sbResult.sb_step_16_htf_align_ok ? "ALIGNED" : "LOCKED"}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-white leading-relaxed mt-0.5">
+                                    {sbResult.sb_step_16_details ? sbResult.sb_step_16_details.split("|")[0].trim() : "HTF (4H) Trend Directional alignment check."}
+                                  </p>
+                                  <span className="text-[10px] text-indigo-300/80 font-sans">
+                                    {sbResult.sb_step_16_details ? (sbResult.sb_step_16_details.split("|")[1]?.trim() || "HTF (4H) ප්‍රවණතා දිශානති පෙළගැස්ම.") : "HTF (4H) ප්‍රවණතා දිශානති පෙළගැස්ම."}
+                                  </span>
+                                </div>
+                              </div>
                             </div>
                           </div>
                         )}
