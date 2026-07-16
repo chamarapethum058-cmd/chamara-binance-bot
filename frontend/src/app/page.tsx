@@ -3236,7 +3236,9 @@ export default function Dashboard() {
                                 ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
                                 : trade.status === "LOSS"
                                   ? "bg-rose-500/10 text-rose-400 border border-rose-500/20"
-                                  : "bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse"
+                                  : trade.status === "ACTIVE"
+                                    ? "bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 animate-pulse"
+                                    : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
                             }`}>
                               {trade.status}
                             </span>
@@ -3247,7 +3249,8 @@ export default function Dashboard() {
                               onChange={(e) => handleUpdateTradeStatus(trade.id, e.target.value)}
                               className="bg-[#141626] border border-[#1E2235] text-[10px] text-gray-300 rounded px-1 py-0.5 focus:outline-none focus:border-[#6366F1] font-mono cursor-pointer"
                             >
-                              <option value="PENDING">PENDING</option>
+                              <option value="PENDING">PENDING ⏳</option>
+                              <option value="ACTIVE">ACTIVE ⚡</option>
                               <option value="WIN">WIN 🏆</option>
                               <option value="LOSS">LOSS ❌</option>
                             </select>

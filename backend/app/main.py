@@ -651,24 +651,37 @@ def log_trade(trade: LoggedTradeCreate, db: Session = Depends(get_db)):
 async def get_trade_history(db: Session = Depends(get_db)):
     trades = db.query(LoggedTradeModel).all()
     for trade in trades:
-        if trade.status == "PENDING":
+        if trade.status in ["PENDING", "ACTIVE"]:
             try:
                 current_price = await fetch_current_price_for_symbol(trade.symbol)
                 if current_price > 0:
-                    if trade.direction == "BULLISH":
-                        if current_price >= trade.take_profit:
-                            trade.status = "WIN"
-                            db.commit()
-                        elif current_price <= trade.stop_loss:
-                            trade.status = "LOSS"
-                            db.commit()
-                    elif trade.direction == "BEARISH":
-                        if current_price <= trade.take_profit:
-                            trade.status = "WIN"
-                            db.commit()
-                        elif current_price >= trade.stop_loss:
-                            trade.status = "LOSS"
-                            db.commit()
+                    if trade.status == "PENDING":
+                        # Limit order trigger checks
+                        if trade.direction == "BULLISH":
+                            if current_price <= trade.entry_price:
+                                trade.status = "ACTIVE"
+                                db.commit()
+                        elif trade.direction == "BEARISH":
+                            if current_price >= trade.entry_price:
+                                trade.status = "ACTIVE"
+                                db.commit()
+                                
+                    # Note: We check if status became ACTIVE in the block above
+                    if trade.status == "ACTIVE":
+                        if trade.direction == "BULLISH":
+                            if current_price >= trade.take_profit:
+                                trade.status = "WIN"
+                                db.commit()
+                            elif current_price <= trade.stop_loss:
+                                trade.status = "LOSS"
+                                db.commit()
+                        elif trade.direction == "BEARISH":
+                            if current_price <= trade.take_profit:
+                                trade.status = "WIN"
+                                db.commit()
+                            elif current_price >= trade.stop_loss:
+                                trade.status = "LOSS"
+                                db.commit()
             except Exception:
                 pass
     return trades
@@ -679,7 +692,7 @@ def update_trade_status(trade_id: int, status_update: Dict[str, str], db: Sessio
     if not db_trade:
         raise HTTPException(status_code=404, detail="Trade not found")
     new_status = status_update.get("status")
-    if new_status in ["PENDING", "WIN", "LOSS"]:
+    if new_status in ["PENDING", "ACTIVE", "WIN", "LOSS"]:
         db_trade.status = new_status
         db.commit()
         db.refresh(db_trade)
