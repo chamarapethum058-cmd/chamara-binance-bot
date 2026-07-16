@@ -81,3 +81,10 @@ The bot must strictly enforce the following high-impact news rules:
 > **NO MARKET ENTRIES & WAIT FOR PULLBACK:** 
 > 1. **Limit Entry Only:** The bot must never advise or execute market orders immediately when Market Structure Shift (MSS/Choch) occurs. Instead, it must strictly calculate and advise a Limit Order entry at the FVG boundary or 50% Mean Threshold of the Order Block.
 > 2. **Pullback Mitigation Verification:** Trade setup validation steps (specifically Step 5 and Step 10) must explicitly require waiting for a deeper pullback/mitigation to touch the limit price before executing, reducing stop-loss hits and increasing overall win rate.
+
+## 13. Dynamic Market Structure Bias Auto-Detection Protocol (New Rule)
+> [!IMPORTANT]
+> **DYNAMIC STRUCTURE BIAS AUTO-DETECTION:**
+> 1. **Live Candle MSS Analysis:** The bot must dynamically analyze the last 50 candles on the selected timeframe to identify recent Swing High breaks (Bullish MSS) or Swing Low breaks (Bearish MSS).
+> 2. **Daily Bias Override:** If a bearish structural shift (Bearish MSS) or bearish momentum is detected, the setup direction and daily bias must be automatically overridden to BEARISH (Sell Limit setups). If a bullish structural shift (Bullish MSS) or bullish momentum is detected, it must be overridden to BULLISH (Buy Limit setups), regardless of the manual frontend input dropdown setting. This prevents counter-market entries and shields the user from entering buy setups during rapid market crashes or sell setups during rapid market pumps.
+
