@@ -1842,7 +1842,7 @@ export default function Dashboard() {
                               <span className="text-gray-400 font-mono">Confluences:</span>
                               <span className={`font-mono font-bold ${
                                 tracker.confluences >= 10 ? "text-emerald-400" : tracker.confluences >= 7 ? "text-indigo-400" : "text-gray-400"
-                              }`}>{tracker.confluences}/12</span>
+                              }`}>{tracker.confluences}/16</span>
                             </div>
                             {/* Progress Bar */}
                             <div className="w-full bg-[#1E2235] h-1.5 rounded-full overflow-hidden">
@@ -1850,7 +1850,7 @@ export default function Dashboard() {
                                 className={`h-full transition-all duration-500 ${
                                   tracker.confluences >= 10 ? "bg-emerald-400" : tracker.confluences >= 7 ? "bg-indigo-400" : "bg-gray-500"
                                 }`}
-                                style={{ width: `${(tracker.confluences / 12) * 100}%` }}
+                                style={{ width: `${(tracker.confluences / 16) * 100}%` }}
                               />
                             </div>
                             <div className="flex justify-between items-center text-[10px] text-gray-500 font-mono mt-0.5">

@@ -72,43 +72,33 @@ async def run_tracker_loop():
                     )
                     tracker["last_result"] = result
                     
-                    # Count confluences out of 12 steps
+                    # Count confluences out of 16 steps dynamically
                     steps_confirmed = 0
-                    for i in range(1, 13):
-                        # Count sb_step_x_time_window_ok, etc.
-                        key_name = f"sb_step_{i}_time_window_ok"
-                        if i == 2:
-                            key_name = "sb_step_2_liquidity_sweep_ok"
-                        elif i == 3:
-                            key_name = "sb_step_3_displacement_mss_ok"
-                        elif i == 4:
-                            key_name = "sb_step_4_fvg_bpr_ok"
-                        elif i == 5:
-                            key_name = "sb_step_5_entry_exec_ok"
-                        elif i == 6:
-                            key_name = "sb_step_6_risk_mgmt_ok"
-                        elif i == 7:
-                            key_name = "sb_step_7_london_asian_sweep_ok"
-                        elif i == 8:
-                            key_name = "sb_step_8_htf_pd_mitigation_ok"
-                        elif i == 9:
-                            key_name = "sb_step_9_ltf_choch_ok"
-                        elif i == 10:
-                            key_name = "sb_step_10_fvg_limit_ok"
-                        elif i == 11:
-                            key_name = "sb_step_11_equilibrium_ok"
-                        elif i == 12:
-                            key_name = "sb_step_12_po3_align_ok"
-                            
-                        if result.get(key_name):
+                    for i in range(1, 17):
+                        step_ok = False
+                        for k, v in result.items():
+                            if k.startswith(f"sb_step_{i}_") and k.endswith("_ok") and v is True:
+                                step_ok = True
+                                break
+                        if step_ok:
                             steps_confirmed += 1
                     
                     tracker["confluences"] = steps_confirmed
                     tracker["confidence"] = result.get("confidence", 0)
                     tracker["current_price"] = new_price or tracker["req_payload"].get("current_price") or 0.0
                     
-                    # Determine status
-                    if steps_confirmed >= 10:
+                    # Determine status: only ENTRY READY if a valid entry is active and not locked
+                    entry_area = result.get("entry_price_area") or ""
+                    is_entry_active = (
+                        "Buy Limit" in entry_area or 
+                        "Sell Limit" in entry_area or 
+                        "Est. Buy Limit" in entry_area or 
+                        "Est. Sell Limit" in entry_area
+                    ) and not ("No Entry" in entry_area)
+                    
+                    is_locked = result.get("counter_trend_locked", False)
+                    
+                    if is_entry_active and not is_locked and steps_confirmed >= 10:
                         tracker["status"] = "ENTRY READY"
                     else:
                         tracker["status"] = "RUNNING"
