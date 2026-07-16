@@ -134,7 +134,8 @@ export default function Dashboard() {
           direction: sbResult.daily_bias,
           entry_price: confirmedEntry,
           stop_loss: confirmedSl,
-          take_profit: confirmedTarget
+          take_profit: confirmedTarget,
+          confidence: sbResult.confidence || 0
         })
       });
       if (res.ok) {
@@ -3189,7 +3190,16 @@ export default function Dashboard() {
                       {tradeHistory.map((trade: any) => (
                         <tr key={trade.id} className="border-b border-[#1E2235]/40 hover:bg-[#141626]/20 transition-all">
                           <td className="p-3 text-gray-400">{new Date(trade.timestamp).toLocaleString()}</td>
-                          <td className="p-3 text-white font-bold">{trade.symbol}</td>
+                          <td className="p-3 text-white font-bold">
+                            <div className="flex flex-col gap-0.5">
+                              <span>{trade.symbol}</span>
+                              {trade.confidence !== undefined && trade.confidence !== null && trade.confidence > 0 && (
+                                <span className="text-[9px] font-extrabold text-indigo-400 font-mono">
+                                  {trade.confidence}% Conf.
+                                </span>
+                              )}
+                            </div>
+                          </td>
                           <td className="p-3">
                             <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                               trade.direction === "BULLISH" ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400"

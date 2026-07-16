@@ -44,4 +44,5 @@ class LoggedTradeModel(Base):
     stop_loss = Column(Float)
     take_profit = Column(Float)
     status = Column(String, default="PENDING")  # PENDING, WIN, LOSS
+    confidence = Column(Integer, nullable=True)  # Confirmation percentage (e.g. 85)
     timestamp = Column(DateTime, default=datetime.utcnow)

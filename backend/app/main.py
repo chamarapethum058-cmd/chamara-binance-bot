@@ -639,6 +639,7 @@ def log_trade(trade: LoggedTradeCreate, db: Session = Depends(get_db)):
         entry_price=trade.entry_price,
         stop_loss=trade.stop_loss,
         take_profit=trade.take_profit,
+        confidence=trade.confidence,
         status="PENDING"
     )
     db.add(db_trade)
@@ -693,6 +694,8 @@ def update_logged_trade(trade_id: int, updates: Dict[str, Any], db: Session = De
         db_trade.stop_loss = float(updates["stop_loss"])
     if "entry_price" in updates:
         db_trade.entry_price = float(updates["entry_price"])
+    if "confidence" in updates:
+        db_trade.confidence = int(updates["confidence"]) if updates["confidence"] is not None else None
     if "status" in updates:
         db_trade.status = updates["status"]
     db.commit()

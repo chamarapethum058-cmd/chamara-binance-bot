@@ -172,6 +172,7 @@ class LoggedTradeCreate(BaseModel):
     entry_price: float
     stop_loss: float
     take_profit: float
+    confidence: Optional[int] = None
 
 class LoggedTradeResponse(BaseModel):
     id: int
@@ -181,6 +182,7 @@ class LoggedTradeResponse(BaseModel):
     stop_loss: float
     take_profit: float
     status: str
+    confidence: Optional[int] = None
     timestamp: datetime
 
     class Config:
