@@ -1142,13 +1142,21 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
             tp2_val = entry_price - (actual_risk * 4.0)
             target = tp2_val
             stop_loss = stop_loss_rounded
+        price_already_past = False
+        if daily_bias == "BULLISH" and entry_price >= current_price:
+            price_already_past = True
+        elif daily_bias == "BEARISH" and entry_price <= current_price:
+            price_already_past = True
+
+        if price_already_past:
+            setup_triggered = False
 
         # Build final response dictionary matching Gemini schema structure
         result = {
-            "is_valid": True,
-            "confidence": conf_score,
+            "is_valid": setup_triggered,
+            "confidence": conf_score if setup_triggered else 0,
             "daily_bias": daily_bias if setup_triggered else "NEUTRAL",
-            "entry_price_area": f"{'Buy Limit' if daily_bias == 'BULLISH' else 'Sell Limit'} at {entry_price:.2f}" if setup_triggered else ("No Entry (High-Impact News Lockout)" if news_lockout_active else "No Entry (Confidence < 70%)"),
+            "entry_price_area": f"{'Buy Limit' if daily_bias == 'BULLISH' else 'Sell Limit'} at {entry_price:.2f}" if setup_triggered else ("No Entry (High-Impact News Lockout)" if news_lockout_active else ("No Entry (Price Already Past Entry)" if price_already_past else "No Entry (Confidence < 70%)")),
             "stop_loss_level": round(stop_loss, r_places) if setup_triggered else None,
             "liquidity_target": round(target, r_places) if setup_triggered else None,
             "target_reward_ratio": "1:4.00" if setup_triggered else "N/A",
@@ -1713,6 +1721,124 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                 conf_score += 5
             elif swept_pool != "NONE" or asian_sweep:
                 conf_score += 5
+
+            # Enforce Price Already Past Entry lockout
+            price_already_past = False
+            if current_price is not None:
+                if bias == "BULLISH" and entry_price >= current_price:
+                    price_already_past = True
+                elif bias == "BEARISH" and entry_price <= current_price:
+                    price_already_past = True
+
+            if price_already_past:
+                market_structure_status = (
+                    f"HTF Trend is {bias}, but setup is locked because current price is already past the entry level.\n\n"
+                    f"---\n\n"
+                    f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
+                    f"Trend එක {bias} වුවත්, වත්මන් මිල දැනටමත් entry මට්ටම පසුකර ඇති බැවින් Setup අවහිර කර ඇත."
+                )
+                
+                reasoning = (
+                    f"No Entry Triggered because current market price ({current_price:.2f}) is already past the proposed entry price ({entry_price:.2f}).\n"
+                    f"Per strategy rules, entering here would result in sub-optimal discount/premium matrix pricing.\n\n"
+                    f"---\n\n"
+                    f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
+                    f"වත්මන් වෙළඳපල මිල ({current_price:.2f}) දැනටමත් අපේක්ෂිත entry මිල ({entry_price:.2f}) පසුකර ඇති බැවින් entry එක ලබා දී නොමැත.\n"
+                    f"රීති අනුව, මෙහිදී trade එකට ඇතුල් වීම අසමතුලිත මිල මට්ටමක් (sub-optimal matrix pricing) නිර්මාණය කරයි."
+                )
+                
+                invalidation = (
+                    f"Setup is locked out due to price already violating entry level.\n\n"
+                    f"---\n\n"
+                    f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
+                    f"මිල දැනටමත් entry සීමාව ඉක්මවා ඇති නිසා setup එක වලංගු නොවේ."
+                )
+                
+                risk_notes = (
+                    f"Execution locked because current price has already crossed the entry limit. Do not enter trades.\n\n"
+                    f"---\n\n"
+                    f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
+                    f"වත්මන් මිල entry සීමාව පසුකර ඇති බැවින් ගනුදෙනුව අවහිර කර ඇත. Trade එකට ඇතුල් නොවන්න."
+                )
+                
+                steps = cls._get_sb_steps(
+                    kz_valid=kz_valid,
+                    killzone=killzone,
+                    swept_pool=swept_pool,
+                    asian_sweep=asian_sweep,
+                    ltf_shift=ltf_shift,
+                    ltf_trigger=ltf_trigger,
+                    has_fresh_fvg=has_fresh_fvg,
+                    mit_array=mit_array,
+                    ct_locked=ct_locked,
+                    setup_triggered=False,
+                    entry_price=entry_price,
+                    rr_ratio=4.0,
+                    conf_score=conf_score,
+                    timeframe=timeframe,
+                    zone=zone,
+                    daily_bias="NEUTRAL",
+                    daily_open_relation=open_relation,
+                    htf_align_ok=is_htf_aligned
+                )
+                
+                return {
+                    "is_valid": False,
+                    "status_message": "Strategy Lockout: Current price is already past the entry level.",
+                    "market_structure_status": market_structure_status,
+                    "daily_bias": "NEUTRAL",
+                    "liquidity_target": None,
+                    "entry_price_area": "No Entry (Price Already Past Entry)",
+                    "stop_loss_level": None,
+                    "target_reward_ratio": "N/A",
+                    "reasoning": reasoning,
+                    "invalidation": invalidation,
+                    "risk_notes": risk_notes,
+                    "equilibrium_price": eq_price,
+                    "zone_type": zone,
+                    "daily_open_relation": open_relation,
+                    "killzone_valid": kz_valid,
+                    "counter_trend_locked": True,
+                    "erl_irl_state": "NONE",
+                    "swept_liquidity_pool": swept_pool,
+                    "mitigated_pd_array_type": mit_array,
+                    "is_advanced_setup": is_adv,
+                    "advanced_setup_status": adv_status,
+                    
+                    "sb_step_1_time_window_ok": steps["sb_step_1_time_window_ok"],
+                    "sb_step_1_details": steps["sb_step_1_details"],
+                    "sb_step_2_liquidity_sweep_ok": steps["sb_step_2_liquidity_sweep_ok"],
+                    "sb_step_2_details": steps["sb_step_2_details"],
+                    "sb_step_3_displacement_mss_ok": steps["sb_step_3_displacement_mss_ok"],
+                    "sb_step_3_details": steps["sb_step_3_details"],
+                    "sb_step_4_fvg_bpr_ok": steps["sb_step_4_fvg_bpr_ok"],
+                    "sb_step_4_details": steps["sb_step_4_details"],
+                    "sb_step_5_entry_exec_ok": steps["sb_step_5_entry_exec_ok"],
+                    "sb_step_5_details": steps["sb_step_5_details"],
+                    "sb_step_6_risk_mgmt_ok": steps["sb_step_6_risk_mgmt_ok"],
+                    "sb_step_6_details": steps["sb_step_6_details"],
+                    "sb_step_7_london_asian_sweep_ok": steps["sb_step_7_london_asian_sweep_ok"],
+                    "sb_step_7_details": steps["sb_step_7_details"],
+                    "sb_step_8_htf_pd_mitigation_ok": steps["sb_step_8_htf_pd_mitigation_ok"],
+                    "sb_step_8_details": steps["sb_step_8_details"],
+                    "sb_step_9_ltf_choch_ok": steps["sb_step_9_ltf_choch_ok"],
+                    "sb_step_9_details": steps["sb_step_9_details"],
+                    "sb_step_10_fvg_limit_ok": steps["sb_step_10_fvg_limit_ok"],
+                    "sb_step_10_details": steps["sb_step_10_details"],
+                    "sb_step_11_equilibrium_ok": steps["sb_step_11_equilibrium_ok"],
+                    "sb_step_11_details": steps["sb_step_11_details"],
+                    "sb_step_12_po3_align_ok": steps["sb_step_12_po3_align_ok"],
+                    "sb_step_12_details": steps["sb_step_12_details"],
+                    "sb_step_13_htf_mapped_ok": steps["sb_step_13_htf_mapped_ok"],
+                    "sb_step_13_details": steps["sb_step_13_details"],
+                    "sb_step_14_ltf_tap_ok": steps["sb_step_14_ltf_tap_ok"],
+                    "sb_step_14_details": steps["sb_step_14_details"],
+                    "sb_step_15_dual_entry_ok": steps["sb_step_15_dual_entry_ok"],
+                    "sb_step_15_details": steps["sb_step_15_details"],
+                    "sb_step_16_htf_align_ok": steps["sb_step_16_htf_align_ok"],
+                    "sb_step_16_details": steps["sb_step_16_details"],
+                    "confidence": conf_score
+                }
 
             # Enforce 70% Minimum Filter lockout
             if conf_score < 70:
