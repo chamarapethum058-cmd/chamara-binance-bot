@@ -90,8 +90,37 @@ export default function Dashboard() {
     const sl = parsePrice(sbResult.stop_loss_level);
     const target = parsePrice(sbResult.liquidity_target) || (sbResult.daily_bias === "BULLISH" ? entry + (entry - sl) * 3 : entry - (sl - entry) * 3);
 
-    if (entry <= 0) {
-      alert("Invalid entry price level detected. Cannot log trade.");
+    // Confirm or edit trade values before logging
+    const confirmedEntryStr = prompt(`Confirm/Edit Entry Price for ${sbSymbol}:`, entry.toFixed(4));
+    if (confirmedEntryStr === null) return;
+    const confirmedEntry = parseFloat(confirmedEntryStr);
+    if (isNaN(confirmedEntry) || confirmedEntry <= 0) {
+      alert("Invalid Entry Price entered.");
+      return;
+    }
+
+    const confirmedSlStr = prompt(`Confirm/Edit Stop-Loss (SL) Price for ${sbSymbol}:`, sl.toFixed(4));
+    if (confirmedSlStr === null) return;
+    const confirmedSl = parseFloat(confirmedSlStr);
+    if (isNaN(confirmedSl) || confirmedSl <= 0) {
+      alert("Invalid Stop-Loss Price entered.");
+      return;
+    }
+
+    const riskVal = Math.abs(confirmedEntry - confirmedSl);
+    const tp3rr = sbResult.daily_bias === "BULLISH" ? confirmedEntry + (riskVal * 3.0) : confirmedEntry - (riskVal * 3.0);
+    const tp2rr = sbResult.daily_bias === "BULLISH" ? confirmedEntry + (riskVal * 2.0) : confirmedEntry - (riskVal * 2.0);
+
+    const targetPromptMsg = `Set Take-Profit (TP) Price:\n` +
+      `- Standard 1:4 RR: ${target.toFixed(4)}\n` +
+      `- Custom 1:3 RR: ${tp3rr.toFixed(4)}\n` +
+      `- Quick 1:2 RR: ${tp2rr.toFixed(4)}`;
+
+    const confirmedTargetStr = prompt(targetPromptMsg, target.toFixed(4));
+    if (confirmedTargetStr === null) return;
+    const confirmedTarget = parseFloat(confirmedTargetStr);
+    if (isNaN(confirmedTarget) || confirmedTarget <= 0) {
+      alert("Invalid Take-Profit Price entered.");
       return;
     }
 
@@ -103,9 +132,9 @@ export default function Dashboard() {
         body: JSON.stringify({
           symbol: sbSymbol,
           direction: sbResult.daily_bias,
-          entry_price: entry,
-          stop_loss: sl,
-          take_profit: target
+          entry_price: confirmedEntry,
+          stop_loss: confirmedSl,
+          take_profit: confirmedTarget
         })
       });
       if (res.ok) {
@@ -149,6 +178,34 @@ export default function Dashboard() {
       }
     } catch (err) {
       console.error("Error updating trade status:", err);
+    }
+  };
+
+  const handleEditTradeField = async (trade: any, field: "entry_price" | "stop_loss" | "take_profit", fieldName: string) => {
+    const currentValue = trade[field];
+    const newValueStr = prompt(`Edit ${fieldName} price for ${trade.symbol}:`, currentValue.toFixed(4));
+    if (newValueStr === null) return;
+    const newValue = parseFloat(newValueStr);
+    if (isNaN(newValue) || newValue <= 0) {
+      alert(`Invalid ${fieldName} price entered.`);
+      return;
+    }
+    
+    try {
+      const res = await fetch(`http://127.0.0.1:8000/api/trades/${trade.id}/update`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [field]: newValue })
+      });
+      if (res.ok) {
+        alert(`${fieldName} updated successfully! 🎯`);
+        fetchTradeHistory();
+      } else {
+        alert(`Failed to update ${fieldName}.`);
+      }
+    } catch (err) {
+      console.error(err);
+      alert(`Error updating ${fieldName}.`);
     }
   };
 
@@ -3140,9 +3197,27 @@ export default function Dashboard() {
                               {trade.direction === "BULLISH" ? "LONG" : "SHORT"}
                             </span>
                           </td>
-                          <td className="p-3 text-gray-300">${trade.entry_price.toFixed(2)}</td>
-                          <td className="p-3 text-rose-400">${trade.stop_loss.toFixed(2)}</td>
-                          <td className="p-3 text-indigo-400">${trade.take_profit.toFixed(2)}</td>
+                          <td 
+                            onClick={() => handleEditTradeField(trade, "entry_price", "Entry")}
+                            className="p-3 text-gray-300 hover:text-white hover:underline cursor-pointer select-none decoration-dotted"
+                            title="Click to edit Entry price"
+                          >
+                            ${trade.entry_price.toFixed(2)}
+                          </td>
+                          <td 
+                            onClick={() => handleEditTradeField(trade, "stop_loss", "Stop Loss")}
+                            className="p-3 text-rose-400 hover:text-rose-300 hover:underline cursor-pointer select-none decoration-dotted"
+                            title="Click to edit Stop Loss price"
+                          >
+                            ${trade.stop_loss.toFixed(2)}
+                          </td>
+                          <td 
+                            onClick={() => handleEditTradeField(trade, "take_profit", "Take Profit")}
+                            className="p-3 text-emerald-400 hover:text-emerald-300 hover:underline cursor-pointer select-none decoration-dotted"
+                            title="Click to edit Take Profit price"
+                          >
+                            ${trade.take_profit.toFixed(2)}
+                          </td>
                           <td className="p-3">
                             <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                               trade.status === "WIN"

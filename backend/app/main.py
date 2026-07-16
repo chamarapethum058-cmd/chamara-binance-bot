@@ -682,7 +682,24 @@ def update_trade_status(trade_id: int, status_update: Dict[str, str], db: Sessio
         db_trade.status = new_status
         db.commit()
         db.refresh(db_trade)
+@app.post("/api/trades/{trade_id}/update", response_model=LoggedTradeResponse)
+def update_logged_trade(trade_id: int, updates: Dict[str, Any], db: Session = Depends(get_db)):
+    db_trade = db.query(LoggedTradeModel).filter(LoggedTradeModel.id == trade_id).first()
+    if not db_trade:
+        raise HTTPException(status_code=404, detail="Trade not found")
+    if "take_profit" in updates:
+        db_trade.take_profit = float(updates["take_profit"])
+    if "stop_loss" in updates:
+        db_trade.stop_loss = float(updates["stop_loss"])
+    if "entry_price" in updates:
+        db_trade.entry_price = float(updates["entry_price"])
+    if "status" in updates:
+        db_trade.status = updates["status"]
+    db.commit()
+    db.refresh(db_trade)
     return db_trade
+
+
 
 @app.delete("/api/trades/{trade_id}")
 def delete_trade(trade_id: int, db: Session = Depends(get_db)):
