@@ -334,7 +334,8 @@ USER'S TRADING STRATEGY RULES:
         timeframe: str = "1m",
         zone: str = "EQUILIBRIUM",
         daily_bias: str = "NEUTRAL",
-        daily_open_relation: str = "N/A"
+        daily_open_relation: str = "N/A",
+        htf_align_ok: bool = True
     ) -> Dict[str, Any]:
         sb_step_1_time_window_ok = kz_valid
         if killzone == "ALL_TIME":
@@ -484,7 +485,7 @@ USER'S TRADING STRATEGY RULES:
             )
 
         # Step 16: HTF (4H) Trend Directional Alignment
-        sb_step_16_htf_align_ok = (daily_bias in ["BULLISH", "BEARISH"])
+        sb_step_16_htf_align_ok = htf_align_ok and (daily_bias in ["BULLISH", "BEARISH"])
         if sb_step_16_htf_align_ok:
             sb_step_16_details = (
                 f"HTF (4H) Alignment confirmed: 15m/5m/3m/1m setup aligns strictly with the 4H trend direction ({daily_bias}). | "
@@ -1548,6 +1549,11 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
         # 2. SELLS/Shorts are strictly locked in Discount (<50% line) or below Daily Open
         # 3. Discard and auto-ignore any setups that run counter to the active Daily Bias (HTF trend)
         ct_locked = False
+        is_htf_aligned = True
+        if setup_direction == "BULLISH" and not is_htf_bullish:
+            is_htf_aligned = False
+        elif setup_direction == "BEARISH" and is_htf_bullish:
+            is_htf_aligned = False
         
         if setup_direction == "BULLISH":
             if zone == "PREMIUM" or open_relation == "ABOVE_OPEN":
@@ -1744,7 +1750,8 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                     timeframe=timeframe,
                     zone=zone,
                     daily_bias="NEUTRAL",
-                    daily_open_relation=open_relation
+                    daily_open_relation=open_relation,
+                    htf_align_ok=is_htf_aligned
                 )
                 sb_step_1_time_window_ok = steps["sb_step_1_time_window_ok"]
                 sb_step_1_details = steps["sb_step_1_details"]
@@ -1876,7 +1883,8 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                     timeframe=timeframe,
                     zone=zone,
                     daily_bias=bias,
-                    daily_open_relation=open_relation
+                    daily_open_relation=open_relation,
+                    htf_align_ok=is_htf_aligned
                 )
                 sb_step_1_time_window_ok = steps["sb_step_1_time_window_ok"]
                 sb_step_1_details = steps["sb_step_1_details"]
@@ -2030,7 +2038,8 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                 timeframe=timeframe,
                 zone=zone,
                 daily_bias=bias,
-                daily_open_relation=open_relation
+                daily_open_relation=open_relation,
+                htf_align_ok=is_htf_aligned
             )
             sb_step_1_time_window_ok = steps["sb_step_1_time_window_ok"]
             sb_step_1_details = steps["sb_step_1_details"]
@@ -2285,7 +2294,8 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                 timeframe=timeframe,
                 zone=zone,
                 daily_bias="NEUTRAL",
-                daily_open_relation=open_relation
+                daily_open_relation=open_relation,
+                htf_align_ok=is_htf_aligned
             )
             sb_step_1_time_window_ok = steps["sb_step_1_time_window_ok"]
             sb_step_1_details = steps["sb_step_1_details"]
