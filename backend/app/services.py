@@ -1835,14 +1835,11 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                     "confidence": conf_score
                 }
 
-            # Calculate Risk-to-Reward ratio based on natural target before strict 1:3 RR expansion
+            # Calculate Risk-to-Reward ratio based on actual calculated scalp target (Rule 4)
             natural_risk = abs(entry_price - stop_loss)
-            if bias == "BULLISH":
-                natural_target = pdh if pdh is not None else candle_9am_high if candle_9am_high is not None else target
-            else:
-                natural_target = pdl if pdl is not None else candle_9am_low if candle_9am_low is not None else target
+            natural_target = target
             natural_reward = abs(natural_target - entry_price)
-            natural_rr = natural_reward / natural_risk if natural_risk > 0 else 0.0
+            natural_rr = natural_reward / natural_risk if natural_risk > 0 else 4.0
             
             if natural_rr < 2.0:
                 reasons = [f"Risk-to-Reward ratio ({natural_rr:.2f}) is less than 1:2 minimum threshold"]
