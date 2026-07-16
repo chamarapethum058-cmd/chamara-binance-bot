@@ -2073,10 +2073,10 @@ export default function Dashboard() {
 
                           <div className="bg-[#141626]/40 border border-[#1E2235]/60 rounded-xl p-4 flex flex-col gap-2.5">
                             <div className="flex justify-between items-center">
-                              <h4 className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider font-mono">Take Profit 2 (TP2)</h4>
-                              <span className="bg-indigo-500/10 text-indigo-400 text-[9px] font-extrabold px-1.5 py-0.5 rounded font-mono">1:4.00 RR</span>
+                              <h4 className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider font-mono">Take Profit 2 (TP2)</h4>
+                              <span className="bg-emerald-500/10 text-emerald-400 text-[9px] font-extrabold px-1.5 py-0.5 rounded font-mono">1:4.00 RR</span>
                             </div>
-                            <span className="text-xs font-semibold text-indigo-400 font-mono flex items-center gap-1.5">
+                            <span className="text-xs font-semibold text-emerald-400 font-mono flex items-center gap-1.5">
                               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 11l7-7m0 0l7 7m-7-7v18" />
                               </svg>
