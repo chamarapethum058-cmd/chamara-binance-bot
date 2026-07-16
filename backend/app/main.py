@@ -656,40 +656,85 @@ def log_trade(trade: LoggedTradeCreate, db: Session = Depends(get_db)):
 @app.get("/api/trades/history", response_model=List[LoggedTradeResponse])
 async def get_trade_history(db: Session = Depends(get_db)):
     trades = db.query(LoggedTradeModel).all()
+    import datetime
     for trade in trades:
         if trade.status in ["PENDING", "ACTIVE"]:
             try:
-                current_price = await fetch_current_price_for_symbol(trade.symbol)
-                if current_price > 0:
-                    if trade.status == "PENDING":
-                        # Limit order trigger checks
-                        if trade.direction == "BULLISH":
-                            if current_price <= trade.entry_price:
-                                trade.status = "ACTIVE"
-                                db.commit()
-                        elif trade.direction == "BEARISH":
-                            if current_price >= trade.entry_price:
-                                trade.status = "ACTIVE"
-                                db.commit()
-                                
-                    # Note: We check if status became ACTIVE in the block above
-                    if trade.status == "ACTIVE":
-                        if trade.direction == "BULLISH":
-                            if current_price >= trade.take_profit:
-                                trade.status = "WIN"
-                                db.commit()
-                            elif current_price <= trade.stop_loss:
-                                trade.status = "LOSS"
-                                db.commit()
-                        elif trade.direction == "BEARISH":
-                            if current_price <= trade.take_profit:
-                                trade.status = "WIN"
-                                db.commit()
-                            elif current_price >= trade.stop_loss:
-                                trade.status = "LOSS"
-                                db.commit()
-            except Exception:
-                pass
+                sym = trade.symbol.upper()
+                binance_symbol = sym
+                if not binance_symbol.endswith("USDT") and len(binance_symbol) <= 5:
+                    binance_symbol = f"{binance_symbol}USDT"
+                
+                # Fetch recent 100 1-minute candles from Binance
+                from app.market import get_candles
+                candles = get_candles(binance_symbol, "1m", limit=100)
+                
+                # Filter candles that closed around/after the trade was logged
+                trade_start_time = trade.timestamp - datetime.timedelta(minutes=2)
+                valid_candles = [c for c in candles if c["close_time"] >= trade_start_time]
+                
+                if not valid_candles:
+                    current_price = await fetch_current_price_for_symbol(trade.symbol)
+                    if current_price > 0:
+                        if trade.status == "PENDING":
+                            if trade.direction == "BULLISH":
+                                if current_price <= trade.entry_price:
+                                    trade.status = "ACTIVE"
+                                    db.commit()
+                            elif trade.direction == "BEARISH":
+                                if current_price >= trade.entry_price:
+                                    trade.status = "ACTIVE"
+                                    db.commit()
+                        if trade.status == "ACTIVE":
+                            if trade.direction == "BULLISH":
+                                if current_price >= trade.take_profit:
+                                    trade.status = "WIN"
+                                    db.commit()
+                                elif current_price <= trade.stop_loss:
+                                    trade.status = "LOSS"
+                                    db.commit()
+                            elif trade.direction == "BEARISH":
+                                if current_price <= trade.take_profit:
+                                    trade.status = "WIN"
+                                    db.commit()
+                                elif current_price >= trade.stop_loss:
+                                    trade.status = "LOSS"
+                                    db.commit()
+                else:
+                    # Sort candles chronologically to simulate progress
+                    valid_candles.sort(key=lambda x: x["close_time"])
+                    for c in valid_candles:
+                        if trade.status == "PENDING":
+                            if trade.direction == "BULLISH":
+                                if c["low"] <= trade.entry_price:
+                                    trade.status = "ACTIVE"
+                                    db.commit()
+                            elif trade.direction == "BEARISH":
+                                if c["high"] >= trade.entry_price:
+                                    trade.status = "ACTIVE"
+                                    db.commit()
+                                    
+                        if trade.status == "ACTIVE":
+                            if trade.direction == "BULLISH":
+                                if c["high"] >= trade.take_profit:
+                                    trade.status = "WIN"
+                                    db.commit()
+                                    break
+                                elif c["low"] <= trade.stop_loss:
+                                    trade.status = "LOSS"
+                                    db.commit()
+                                    break
+                            elif trade.direction == "BEARISH":
+                                if c["low"] <= trade.take_profit:
+                                    trade.status = "WIN"
+                                    db.commit()
+                                    break
+                                elif c["high"] >= trade.stop_loss:
+                                    trade.status = "LOSS"
+                                    db.commit()
+                                    break
+            except Exception as e:
+                print(f"Error checking trade status for {trade.symbol}: {e}")
     return trades
 
 @app.post("/api/trades/{trade_id}/status", response_model=LoggedTradeResponse)
