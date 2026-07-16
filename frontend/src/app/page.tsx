@@ -2816,7 +2816,7 @@ export default function Dashboard() {
                                 </div>
                                 <div className="flex flex-col gap-1 w-full">
                                   <div className="flex justify-between items-center">
-                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider font-mono">Step 5: Entry Execution</span>
+                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider font-mono">Step 5: Limit Entry Only (No Market)</span>
                                     <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded font-mono ${
                                       sbResult.sb_step_5_entry_exec_ok ? "bg-indigo-500/10 text-indigo-400" : "bg-[#1E2235]/30 text-gray-400"
                                     }`}>
@@ -2951,7 +2951,7 @@ export default function Dashboard() {
                                 </div>
                                 <div className="flex flex-col gap-1 w-full">
                                   <div className="flex justify-between items-center">
-                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider font-mono">Step 10: 1m FVG Limit Entry</span>
+                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider font-mono">Step 10: Wait for Pullback / Mitigation</span>
                                     <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded font-mono ${
                                       sbResult.sb_step_10_fvg_limit_ok ? "bg-indigo-500/10 text-indigo-400" : "bg-[#1E2235]/30 text-gray-400"
                                     }`}>

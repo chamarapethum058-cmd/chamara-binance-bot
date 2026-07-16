@@ -368,9 +368,15 @@ USER'S TRADING STRATEGY RULES:
             
         sb_step_5_entry_exec_ok = (not ct_locked and setup_triggered)
         if sb_step_5_entry_exec_ok:
-            sb_step_5_details = f"Entry order ready at FVG 50% CE level ({entry_price:.2f}). | FVG 50% CE ({entry_price:.2f}) මට්ටමේ ලිමිට් ඕඩරය සූදානම්."
+            sb_step_5_details = (
+                f"Limit Entry Only: Place limit order at 50% Mean Threshold or FVG boundary. Do not enter at market ({entry_price:.2f}). | "
+                f"Limit Entry Only (Market Entries මඟ හැරීම): MSS එක සිදු වූ සැනින් Market Price ඇතුළු නොවී, FVG හෝ OB 50% මට්ටමේ ({entry_price:.2f}) Limit Order එකක් තබන්න."
+            )
         else:
-            sb_step_5_details = "Setup locked/pending: Premium zone, above daily open, or news lockout active. | රීති අවහිරය: මිල Premium/Daily Open එකට ඉහළින් හෝ පුවත් අවහිරය සක්‍රීයයි."
+            sb_step_5_details = (
+                "Setup locked/pending: Entry execution requirements not fully met. | "
+                "රීති අවහිරය: Limit Entry කොන්දේසි සපුරා නැත."
+            )
             
         sb_step_6_risk_mgmt_ok = (setup_triggered and not ct_locked and rr_ratio >= 2.0 and conf_score >= 70)
         if sb_step_6_risk_mgmt_ok:
@@ -399,9 +405,15 @@ USER'S TRADING STRATEGY RULES:
 
         sb_step_10_fvg_limit_ok = sb_step_5_entry_exec_ok
         if sb_step_10_fvg_limit_ok:
-            sb_step_10_details = f"Entry order placed at 1 Min FVG 50% Consequent Encroachment ({entry_price:.2f}). | 1 Min FVG 50% CE ({entry_price:.2f}) මට්ටමේ ලිමිට් ඕඩරය සකසා ඇත."
+            sb_step_10_details = (
+                f"Wait for Pullback: Wait for price to return and mitigate FVG/OB before execution. | "
+                f"මොහොතක් රැඳී සිටීම (Wait for Deeper Pullback): මිල නැවත FVG/OB මට්ටම සජීවීව පිරිමදින (mitigate කරන) තෙක් රැඳී සිටින්න."
+            )
         else:
-            sb_step_10_details = f"Awaiting valid entry trigger conditions at 1 Min FVG 50% CE level. | 1 Min FVG 50% CE මට්ටමේ ලිමිට් ඕඩරය සක්‍රීය වීමට කොන්දේසි සපුරා නැත."
+            sb_step_10_details = (
+                "Awaiting valid entry trigger and mitigation pullback. | "
+                "මිල FVG/OB මට්ටමට පැමිණ සක්‍රීය වන තෙක් බලාපොරොත්තුවෙන්."
+            )
 
         # Step 11: Equilibrium Zone Verification (50% Rule)
         sb_step_11_equilibrium_ok = (
