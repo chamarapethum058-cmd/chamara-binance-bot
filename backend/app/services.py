@@ -913,9 +913,10 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
         candle_9am_high = req.get("candle_9am_high")
         candle_9am_low = req.get("candle_9am_low")
 
-        # 1. Determine Trend and Bias
-        is_htf_bullish = htf_trend.upper() == "BULLISH" or (pullback_days is not None and pullback_days >= 3)
-        daily_bias = htf_trend.upper() if htf_trend.upper() in ["BULLISH", "BEARISH"] else "NEUTRAL"
+        # 1. Determine Trend and Bias dynamically
+        true_bias = cls._detect_market_structure_bias(symbol, timeframe, fallback_bias=htf_trend.upper())
+        is_htf_bullish = (true_bias == "BULLISH")
+        daily_bias = true_bias
 
         # 2. Determine Zone
         zone = "EQUILIBRIUM"
@@ -1247,6 +1248,59 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                 return round(val, 4)
 
     @classmethod
+    def _detect_market_structure_bias(cls, symbol: str, timeframe: str, fallback_bias: str) -> str:
+        from app.market import get_candles
+        try:
+            sym = symbol.upper()
+            if not sym.endswith("USDT") and not sym.endswith("USD") and sym not in ["BTC", "ETH", "SOL", "XAUUSD"]:
+                sym = f"{sym}USDT"
+            elif sym in ["BTC", "ETH", "SOL"]:
+                sym = f"{sym}USDT"
+
+            candles = get_candles(sym, timeframe, limit=50)
+            if not candles or len(candles) < 20:
+                return fallback_bias
+
+            # Calculate SMA of closes
+            closes = [c["close"] for c in candles]
+            sma_20 = sum(closes[-20:]) / 20.0
+            last_close = closes[-1]
+
+            # Detect swing high and low breaks
+            # Find local lowest low of candles 10 to 35
+            mid_candles = candles[10:35]
+            lowest_pdl = min(c["low"] for c in mid_candles)
+            highest_pdh = max(c["high"] for c in mid_candles)
+
+            # Check if any of the recent 5 candles closed below lowest_pdl (Bearish MSS)
+            bearish_mss = any(c["close"] < lowest_pdl for c in candles[-6:])
+            # Check if any of the recent 5 candles closed above highest_pdh (Bullish MSS)
+            bullish_mss = any(c["close"] > highest_pdh for c in candles[-6:])
+
+            # Count of consecutive down/up closes in recent 10 candles to identify momentum direction
+            down_closes = sum(1 for c in candles[-10:] if c["close"] < c["open"])
+            up_closes = sum(1 for c in candles[-10:] if c["close"] > c["open"])
+
+            if bearish_mss and not bullish_mss:
+                logger.info(f"Dynamic structure detection for {sym}: BEARISH MSS detected.")
+                return "BEARISH"
+            elif bullish_mss and not bearish_mss:
+                logger.info(f"Dynamic structure detection for {sym}: BULLISH MSS detected.")
+                return "BULLISH"
+            
+            # Fallback to SMA & Close comparison and candle count momentum
+            if last_close < sma_20 and down_closes > up_closes:
+                logger.info(f"Dynamic structure detection for {sym}: BEARISH SMA & Momentum trend.")
+                return "BEARISH"
+            elif last_close > sma_20 and up_closes > down_closes:
+                logger.info(f"Dynamic structure detection for {sym}: BULLISH SMA & Momentum trend.")
+                return "BULLISH"
+
+        except Exception as e:
+            logger.error(f"Error detecting market structure bias dynamically: {e}")
+        return fallback_bias
+
+    @classmethod
     def _get_mock_silver_bullet(cls, req: Dict[str, Any], upcoming_news_events: List[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Provides a structured mock analysis for Silver Bullet strategy if API key fails."""
         if upcoming_news_events is None:
@@ -1352,7 +1406,9 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
         bias = "NEUTRAL"
 
         # Parse text-based parameters if present
-        is_htf_bullish = htf_trend.upper() == "BULLISH" or (pullback_days is not None and pullback_days >= 3)
+        # Dynamically detect true market structure bias to prevent wrong-direction setups
+        true_bias = cls._detect_market_structure_bias(symbol, timeframe, fallback_bias=htf_trend.upper())
+        is_htf_bullish = (true_bias == "BULLISH")
         if scenario_text:
             text_lower = scenario_text.lower()
             if "bullish" in text_lower or "higher high" in text_lower or "pullback" in text_lower:
