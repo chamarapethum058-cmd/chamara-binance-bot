@@ -1104,6 +1104,10 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
         low_val = dealing_range_low if dealing_range_low is not None else pdl
         eq_price = (high_val + low_val) / 2.0 if (high_val is not None and low_val is not None) else current_price
         
+        # Round values based on size
+        is_small = current_price < 2.0
+        r_places = 4 if is_small else 2
+
         if daily_bias == "BULLISH":
             # Pullback to deepest valid FVG/OB inside the Discount Zone
             entry_price = cls._find_deepest_pd_array_level(
@@ -1116,9 +1120,12 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                 current_price=current_price
             )
             stop_loss = entry_price - min_risk
-            tp1_val = entry_price + (min_risk * 2.0)
-            tp2_val = entry_price + (min_risk * 4.0)
+            stop_loss_rounded = round(stop_loss, r_places)
+            actual_risk = round(abs(entry_price - stop_loss_rounded), r_places)
+            tp1_val = entry_price + (actual_risk * 2.0)
+            tp2_val = entry_price + (actual_risk * 4.0)
             target = tp2_val
+            stop_loss = stop_loss_rounded
         else:
             # Pullback to deepest valid FVG/OB inside the Premium Zone
             entry_price = cls._find_deepest_pd_array_level(
@@ -1131,13 +1138,12 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                 current_price=current_price
             )
             stop_loss = entry_price + min_risk
-            tp1_val = entry_price - (min_risk * 2.0)
-            tp2_val = entry_price - (min_risk * 4.0)
+            stop_loss_rounded = round(stop_loss, r_places)
+            actual_risk = round(abs(stop_loss_rounded - entry_price), r_places)
+            tp1_val = entry_price - (actual_risk * 2.0)
+            tp2_val = entry_price - (actual_risk * 4.0)
             target = tp2_val
-
-        # Round values based on size
-        is_small = current_price < 2.0
-        r_places = 4 if is_small else 2
+            stop_loss = stop_loss_rounded
 
         # Build final response dictionary matching Gemini schema structure
         result = {
@@ -1319,10 +1325,16 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
         symbol_upper = symbol.upper()
         if "XAU" in symbol_upper or "GOLD" in symbol_upper:
             return 1.8  # Gold-like assets
-        else:
-            # Dynamic scaling for all other crypto coins (ETH, BTC, SOL, DOGE etc. at 0.16% of price)
+        elif "BTC" in symbol_upper:
             val = entry_price * 0.0016
-            if entry_price > 1000.0:
+            return round(val, 2)
+        elif "ETH" in symbol_upper:
+            val = entry_price * 0.0016
+            return round(val, 2)
+        else:
+            # Altcoins need a wider SL (e.g. 1.1% of price) to prevent instant wick stopouts
+            val = entry_price * 0.011
+            if entry_price > 100.0:
                 return round(val, 2)
             else:
                 return round(val, 4)
@@ -1958,8 +1970,12 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                     "confidence": conf_score
                 }
             
-            # Recalculate strict 1:4 Risk-to-Reward parameters if needed
-            risk = abs(entry_price - stop_loss)
+            # Round values based on size
+            is_small = (current_price or 0.0) < 2.0
+            r_places = 4 if is_small else 2
+            
+            stop_loss = round(stop_loss, r_places)
+            risk = round(abs(entry_price - stop_loss), r_places)
             if risk > 0:
                 if bias == "BULLISH":
                     target = entry_price + (risk * 4.0)
@@ -1972,10 +1988,6 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
             else:
                 tp1_val = entry_price
                 tp2_val = entry_price
-            
-            # Round values based on size
-            is_small = (current_price or 0.0) < 2.0
-            r_places = 4 if is_small else 2
             
             tp1_target = round(tp1_val, r_places)
             tp2_target = round(tp2_val, r_places)
