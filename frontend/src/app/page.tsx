@@ -321,6 +321,35 @@ export default function Dashboard() {
   const [sbSearchLoading, setSbSearchLoading] = useState(false);
   const [sbSearchError, setSbSearchError] = useState<string | null>(null);
 
+  // Helper calculations for TP1 and TP2 fallback
+  const entryPriceNum = (() => {
+    if (!sbResult || !sbResult.entry_price_area) return null;
+    const matches = sbResult.entry_price_area.match(/\d+(?:\.\d+)?/g);
+    return matches ? Number(matches[0]) : null;
+  })();
+  const stopLossNum = sbResult?.stop_loss_level ? Number(sbResult.stop_loss_level) : null;
+
+  const tp1TargetFallback = (() => {
+    if (sbResult?.tp1_target) return sbResult.tp1_target;
+    if (!entryPriceNum || !stopLossNum) return null;
+    const risk = Math.abs(entryPriceNum - stopLossNum);
+    const direction = sbResult.daily_bias;
+    if (direction === "BULLISH") return entryPriceNum + (risk * 2.0);
+    if (direction === "BEARISH") return entryPriceNum - (risk * 2.0);
+    return null;
+  })();
+
+  const tp2TargetFallback = (() => {
+    if (sbResult?.tp2_target) return sbResult.tp2_target;
+    if (sbResult?.liquidity_target) return sbResult.liquidity_target;
+    if (!entryPriceNum || !stopLossNum) return null;
+    const risk = Math.abs(entryPriceNum - stopLossNum);
+    const direction = sbResult.daily_bias;
+    if (direction === "BULLISH") return entryPriceNum + (risk * 4.0);
+    if (direction === "BEARISH") return entryPriceNum - (risk * 4.0);
+    return null;
+  })();
+
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 
   const fetchLivePrices = async () => {
@@ -1982,17 +2011,7 @@ export default function Dashboard() {
                             </div>
                           </div>
 
-                          <div className="bg-[#141626]/40 border border-[#1E2235]/60 rounded-xl p-4 flex flex-col gap-2.5">
-                            <h4 className="text-[10px] font-bold text-gray-500 uppercase tracking-wider font-mono">Liquidity Target (PDH)</h4>
-                            <span className="text-xs font-semibold text-emerald-400 font-mono flex items-center gap-1.5">
-                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
-                              </svg>
-                              {sbResult.liquidity_target || "N/A"}
-                            </span>
-                          </div>
-
-                          <div className={`bg-[#141626]/40 border rounded-xl p-4 flex flex-col gap-2.5 transition-all ${
+                          <div className={`bg-[#141626]/40 border rounded-xl p-4 flex flex-col gap-2.5 transition-all md:col-span-2 ${
                             sbResult.news_lockout_active 
                               ? "border-rose-500/50 shadow-md shadow-rose-500/5"
                               : sbResult.confidence && sbResult.confidence >= 70 
@@ -2039,7 +2058,33 @@ export default function Dashboard() {
                             </span>
                           </div>
 
-                          <div className="bg-[#141626]/40 border border-[#1E2235]/60 rounded-xl p-4 flex flex-col gap-2.5 md:col-span-2">
+                          <div className="bg-[#141626]/40 border border-[#1E2235]/60 rounded-xl p-4 flex flex-col gap-2.5">
+                            <div className="flex justify-between items-center">
+                              <h4 className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider font-mono">Take Profit 1 (TP1)</h4>
+                              <span className="bg-emerald-500/10 text-emerald-400 text-[9px] font-extrabold px-1.5 py-0.5 rounded font-mono">1:2.00 RR</span>
+                            </div>
+                            <span className="text-xs font-semibold text-emerald-400 font-mono flex items-center gap-1.5">
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 11l3-3m0 0l3 3m-3-3v8" />
+                              </svg>
+                              {tp1TargetFallback ? (typeof tp1TargetFallback === 'number' ? tp1TargetFallback.toFixed(4).replace(/\.?0+$/, '') : tp1TargetFallback) : "N/A"}
+                            </span>
+                          </div>
+
+                          <div className="bg-[#141626]/40 border border-[#1E2235]/60 rounded-xl p-4 flex flex-col gap-2.5">
+                            <div className="flex justify-between items-center">
+                              <h4 className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider font-mono">Take Profit 2 (TP2)</h4>
+                              <span className="bg-indigo-500/10 text-indigo-400 text-[9px] font-extrabold px-1.5 py-0.5 rounded font-mono">1:4.00 RR</span>
+                            </div>
+                            <span className="text-xs font-semibold text-indigo-400 font-mono flex items-center gap-1.5">
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 11l7-7m0 0l7 7m-7-7v18" />
+                              </svg>
+                              {tp2TargetFallback ? (typeof tp2TargetFallback === 'number' ? tp2TargetFallback.toFixed(4).replace(/\.?0+$/, '') : tp2TargetFallback) : "N/A"}
+                            </span>
+                          </div>
+
+                          <div className="bg-[#141626]/40 border border-[#1E2235]/60 rounded-xl p-4 flex flex-col gap-2.5">
                             <h4 className="text-[10px] font-bold text-[#8B5CF6] uppercase tracking-wider font-mono">Target Reward Ratio</h4>
                             <span className="text-xs font-semibold text-[#8B5CF6] font-mono">{sbResult.target_reward_ratio || "1:3 Minimum"}</span>
                           </div>

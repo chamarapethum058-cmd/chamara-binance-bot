@@ -108,6 +108,10 @@ class SilverBulletResponse(BaseModel):
     entry_price_area: Optional[str] = None
     stop_loss_level: Optional[float] = None
     target_reward_ratio: Optional[str] = None
+    tp1_target: Optional[float] = None
+    tp1_rr: Optional[str] = None
+    tp2_target: Optional[float] = None
+    tp2_rr: Optional[str] = None
     reasoning: Optional[str] = None
     invalidation: Optional[str] = None
     risk_notes: Optional[str] = None

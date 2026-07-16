@@ -1008,11 +1008,19 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
         if daily_bias == "BULLISH":
             entry_price = current_price
             stop_loss = entry_price - min_risk
-            target = entry_price + (min_risk * 4.0)
+            tp1_val = entry_price + (min_risk * 2.0)
+            tp2_val = entry_price + (min_risk * 4.0)
+            target = tp2_val
         else:
             entry_price = current_price
             stop_loss = entry_price + min_risk
-            target = entry_price - (min_risk * 4.0)
+            tp1_val = entry_price - (min_risk * 2.0)
+            tp2_val = entry_price - (min_risk * 4.0)
+            target = tp2_val
+
+        # Round values based on size
+        is_small = current_price < 2.0
+        r_places = 4 if is_small else 2
 
         # Build final response dictionary matching Gemini schema structure
         result = {
@@ -1020,9 +1028,13 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
             "confidence": conf_score,
             "daily_bias": daily_bias if setup_triggered else "NEUTRAL",
             "entry_price_area": f"{'Buy Limit' if daily_bias == 'BULLISH' else 'Sell Limit'} at {entry_price:.2f}" if setup_triggered else ("No Entry (High-Impact News Lockout)" if news_lockout_active else "No Entry (Confidence < 70%)"),
-            "stop_loss_level": round(stop_loss, 2) if setup_triggered else None,
-            "liquidity_target": round(target, 2) if setup_triggered else None,
+            "stop_loss_level": round(stop_loss, r_places) if setup_triggered else None,
+            "liquidity_target": round(target, r_places) if setup_triggered else None,
             "target_reward_ratio": "1:4.00" if setup_triggered else "N/A",
+            "tp1_target": round(tp1_val, r_places) if setup_triggered else None,
+            "tp1_rr": "1:2.00" if setup_triggered else None,
+            "tp2_target": round(tp2_val, r_places) if setup_triggered else None,
+            "tp2_rr": "1:4.00" if setup_triggered else None,
             "news_lockout_active": news_lockout_active,
             "active_news_event": active_news_event,
             "upcoming_news_events": upcoming_news_events,
@@ -1590,8 +1602,22 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
             if risk > 0:
                 if bias == "BULLISH":
                     target = entry_price + (risk * 4.0)
+                    tp1_val = entry_price + (risk * 2.0)
+                    tp2_val = entry_price + (risk * 4.0)
                 else:
                     target = entry_price - (risk * 4.0)
+                    tp1_val = entry_price - (risk * 2.0)
+                    tp2_val = entry_price - (risk * 4.0)
+            else:
+                tp1_val = entry_price
+                tp2_val = entry_price
+            
+            # Round values based on size
+            is_small = (current_price or 0.0) < 2.0
+            r_places = 4 if is_small else 2
+            
+            tp1_target = round(tp1_val, r_places)
+            tp2_target = round(tp2_val, r_places)
             
             reward = abs(target - entry_price)
             rr_ratio = reward / risk if risk > 0 else 4.0
@@ -1675,6 +1701,10 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                 "entry_price_area": f"{action_type} at {entry_price:.2f}",
                 "stop_loss_level": stop_loss,
                 "target_reward_ratio": f"1:{rr_ratio:.2f}",
+                "tp1_target": tp1_target,
+                "tp1_rr": "1:2.00",
+                "tp2_target": tp2_target,
+                "tp2_rr": "1:4.00",
                 "reasoning": reasoning,
                 "invalidation": invalidation,
                 "risk_notes": risk_notes,
