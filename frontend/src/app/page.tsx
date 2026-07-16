@@ -431,6 +431,9 @@ export default function Dashboard() {
         if (data.open !== undefined) setSbOpen(Number(data.open));
         if (data.close !== undefined) setSbClose(Number(data.close));
         if (data.current_price !== undefined) setSbCurrentPrice(Number(data.current_price));
+        if (data.daily_bias !== undefined && data.daily_bias !== null) {
+          setSbHtfTrend(data.daily_bias);
+        }
       } else {
         const err = await res.json();
         setSbSearchError(err.detail || "Failed to fetch prices");

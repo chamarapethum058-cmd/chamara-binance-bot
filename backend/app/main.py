@@ -581,23 +581,29 @@ async def get_market_price(symbol: str):
                 if len(data) >= 2:
                     prev_candle = data[0]
                     curr_candle = data[1]
+                    daily_bias = AIService._detect_market_structure_bias(symbol_upper, "4h", "BULLISH")
                     return {
                         "symbol": symbol_upper,
                         "pdh": float(prev_candle[2]),
                         "pdl": float(prev_candle[3]),
                         "open": float(prev_candle[1]),
                         "close": float(prev_candle[4]),
-                        "current_price": float(curr_candle[4])
+                        "current_price": float(curr_candle[4]),
+                        "daily_bias": daily_bias
                     }
         except Exception:
             pass
             
         # 3. Fallback: try Yahoo Finance as {symbol}-USD
         try:
-            return await fetch_yahoo_finance(f"{symbol_upper}-USD")
+            res_data = await fetch_yahoo_finance(f"{symbol_upper}-USD")
+            res_data["daily_bias"] = AIService._detect_market_structure_bias(symbol_upper, "4h", "BULLISH")
+            return res_data
         except Exception:
             try:
-                return await fetch_yahoo_finance(symbol_upper)
+                res_data = await fetch_yahoo_finance(symbol_upper)
+                res_data["daily_bias"] = AIService._detect_market_structure_bias(symbol_upper, "4h", "BULLISH")
+                return res_data
             except Exception as e:
                 raise HTTPException(status_code=400, detail=f"Failed to fetch market data for {symbol}: {str(e)}")
 
