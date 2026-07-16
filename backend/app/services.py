@@ -1017,14 +1017,28 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
         
         # Stop loss & take profit levels
         min_risk = cls._get_tight_scalp_risk(current_price, symbol)
+        
+        # Calculate pullback entry price inside the discount/premium matrix
+        high_val = dealing_range_high if dealing_range_high is not None else pdh
+        low_val = dealing_range_low if dealing_range_low is not None else pdl
+        eq_price = (high_val + low_val) / 2.0 if (high_val is not None and low_val is not None) else current_price
+        
         if daily_bias == "BULLISH":
-            entry_price = current_price
+            # Pullback to 25% below Equilibrium into Discount
+            entry_price = eq_price - (eq_price - low_val) * 0.25 if low_val is not None else current_price - min_risk * 0.5
+            # Ensure entry is below current price
+            if entry_price >= current_price:
+                entry_price = current_price - min_risk * 0.5
             stop_loss = entry_price - min_risk
             tp1_val = entry_price + (min_risk * 2.0)
             tp2_val = entry_price + (min_risk * 4.0)
             target = tp2_val
         else:
-            entry_price = current_price
+            # Pullback to 25% above Equilibrium into Premium
+            entry_price = eq_price + (high_val - eq_price) * 0.25 if high_val is not None else current_price + min_risk * 0.5
+            # Ensure entry is above current price
+            if entry_price <= current_price:
+                entry_price = current_price + min_risk * 0.5
             stop_loss = entry_price + min_risk
             tp1_val = entry_price - (min_risk * 2.0)
             tp2_val = entry_price - (min_risk * 4.0)
@@ -1314,26 +1328,37 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
 
         if setup_triggered:
             min_risk = cls._get_tight_scalp_risk(current_price or pdl or pdh or 2320.0, symbol)
+            high_val = dealing_range_high if dealing_range_high is not None else pdh
+            low_val = dealing_range_low if dealing_range_low is not None else pdl
+            eq_price = (high_val + low_val) / 2.0 if (high_val is not None and low_val is not None) else (current_price or 0.0)
             
             if is_adv:
                 if swept_pool == "9AM_LOW_SSL":
-                    entry_price = current_price or ((candle_9am_low or 0.0) + min_risk)
+                    entry_price = eq_price - (eq_price - low_val) * 0.25 if low_val is not None else (current_price or 0.0) - min_risk * 0.5
+                    if current_price is not None and entry_price >= current_price:
+                        entry_price = current_price - min_risk * 0.5
                     stop_loss = entry_price - min_risk
                     target = entry_price + (min_risk * 4.0)
                     bias = "BULLISH"
                 else:
-                    entry_price = current_price or ((candle_9am_high or 0.0) - min_risk)
+                    entry_price = eq_price + (high_val - eq_price) * 0.25 if high_val is not None else (current_price or 0.0) + min_risk * 0.5
+                    if current_price is not None and entry_price <= current_price:
+                        entry_price = current_price + min_risk * 0.5
                     stop_loss = entry_price + min_risk
                     target = entry_price - (min_risk * 4.0)
                     bias = "BEARISH"
             else:
                 if setup_direction == "BULLISH":
-                    entry_price = current_price or ((pdl or 0.0) + min_risk)
+                    entry_price = eq_price - (eq_price - low_val) * 0.25 if low_val is not None else (current_price or 0.0) - min_risk * 0.5
+                    if current_price is not None and entry_price >= current_price:
+                        entry_price = current_price - min_risk * 0.5
                     stop_loss = entry_price - min_risk
                     target = entry_price + (min_risk * 4.0)
                     bias = "BULLISH"
                 else:
-                    entry_price = current_price or ((pdh or 0.0) - min_risk)
+                    entry_price = eq_price + (high_val - eq_price) * 0.25 if high_val is not None else (current_price or 0.0) + min_risk * 0.5
+                    if current_price is not None and entry_price <= current_price:
+                        entry_price = current_price + min_risk * 0.5
                     stop_loss = entry_price + min_risk
                     target = entry_price - (min_risk * 4.0)
                     bias = "BEARISH"
