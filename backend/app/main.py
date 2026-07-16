@@ -703,36 +703,44 @@ async def get_trade_history(db: Session = Depends(get_db)):
                 else:
                     # Sort candles chronologically to simulate progress
                     valid_candles.sort(key=lambda x: x["close_time"])
+                    sim_status = "PENDING"
+                    start_price = valid_candles[0]["open"] if valid_candles else trade.entry_price
                     for c in valid_candles:
-                        if trade.status == "PENDING":
+                        if sim_status == "PENDING":
                             if trade.direction == "BULLISH":
-                                if c["low"] <= trade.entry_price:
-                                    trade.status = "ACTIVE"
-                                    db.commit()
+                                if start_price >= trade.entry_price:
+                                    if c["low"] <= trade.entry_price:
+                                        sim_status = "ACTIVE"
+                                else:
+                                    if c["high"] >= trade.entry_price:
+                                        sim_status = "ACTIVE"
                             elif trade.direction == "BEARISH":
-                                if c["high"] >= trade.entry_price:
-                                    trade.status = "ACTIVE"
-                                    db.commit()
+                                if start_price <= trade.entry_price:
+                                    if c["high"] >= trade.entry_price:
+                                        sim_status = "ACTIVE"
+                                else:
+                                    if c["low"] <= trade.entry_price:
+                                        sim_status = "ACTIVE"
                                     
-                        if trade.status == "ACTIVE":
+                        if sim_status == "ACTIVE":
                             if trade.direction == "BULLISH":
                                 if c["high"] >= trade.take_profit:
-                                    trade.status = "WIN"
-                                    db.commit()
+                                    sim_status = "WIN"
                                     break
                                 elif c["low"] <= trade.stop_loss:
-                                    trade.status = "LOSS"
-                                    db.commit()
+                                    sim_status = "LOSS"
                                     break
                             elif trade.direction == "BEARISH":
                                 if c["low"] <= trade.take_profit:
-                                    trade.status = "WIN"
-                                    db.commit()
+                                    sim_status = "WIN"
                                     break
                                 elif c["high"] >= trade.stop_loss:
-                                    trade.status = "LOSS"
-                                    db.commit()
+                                    sim_status = "LOSS"
                                     break
+                                    
+                    if trade.status != sim_status:
+                        trade.status = sim_status
+                        db.commit()
             except Exception as e:
                 print(f"Error checking trade status for {trade.symbol}: {e}")
     return trades
