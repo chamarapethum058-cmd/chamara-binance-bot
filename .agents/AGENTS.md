@@ -103,5 +103,13 @@ The bot must strictly enforce the following high-impact news rules:
 > 3. **Lower High (LH) Rule:** The highest point reached by the price between the previous confirmed Lower Low and the new candle body close that caused the BOS is marked as the valid Lower High (LH).
 > 4. **Sub-structure vs Major Structure Filter:** Internal pullback channels (corrective flags) must not be mapped as major swings. Only breaks of major validated Lower Highs/Swing Highs qualify as structural shift reversals (MSS/Choch).
 
+## 16. Higher Timeframe (4H) Directional Alignment Protocol (New Rule)
+> [!IMPORTANT]
+> **HTF (4H) DIRECTIONAL ALIGNMENT RULES:**
+> 1. **Baseline Trend Timeframe:** Use the 4-Hour (4H) chart as the primary Higher Timeframe (HTF) trend reference to establish Daily Bias.
+> 2. **Strict Directional Lockout:** When the 4H chart is in a downtrend (bearish market structure), only Sell setups are allowed on lower timeframes (15m/5m/3m/1m). All Buy setups must be suppressed. When the 4H chart is in an uptrend (bullish market structure), only Buy setups are allowed on lower timeframes, and all Sell setups must be suppressed. Counter-trend executions are strictly forbidden to ensure high-accuracy setups (90-100% accuracy rate).
+> 3. **Timeframe Drilling Sequence:** Analyze 4H (HTF Bias & POI) -> 15m/5m (LTF Structure & Pullback mapping) -> 15m/3m/1m (LTF Entry confirmations).
+
+
 
 
