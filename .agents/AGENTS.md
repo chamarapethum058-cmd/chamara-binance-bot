@@ -95,4 +95,13 @@ The bot must strictly enforce the following high-impact news rules:
 > 2. **Dual Entry Models:** Entry confirmations must dynamically track both the **1st Entry Model** (pullback to the 50% consequent encroachment or boundary of the FVG/BISI) and the **2nd Entry Model** (pullback to the Rejection Block wick sweep zone), keeping stop loss extremely tight past the manipulation low/high to optimize high reward-to-risk (minimum 1:5 to 1:13.5+ RR targets).
 > 3. **Setup Direction Classification:** A **Bullish setup (Buy Limit)** is defined when a downward manipulation sweeps the Lows/SSL followed by a Bullish MSS (Swing High break with displacement). A **Bearish setup (Sell Limit)** is defined when an upward manipulation sweeps the Highs/BSL followed by a Bearish MSS (Swing Low break with displacement).
 
+## 15. Trading Masterguide SMC Market Structure Mapping Protocol (New Rule)
+> [!IMPORTANT]
+> **SMC DOWNTREND STRUCTURE MAPPING RULES:**
+> 1. **Lower Low (LL) Confirmation (Inducement Rule):** In a bearish market structure, a Lower Low (LL) is only confirmed/validated when the price pulls back upwards to take out/sweep the first recent minor pullback high (known as Inducement or IDM). Prior to sweeping this pullback high, the lowest point remains an unconfirmed low.
+> 2. **Break of Structure (BOS) Rule:** A Break of Structure (BOS) is only valid when a candle body closes strictly below a confirmed Lower Low (LL). If only a wick sweeps past the low, it is considered a liquidity sweep, not a structural break.
+> 3. **Lower High (LH) Rule:** The highest point reached by the price between the previous confirmed Lower Low and the new candle body close that caused the BOS is marked as the valid Lower High (LH).
+> 4. **Sub-structure vs Major Structure Filter:** Internal pullback channels (corrective flags) must not be mapped as major swings. Only breaks of major validated Lower Highs/Swing Highs qualify as structural shift reversals (MSS/Choch).
+
+
 
