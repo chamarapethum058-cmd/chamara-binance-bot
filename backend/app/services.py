@@ -1024,21 +1024,31 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
         eq_price = (high_val + low_val) / 2.0 if (high_val is not None and low_val is not None) else current_price
         
         if daily_bias == "BULLISH":
-            # Pullback to 25% below Equilibrium into Discount
-            entry_price = eq_price - (eq_price - low_val) * 0.25 if low_val is not None else current_price - min_risk * 0.5
-            # Ensure entry is below current price
-            if entry_price >= current_price:
-                entry_price = current_price - min_risk * 0.5
+            # Pullback to deepest valid FVG/OB inside the Discount Zone
+            entry_price = cls._find_deepest_pd_array_level(
+                symbol=symbol,
+                timeframe=timeframe,
+                daily_bias="BULLISH",
+                eq_price=eq_price,
+                dr_low=low_val,
+                dr_high=high_val,
+                current_price=current_price
+            )
             stop_loss = entry_price - min_risk
             tp1_val = entry_price + (min_risk * 2.0)
             tp2_val = entry_price + (min_risk * 4.0)
             target = tp2_val
         else:
-            # Pullback to 25% above Equilibrium into Premium
-            entry_price = eq_price + (high_val - eq_price) * 0.25 if high_val is not None else current_price + min_risk * 0.5
-            # Ensure entry is above current price
-            if entry_price <= current_price:
-                entry_price = current_price + min_risk * 0.5
+            # Pullback to deepest valid FVG/OB inside the Premium Zone
+            entry_price = cls._find_deepest_pd_array_level(
+                symbol=symbol,
+                timeframe=timeframe,
+                daily_bias="BEARISH",
+                eq_price=eq_price,
+                dr_low=low_val,
+                dr_high=high_val,
+                current_price=current_price
+            )
             stop_loss = entry_price + min_risk
             tp1_val = entry_price - (min_risk * 2.0)
             tp2_val = entry_price - (min_risk * 4.0)
@@ -1091,6 +1101,137 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
         )
         result.update(steps)
         return result
+
+    @classmethod
+    def _find_deepest_pd_array_level(
+        cls,
+        symbol: str,
+        timeframe: str,
+        daily_bias: str,
+        eq_price: float,
+        dr_low: float,
+        dr_high: float,
+        current_price: float
+    ) -> float:
+        from app.market import get_candles
+        try:
+            # Format symbol
+            sym = symbol.upper()
+            if not sym.endswith("USDT") and not sym.endswith("USD") and sym not in ["BTC", "ETH", "SOL", "XAUUSD"]:
+                sym = f"{sym}USDT"
+            elif sym in ["BTC", "ETH", "SOL"]:
+                sym = f"{sym}USDT"
+
+            # Fetch last 50 candles of selected timeframe (1m/3m)
+            candles = get_candles(sym, timeframe, limit=50)
+            if not candles or len(candles) < 3:
+                return current_price
+
+            fvgs = []
+            obs = []
+            
+            # Mapped dealing range bounds
+            range_low = dr_low if dr_low is not None else min(c["low"] for c in candles)
+            range_high = dr_high if dr_high is not None else max(c["high"] for c in candles)
+            midpoint = eq_price if eq_price is not None else (range_low + range_high) / 2.0
+
+            # Scan for FVGs and OBs
+            for i in range(2, len(candles)):
+                # Bullish FVG (Low of candle i > High of candle i-2)
+                if candles[i]["low"] > candles[i-2]["high"]:
+                    fvg_high = candles[i]["low"]
+                    fvg_low = candles[i-2]["high"]
+                    fvg_ce = (fvg_high + fvg_low) / 2.0
+                    fvgs.append({
+                        "type": "FVG_BULLISH",
+                        "high": fvg_high,
+                        "low": fvg_low,
+                        "ce": fvg_ce,
+                        "boundary": fvg_high # for limit buy order
+                    })
+                # Bearish FVG (High of candle i < Low of candle i-2)
+                elif candles[i]["high"] < candles[i-2]["low"]:
+                    fvg_high = candles[i-2]["low"]
+                    fvg_low = candles[i]["high"]
+                    fvg_ce = (fvg_high + fvg_low) / 2.0
+                    fvgs.append({
+                        "type": "FVG_BEARISH",
+                        "high": fvg_high,
+                        "low": fvg_low,
+                        "ce": fvg_ce,
+                        "boundary": fvg_low # for limit sell order
+                    })
+                
+                # OB Check: Down-close followed by up-closes
+                if candles[i-1]["close"] < candles[i-1]["open"]:
+                    ob_mean = (candles[i-1]["high"] + candles[i-1]["low"]) / 2.0
+                    obs.append({
+                        "type": "OB_BULLISH",
+                        "high": candles[i-1]["high"],
+                        "low": candles[i-1]["low"],
+                        "mean": ob_mean
+                    })
+                # OB Check: Up-close followed by down-closes
+                elif candles[i-1]["close"] > candles[i-1]["open"]:
+                    ob_mean = (candles[i-1]["high"] + candles[i-1]["low"]) / 2.0
+                    obs.append({
+                        "type": "OB_BEARISH",
+                        "high": candles[i-1]["high"],
+                        "low": candles[i-1]["low"],
+                        "mean": ob_mean
+                    })
+
+            if daily_bias == "BULLISH":
+                # Find deepest valid FVG or OB in Discount Zone (below midpoint)
+                valid_levels = []
+                for fvg in fvgs:
+                    if fvg["type"] == "FVG_BULLISH" and fvg["boundary"] < midpoint:
+                        valid_levels.append(fvg["boundary"])
+                        valid_levels.append(fvg["ce"])
+                for ob in obs:
+                    if ob["type"] == "OB_BULLISH" and ob["mean"] < midpoint:
+                        valid_levels.append(ob["mean"])
+                
+                # Filter only levels above our range_low to be valid
+                valid_levels = [l for l in valid_levels if l > range_low]
+                
+                if valid_levels:
+                    # Deepest FVG/OB in Discount means the one closest to the range low (deepest pullback)
+                    deepest_level = min(valid_levels)
+                    # Make sure it's below current price
+                    if deepest_level < current_price:
+                        return deepest_level
+                
+                # Fallback to discount OTE if no valid arrays found
+                return midpoint - (midpoint - range_low) * 0.5
+                
+            else: # BEARISH
+                # Find highest valid FVG or OB in Premium Zone (above midpoint)
+                valid_levels = []
+                for fvg in fvgs:
+                    if fvg["type"] == "FVG_BEARISH" and fvg["boundary"] > midpoint:
+                        valid_levels.append(fvg["boundary"])
+                        valid_levels.append(fvg["ce"])
+                for ob in obs:
+                    if ob["type"] == "OB_BEARISH" and ob["mean"] > midpoint:
+                        valid_levels.append(ob["mean"])
+                
+                # Filter only levels below our range_high to be valid
+                valid_levels = [l for l in valid_levels if l < range_high]
+                
+                if valid_levels:
+                    # Highest FVG/OB in Premium means the one closest to the range high (deepest pullback)
+                    deepest_level = max(valid_levels)
+                    # Make sure it's above current price
+                    if deepest_level > current_price:
+                        return deepest_level
+                
+                # Fallback to premium OTE if no valid arrays found
+                return midpoint + (range_high - midpoint) * 0.5
+
+        except Exception as e:
+            logger.error(f"Error finding deepest PD array level: {e}")
+        return current_price
 
     @classmethod
     def _get_tight_scalp_risk(cls, entry_price: float, symbol: str = "") -> float:
@@ -1334,31 +1475,55 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
             
             if is_adv:
                 if swept_pool == "9AM_LOW_SSL":
-                    entry_price = eq_price - (eq_price - low_val) * 0.25 if low_val is not None else (current_price or 0.0) - min_risk * 0.5
-                    if current_price is not None and entry_price >= current_price:
-                        entry_price = current_price - min_risk * 0.5
+                    entry_price = cls._find_deepest_pd_array_level(
+                        symbol=symbol,
+                        timeframe=timeframe,
+                        daily_bias="BULLISH",
+                        eq_price=eq_price,
+                        dr_low=low_val,
+                        dr_high=high_val,
+                        current_price=current_price or 0.0
+                    )
                     stop_loss = entry_price - min_risk
                     target = entry_price + (min_risk * 4.0)
                     bias = "BULLISH"
                 else:
-                    entry_price = eq_price + (high_val - eq_price) * 0.25 if high_val is not None else (current_price or 0.0) + min_risk * 0.5
-                    if current_price is not None and entry_price <= current_price:
-                        entry_price = current_price + min_risk * 0.5
+                    entry_price = cls._find_deepest_pd_array_level(
+                        symbol=symbol,
+                        timeframe=timeframe,
+                        daily_bias="BEARISH",
+                        eq_price=eq_price,
+                        dr_low=low_val,
+                        dr_high=high_val,
+                        current_price=current_price or 0.0
+                    )
                     stop_loss = entry_price + min_risk
                     target = entry_price - (min_risk * 4.0)
                     bias = "BEARISH"
             else:
                 if setup_direction == "BULLISH":
-                    entry_price = eq_price - (eq_price - low_val) * 0.25 if low_val is not None else (current_price or 0.0) - min_risk * 0.5
-                    if current_price is not None and entry_price >= current_price:
-                        entry_price = current_price - min_risk * 0.5
+                    entry_price = cls._find_deepest_pd_array_level(
+                        symbol=symbol,
+                        timeframe=timeframe,
+                        daily_bias="BULLISH",
+                        eq_price=eq_price,
+                        dr_low=low_val,
+                        dr_high=high_val,
+                        current_price=current_price or 0.0
+                    )
                     stop_loss = entry_price - min_risk
                     target = entry_price + (min_risk * 4.0)
                     bias = "BULLISH"
                 else:
-                    entry_price = eq_price + (high_val - eq_price) * 0.25 if high_val is not None else (current_price or 0.0) + min_risk * 0.5
-                    if current_price is not None and entry_price <= current_price:
-                        entry_price = current_price + min_risk * 0.5
+                    entry_price = cls._find_deepest_pd_array_level(
+                        symbol=symbol,
+                        timeframe=timeframe,
+                        daily_bias="BEARISH",
+                        eq_price=eq_price,
+                        dr_low=low_val,
+                        dr_high=high_val,
+                        current_price=current_price or 0.0
+                    )
                     stop_loss = entry_price + min_risk
                     target = entry_price - (min_risk * 4.0)
                     bias = "BEARISH"
