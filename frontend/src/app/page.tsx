@@ -3189,7 +3189,9 @@ export default function Dashboard() {
                     <tbody>
                       {tradeHistory.map((trade: any) => (
                         <tr key={trade.id} className="border-b border-[#1E2235]/40 hover:bg-[#141626]/20 transition-all">
-                          <td className="p-3 text-gray-400">{new Date(trade.timestamp).toLocaleString()}</td>
+                          <td className="p-3 text-gray-400">
+                            {new Date(trade.timestamp ? (trade.timestamp.endsWith('Z') || trade.timestamp.includes('+') ? trade.timestamp : trade.timestamp + 'Z') : "").toLocaleString()}
+                          </td>
                           <td className="p-3 text-white font-bold">
                             <div className="flex flex-col gap-0.5">
                               <span>{trade.symbol}</span>
