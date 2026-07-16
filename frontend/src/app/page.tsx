@@ -3020,6 +3020,87 @@ export default function Dashboard() {
                                   </span>
                                 </div>
                               </div>
+
+                              {/* Step 13: HTF Structure Bias & POI Mapped */}
+                              <div className="bg-[#07080E]/40 border border-[#1E2235]/40 rounded-xl p-3.5 flex items-start gap-3.5 hover:border-indigo-500/20 transition-all">
+                                <div className={`w-6 h-6 rounded-full shrink-0 flex items-center justify-center font-bold text-xs font-mono border ${
+                                  sbResult.sb_step_13_htf_mapped_ok 
+                                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" 
+                                    : "bg-[#1E2235]/30 text-gray-500 border-[#1E2235]"
+                                }`}>
+                                  {sbResult.sb_step_13_htf_mapped_ok ? "✓" : "13"}
+                                </div>
+                                <div className="flex flex-col gap-1 w-full">
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider font-mono">Step 13: HTF Structure & POI Mapped</span>
+                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded font-mono ${
+                                      sbResult.sb_step_13_htf_mapped_ok ? "bg-emerald-500/10 text-emerald-400" : "bg-[#1E2235]/30 text-gray-400"
+                                    }`}>
+                                      {sbResult.sb_step_13_htf_mapped_ok ? "MAPPED" : "UNMAPPED"}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-white leading-relaxed mt-0.5">
+                                    {sbResult.sb_step_13_details ? sbResult.sb_step_13_details.split("|")[0].trim() : "HTF Structure mapping."}
+                                  </p>
+                                  <span className="text-[10px] text-indigo-300/80 font-sans">
+                                    {sbResult.sb_step_13_details ? (sbResult.sb_step_13_details.split("|")[1]?.trim() || "HTF ව්‍යුහය සහ POI සලකුණු කිරීම.") : "HTF ව්‍යුහය සහ POI සලකුණු කිරීම."}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Step 14: LTF Alignment & POI Mitigation Tap */}
+                              <div className="bg-[#07080E]/40 border border-[#1E2235]/40 rounded-xl p-3.5 flex items-start gap-3.5 hover:border-indigo-500/20 transition-all">
+                                <div className={`w-6 h-6 rounded-full shrink-0 flex items-center justify-center font-bold text-xs font-mono border ${
+                                  sbResult.sb_step_14_ltf_tap_ok 
+                                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" 
+                                    : "bg-[#1E2235]/30 text-gray-500 border-[#1E2235]"
+                                }`}>
+                                  {sbResult.sb_step_14_ltf_tap_ok ? "✓" : "14"}
+                                </div>
+                                <div className="flex flex-col gap-1 w-full">
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider font-mono">Step 14: LTF POI Mitigation Tap</span>
+                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded font-mono ${
+                                      sbResult.sb_step_14_ltf_tap_ok ? "bg-emerald-500/10 text-emerald-400" : "bg-[#1E2235]/30 text-gray-400"
+                                    }`}>
+                                      {sbResult.sb_step_14_ltf_tap_ok ? "MITIGATED" : "PENDING"}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-white leading-relaxed mt-0.5">
+                                    {sbResult.sb_step_14_details ? sbResult.sb_step_14_details.split("|")[0].trim() : "LTF POI Mitigation tap check."}
+                                  </p>
+                                  <span className="text-[10px] text-indigo-300/80 font-sans">
+                                    {sbResult.sb_step_14_details ? (sbResult.sb_step_14_details.split("|")[1]?.trim() || "LTF POI ස්පර්ශ කිරීම.") : "LTF POI ස්පර්ශ කිරීම."}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Step 15: LTF Reversal & Dual Entry Execution */}
+                              <div className="bg-[#07080E]/40 border border-[#1E2235]/40 rounded-xl p-3.5 flex items-start gap-3.5 hover:border-indigo-500/20 transition-all">
+                                <div className={`w-6 h-6 rounded-full shrink-0 flex items-center justify-center font-bold text-xs font-mono border ${
+                                  sbResult.sb_step_15_dual_entry_ok 
+                                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" 
+                                    : "bg-[#1E2235]/30 text-gray-500 border-[#1E2235]"
+                                }`}>
+                                  {sbResult.sb_step_15_dual_entry_ok ? "✓" : "15"}
+                                </div>
+                                <div className="flex flex-col gap-1 w-full">
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider font-mono">Step 15: LTF Reversal & Dual Entry Execution</span>
+                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded font-mono ${
+                                      sbResult.sb_step_15_dual_entry_ok ? "bg-emerald-500/10 text-emerald-400" : "bg-[#1E2235]/30 text-gray-400"
+                                    }`}>
+                                      {sbResult.sb_step_15_dual_entry_ok ? "ENTRY ACTIVE" : "LOCKED"}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-white leading-relaxed mt-0.5">
+                                    {sbResult.sb_step_15_details ? sbResult.sb_step_15_details.split("|")[0].trim() : "LTF Reversal and Dual Entry execution check."}
+                                  </p>
+                                  <span className="text-[10px] text-indigo-300/80 font-sans">
+                                    {sbResult.sb_step_15_details ? (sbResult.sb_step_15_details.split("|")[1]?.trim() || "LTF Reversal සහ Limit Order පිහිටුවීම.") : "LTF Reversal සහ Limit Order පිහිටුවීම."}
+                                  </span>
+                                </div>
+                              </div>
                             </div>
                           </div>
                         )}

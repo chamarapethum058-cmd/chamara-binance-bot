@@ -444,6 +444,45 @@ USER'S TRADING STRATEGY RULES:
                 "PO3/AMD අසමපාතතාවය: දෛනික ආරම්භක මිල හෝ manipulation sweep සීමාව වලංගු නොවේ."
             )
 
+        # Step 13: HTF Structure Bias & POI Mapped
+        sb_step_13_htf_mapped_ok = (daily_bias in ["BULLISH", "BEARISH"])
+        if sb_step_13_htf_mapped_ok:
+            sb_step_13_details = (
+                "HTF Structure mapped: Daily/4H swing structures (IDM & BOS validation) and POIs identified. | "
+                "HTF ව්‍යුහය සහ POI සලකුණු කිරීම: Daily/H4 Swing structure (IDM & BOS) සහ POIs සාර්ථකව හඳුනාගෙන ඇත."
+            )
+        else:
+            sb_step_13_details = (
+                "HTF structure unmapped or neutral daily bias. | "
+                "HTF ව්‍යුහය හඳුනාගෙන නොමැත (Neutral Daily Bias)."
+            )
+
+        # Step 14: LTF Alignment & POI Mitigation Tap
+        sb_step_14_ltf_tap_ok = (mit_array not in ["NONE", "NONE_OB", None] or swept_pool in ["PDH_BSL", "PDL_SSL", "9AM_LOW_SSL", "9AM_HIGH_BSL"] or asian_sweep)
+        if sb_step_14_ltf_tap_ok:
+            sb_step_14_details = (
+                "LTF POI Mitigation tap: Price tapped HTF POI or swept HTF liquidity pool on 15m/3m/1m chart. | "
+                "LTF POI ස්පර්ශ කිරීම: මිල 15m/3m/1m chart එකෙහි HTF POI එක සාර්ථකව ස්පර්ශ කර ඇත."
+            )
+        else:
+            sb_step_14_details = (
+                "Awaiting price to tap HTF POI or sweep HTF liquidity pool on LTF chart. | "
+                "මිල LTF chart එකෙහි HTF POI එක ස්පර්ශ කරන තෙක් හෝ liquidity sweep එකක් සිදු කරන තෙක් බලාපොරොත්තුවෙන්."
+            )
+
+        # Step 15: LTF Reversal & Dual Entry Execution
+        sb_step_15_dual_entry_ok = (setup_triggered and not ct_locked)
+        if sb_step_15_dual_entry_ok:
+            sb_step_15_details = (
+                "LTF Reversal & Limit Order Placed: 15m/3m/1m MSS confirmed. Pullback Limit Order active on FVG / Rejection Block. | "
+                "LTF Reversal සහ Limit Order පිහිටුවීම: 15m/3m/1m MSS තහවුරුයි. FVG / Rejection Block එකෙහි Limit Order එක ක්‍රියාත්මකයි."
+            )
+        else:
+            sb_step_15_details = (
+                "Awaiting LTF Reversal (MSS) and Limit pullback entry trigger. | "
+                "LTF Reversal (MSS) එක සහ pullback limit entry එක සක්‍රීය වන තෙක් බලාපොරොත්තුවෙන්."
+            )
+
         return {
             "sb_step_1_time_window_ok": sb_step_1_time_window_ok,
             "sb_step_1_details": sb_step_1_details,
@@ -468,7 +507,13 @@ USER'S TRADING STRATEGY RULES:
             "sb_step_11_equilibrium_ok": sb_step_11_equilibrium_ok,
             "sb_step_11_details": sb_step_11_details,
             "sb_step_12_po3_align_ok": sb_step_12_po3_align_ok,
-            "sb_step_12_details": sb_step_12_details
+            "sb_step_12_details": sb_step_12_details,
+            "sb_step_13_htf_mapped_ok": sb_step_13_htf_mapped_ok,
+            "sb_step_13_details": sb_step_13_details,
+            "sb_step_14_ltf_tap_ok": sb_step_14_ltf_tap_ok,
+            "sb_step_14_details": sb_step_14_details,
+            "sb_step_15_dual_entry_ok": sb_step_15_dual_entry_ok,
+            "sb_step_15_details": sb_step_15_details
         }
 
     @classmethod
@@ -601,6 +646,16 @@ USER'S TRADING STRATEGY RULES:
                 "sb_step_9_details": "Blocked by economic news lockout. | ආර්ථික පුවත් අවහිරතාවය නිසා අවහිර කර ඇත.",
                 "sb_step_10_fvg_limit_ok": False,
                 "sb_step_10_details": "Blocked by economic news lockout. | ආර්ථික පුවත් අවහිරතාවය නිසා අවහිර කර ඇත.",
+                "sb_step_11_equilibrium_ok": False,
+                "sb_step_11_details": "Blocked by economic news lockout. | ආර්ථික පුවත් අවහිරතාවය නිසා අවහිර කර ඇත.",
+                "sb_step_12_po3_align_ok": False,
+                "sb_step_12_details": "Blocked by economic news lockout. | ආර්ථික පුවත් අවහිරතාවය නිසා අවහිර කර ඇත.",
+                "sb_step_13_htf_mapped_ok": False,
+                "sb_step_13_details": "Blocked by economic news lockout. | ආර්ථික පුවත් අවහිරතාවය නිසා අවහිර කර ඇත.",
+                "sb_step_14_ltf_tap_ok": False,
+                "sb_step_14_details": "Blocked by economic news lockout. | ආර්ථික පුවත් අවහිරතාවය නිසා අවහිර කර ඇත.",
+                "sb_step_15_dual_entry_ok": False,
+                "sb_step_15_details": "Blocked by economic news lockout. | ආර්ථික පුවත් අවහිරතාවය නිසා අවහිර කර ඇත.",
                 
                 "news_lockout_active": True,
                 "active_news_event": active_news_event,
@@ -1733,6 +1788,12 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                     "sb_step_11_details": steps["sb_step_11_details"],
                     "sb_step_12_po3_align_ok": steps["sb_step_12_po3_align_ok"],
                     "sb_step_12_details": steps["sb_step_12_details"],
+                    "sb_step_13_htf_mapped_ok": steps["sb_step_13_htf_mapped_ok"],
+                    "sb_step_13_details": steps["sb_step_13_details"],
+                    "sb_step_14_ltf_tap_ok": steps["sb_step_14_ltf_tap_ok"],
+                    "sb_step_14_details": steps["sb_step_14_details"],
+                    "sb_step_15_dual_entry_ok": steps["sb_step_15_dual_entry_ok"],
+                    "sb_step_15_details": steps["sb_step_15_details"],
                     "confidence": conf_score
                 }
 
@@ -1859,6 +1920,12 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                     "sb_step_11_details": steps["sb_step_11_details"],
                     "sb_step_12_po3_align_ok": steps["sb_step_12_po3_align_ok"],
                     "sb_step_12_details": steps["sb_step_12_details"],
+                    "sb_step_13_htf_mapped_ok": steps["sb_step_13_htf_mapped_ok"],
+                    "sb_step_13_details": steps["sb_step_13_details"],
+                    "sb_step_14_ltf_tap_ok": steps["sb_step_14_ltf_tap_ok"],
+                    "sb_step_14_details": steps["sb_step_14_details"],
+                    "sb_step_15_dual_entry_ok": steps["sb_step_15_dual_entry_ok"],
+                    "sb_step_15_details": steps["sb_step_15_details"],
                     "confidence": conf_score
                 }
             
@@ -2012,7 +2079,13 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                 "sb_step_11_equilibrium_ok": steps["sb_step_11_equilibrium_ok"],
                 "sb_step_11_details": steps["sb_step_11_details"],
                 "sb_step_12_po3_align_ok": steps["sb_step_12_po3_align_ok"],
-                "sb_step_12_details": steps["sb_step_12_details"]
+                "sb_step_12_details": steps["sb_step_12_details"],
+                "sb_step_13_htf_mapped_ok": steps["sb_step_13_htf_mapped_ok"],
+                "sb_step_13_details": steps["sb_step_13_details"],
+                "sb_step_14_ltf_tap_ok": steps["sb_step_14_ltf_tap_ok"],
+                "sb_step_14_details": steps["sb_step_14_details"],
+                "sb_step_15_dual_entry_ok": steps["sb_step_15_dual_entry_ok"],
+                "sb_step_15_details": steps["sb_step_15_details"]
             }
         else:
             reasons = []
@@ -2255,7 +2328,13 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                 "sb_step_11_equilibrium_ok": steps["sb_step_11_equilibrium_ok"],
                 "sb_step_11_details": steps["sb_step_11_details"],
                 "sb_step_12_po3_align_ok": steps["sb_step_12_po3_align_ok"],
-                "sb_step_12_details": steps["sb_step_12_details"]
+                "sb_step_12_details": steps["sb_step_12_details"],
+                "sb_step_13_htf_mapped_ok": steps["sb_step_13_htf_mapped_ok"],
+                "sb_step_13_details": steps["sb_step_13_details"],
+                "sb_step_14_ltf_tap_ok": steps["sb_step_14_ltf_tap_ok"],
+                "sb_step_14_details": steps["sb_step_14_details"],
+                "sb_step_15_dual_entry_ok": steps["sb_step_15_dual_entry_ok"],
+                "sb_step_15_details": steps["sb_step_15_details"]
             }
 
 
