@@ -3005,7 +3005,7 @@ export default function Dashboard() {
                                 </div>
                                 <div className="flex flex-col gap-1 w-full">
                                   <div className="flex justify-between items-center">
-                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider font-mono">Step 12: PO3 Open Bias Alignment</span>
+                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider font-mono">Step 12: PO3 AMD & Dual Entry Alignment</span>
                                     <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded font-mono ${
                                       sbResult.sb_step_12_po3_align_ok ? "bg-emerald-500/10 text-emerald-400" : "bg-[#1E2235]/30 text-gray-400"
                                     }`}>
@@ -3013,10 +3013,10 @@ export default function Dashboard() {
                                     </span>
                                   </div>
                                   <p className="text-xs text-white leading-relaxed mt-0.5">
-                                    {sbResult.sb_step_12_details ? sbResult.sb_step_12_details.split("|")[0].trim() : "Daily open vector relation check."}
+                                    {sbResult.sb_step_12_details ? sbResult.sb_step_12_details.split("|")[0].trim() : "PO3 AMD setup check."}
                                   </p>
                                   <span className="text-[10px] text-indigo-300/80 font-sans">
-                                    {sbResult.sb_step_12_details ? (sbResult.sb_step_12_details.split("|")[1]?.trim() || "දෛනික ආරම්භක මිලට සාපේක්ෂව දිශාව පරීක්ෂාව.") : "දෛනික ආරම්භක මිලට සාපේක්ෂව දිශාව පරීක්ෂාව."}
+                                    {sbResult.sb_step_12_details ? (sbResult.sb_step_12_details.split("|")[1]?.trim() || "PO3 AMD සහ ඇතුල්වීම් ක්‍රමවේද පෙළගැස්ම.") : "PO3 AMD සහ ඇතුල්වීම් ක්‍රමවේද පෙළගැස්ම."}
                                   </span>
                                 </div>
                               </div>

@@ -426,16 +426,23 @@ USER'S TRADING STRATEGY RULES:
         else:
             sb_step_11_details = f"Equilibrium locked: Entry is in {zone} zone (Long requires Discount, Short Premium). | Equilibrium අවහිරය: මිල පවතින්නේ {zone} කලාපයේය (Long සඳහා Discount, Short සඳහා Premium)."
 
-        # Step 12: PO3 Open Bias Alignment
+        # Step 12: PO3 AMD & Dual Entry Model Alignment
         sb_step_12_po3_align_ok = (
             (daily_bias == "BULLISH" and daily_open_relation == "BELOW_OPEN") or
             (daily_bias == "BEARISH" and daily_open_relation == "ABOVE_OPEN") or
             (daily_bias == "NEUTRAL")
         )
         if sb_step_12_po3_align_ok:
-            sb_step_12_details = f"PO3 Open Bias aligned: Manipulation swept below/above open price ({daily_open_relation}). | PO3 පෙළගැස්ම: Manipulation wick සීමාව {daily_open_relation} වේ."
+            sb_step_12_details = (
+                "PO3 AMD Aligned: Accumulation, Manipulation (Sweep), and Distribution verified. "
+                "Dual Entry Models active (1st: FVG/BISI pullback, 2nd: Rejection Block pullback). | "
+                "3M's PO3 සැකැස්ම: Accumulation, Manipulation Sweep, Distribution තහවුරුයි. ඇතුල්වීම් ක්‍රමවේද 2ම සක්‍රීයයි (1st: FVG/BISI pullback, 2nd: Rejection Block pullback)."
+            )
         else:
-            sb_step_12_details = f"PO3 Open Bias mismatch: Entry violates Open price vector ({daily_open_relation}). | PO3 දෛනික ආරම්භක මිලට සාපේක්ෂව දිශාව ගැලපීමක් සිදු වී නැත ({daily_open_relation})."
+            sb_step_12_details = (
+                "PO3 AMD Mismatch: Daily Open vector relation or manipulation sweep invalid. | "
+                "PO3/AMD අසමපාතතාවය: දෛනික ආරම්භක මිල හෝ manipulation sweep සීමාව වලංගු නොවේ."
+            )
 
         return {
             "sb_step_1_time_window_ok": sb_step_1_time_window_ok,
