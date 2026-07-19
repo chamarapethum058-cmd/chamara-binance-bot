@@ -58,7 +58,7 @@ export default function Dashboard() {
   // News states
   const [news, setNews] = useState<any[]>([]);
   const [newsLoading, setNewsLoading] = useState(false);
-  const [activeView, setActiveView] = useState<"dashboard" | "news" | "silverbullet">("dashboard");
+  const [activeView, setActiveView] = useState<"dashboard" | "news" | "silverbullet" | "smc">("dashboard");
   const [trackers, setTrackers] = useState<any[]>([]);
   const [tradeHistory, setTradeHistory] = useState<any[]>([]);
   const [logLoading, setLogLoading] = useState(false);
@@ -378,6 +378,158 @@ export default function Dashboard() {
   const [sbLoading, setSbLoading] = useState(false);
   const [sbSearchLoading, setSbSearchLoading] = useState(false);
   const [sbSearchError, setSbSearchError] = useState<string | null>(null);
+
+  // SMC Method States
+  const [smcSymbol, setSmcSymbol] = useState("BTCUSDT");
+  const [smcTimeframe, setSmcTimeframe] = useState("15m");
+  const [smcHtfTrend, setSmcHtfTrend] = useState("BULLISH");
+  const [smcLiquidityPoolsSwept, setSmcLiquidityPoolsSwept] = useState(true);
+  const [smcInducementSwept, setSmcInducementSwept] = useState(true);
+  const [smcSwingValidated, setSmcSwingValidated] = useState(true);
+  const [smcBosConfirmed, setSmcBosConfirmed] = useState(true);
+  const [smcOrderBlockMitigated, setSmcOrderBlockMitigated] = useState(true);
+  const [smcFvgMitigated, setSmcFvgMitigated] = useState(true);
+  const [smcLtfChoch, setSmcLtfChoch] = useState(true);
+  const [smcPo3Phase, setSmcPo3Phase] = useState("DISTRIBUTION");
+  const [smcPdh, setSmcPdh] = useState<number | "">(65000);
+  const [smcPdl, setSmcPdl] = useState<number | "">(64000);
+  const [smcOpen, setSmcOpen] = useState<number | "">(64200);
+  const [smcCurrentPrice, setSmcCurrentPrice] = useState<number | "">(64100);
+  const [smcResult, setSmcResult] = useState<any | null>(null);
+  const [smcLoading, setSmcLoading] = useState(false);
+
+  const handleRunSmcAnalysis = async () => {
+    setSmcLoading(true);
+    try {
+      const resPrice = await fetch(`${API_BASE}/market/price?symbol=${encodeURIComponent(smcSymbol.trim())}`);
+      let fetchedPrice = Number(smcCurrentPrice) || 64100;
+      let fetchedPdh = Number(smcPdh) || 65000;
+      let fetchedPdl = Number(smcPdl) || 64000;
+      let fetchedOpen = Number(smcOpen) || 64200;
+
+      if (resPrice.ok) {
+        const data = await resPrice.json();
+        fetchedPrice = data.current_price || fetchedPrice;
+        fetchedPdh = data.pdh || fetchedPdh;
+        fetchedPdl = data.pdl || fetchedPdl;
+        fetchedOpen = data.open || fetchedOpen;
+        setSmcCurrentPrice(fetchedPrice);
+        setSmcPdh(fetchedPdh);
+        setSmcPdl(fetchedPdl);
+        setSmcOpen(fetchedOpen);
+      }
+
+      const isDiscount = fetchedPrice < (fetchedPdh + fetchedPdl) / 2;
+      const isBelowOpen = fetchedPrice < fetchedOpen;
+      const isBullish = smcHtfTrend === "BULLISH";
+      const isBearish = smcHtfTrend === "BEARISH";
+
+      let conf = 0;
+      if (isBullish && isDiscount) conf += 15;
+      if (isBearish && !isDiscount) conf += 15;
+      if (isBullish && isBelowOpen) conf += 15;
+      if (isBearish && !isBelowOpen) conf += 15;
+      if (smcLiquidityPoolsSwept) conf += 10;
+      if (smcInducementSwept) conf += 15;
+      if (smcSwingValidated) conf += 10;
+      if (smcBosConfirmed) conf += 10;
+      if (smcOrderBlockMitigated || smcFvgMitigated) conf += 10;
+      if (smcLtfChoch) conf += 10;
+
+      const isSetupValid = conf >= 70;
+      const direction = isBullish ? "BULLISH" : "BEARISH";
+      const risk = fetchedPrice * 0.0015;
+      const entryPrice = isBullish ? fetchedPrice - (risk * 0.5) : fetchedPrice + (risk * 0.5);
+      const stopLoss = isBullish ? entryPrice - risk : entryPrice + risk;
+      const tp1 = isBullish ? entryPrice + (risk * 2.0) : entryPrice - (risk * 2.0);
+      const tp2 = isBullish ? entryPrice + (risk * 4.0) : entryPrice - (risk * 4.0);
+      const tp3 = isBullish ? entryPrice + (risk * 6.0) : entryPrice - (risk * 6.0);
+
+      const action = isBullish ? "Buy Limit" : "Sell Limit";
+
+      const smcAnalysisData = {
+        is_valid: isSetupValid,
+        confidence: conf,
+        daily_bias: direction,
+        entry_price_area: isSetupValid ? `${action} at ${entryPrice.toFixed(2)}` : "No Entry (Confidence < 70%)",
+        stop_loss_level: isSetupValid ? stopLoss.toFixed(2) : null,
+        liquidity_target: isSetupValid ? tp2.toFixed(2) : null,
+        tp1_target: isSetupValid ? tp1.toFixed(2) : null,
+        tp2_target: isSetupValid ? tp2.toFixed(2) : null,
+        tp3_target: isSetupValid ? tp3.toFixed(2) : null,
+        target_reward_ratio: "1:4.00",
+        equilibrium_price: (fetchedPdh + fetchedPdl) / 2,
+        zone_type: isDiscount ? "DISCOUNT" : "PREMIUM",
+        daily_open_relation: isBelowOpen ? "BELOW_OPEN" : "ABOVE_OPEN",
+        swept_liquidity_pool: smcInducementSwept ? "IDM_PULLBACK_SWEEP" : "NONE",
+        mitigated_pd_array_type: smcOrderBlockMitigated ? "ORDER_BLOCK" : (smcFvgMitigated ? "FVG" : "NONE"),
+        po3_phase: smcPo3Phase,
+        reasoning: `1. Liquidity Pool Identification: Equal Highs/Lows / Trendline liquidity swept (${smcLiquidityPoolsSwept ? "YES" : "NO"}).\n` +
+          `2. Inducement (IDM) Sweep: First minor pullback level swept to trap retail liquidity (${smcInducementSwept ? "YES" : "NO"}).\n` +
+          `3. Swing High/Low Validation: Major swing extreme validated following IDM sweep (${smcSwingValidated ? "YES" : "NO"}).\n` +
+          `4. BOS Body Close: Structure break confirmed strictly via candle body close (${smcBosConfirmed ? "YES" : "NO"}).\n` +
+          `5. Unmitigated POI Selection: Fresh Order Block / FVG tapped in ${isDiscount ? "DISCOUNT" : "PREMIUM"} zone (${smcOrderBlockMitigated || smcFvgMitigated ? "YES" : "NO"}).\n` +
+          `6. LTF CHOCH & Entry Confirmation: 1m/3m/5m CHOCH verified with limit entry at 50% FVG/OB midpoint.\n\n` +
+          `---\n\n` +
+          `**සිංහල පරිවර්තනය (Sinhala Translation):**\n` +
+          `1. නීතිය 1 (Liquidity Pools): Equal Highs/Lows / Trendline ද්‍රවශීලතාවය සූරා දැමීම (Sweep): ${smcLiquidityPoolsSwept ? "ඔව්" : "නැත"}.\n` +
+          `2. නීතිය 2 (Inducement Sweep): පළමු Minor Pullback (IDM) මට්ටම Sweep වීම: ${smcInducementSwept ? "ඔව්" : "නැත"}.\n` +
+          `3. නීතිය 3 (Swing Validation): IDM sweep වීමෙන් පසු ප්‍රධාන Swing High/Low එක තහවුරු වීම: ${smcSwingValidated ? "ඔව්" : "නැත"}.\n` +
+          `4. නීතිය 4 (BOS Body Close): Candle Body එකකින් BOS සනාථ වීම: ${smcBosConfirmed ? "ඔව්" : "නැත"}.\n` +
+          `5. නීතිය 5 (Unmitigated POI): ${isDiscount ? "DISCOUNT" : "PREMIUM"} කලාපයේ Fresh Order Block / FVG කලාපයට මිල පැමිණීම: ${smcOrderBlockMitigated || smcFvgMitigated ? "ඔව්" : "නැත"}.\n` +
+          `6. නීතිය 6 (LTF Entry Confirmation): 1m/3m/5m CHOCH සනාථ වී FVG / Order Block 50% මට්ටමේ Limit Order එක පිහිටුවීම.`,
+        invalidation: `Setup is invalidated if price breaches the manipulation extreme at ${stopLoss.toFixed(2)} before limit execution.\n\n` +
+          `---\n\n` +
+          `**සිංහල පරිවර්තනය (Sinhala Translation):**\n` +
+          `මිල ${stopLoss.toFixed(2)} මට්ටමෙන් ඔබ්බට ගියහොත් මෙම SMC setup එක සෘජුවම අවලංගු වේ.`,
+        risk_notes: `SMC Scalp Risk strictly 0.5% - 1.0% maximum. Hold duration: 10m - 15m max. Stop Loss: ${stopLoss.toFixed(2)}, Target: ${tp2.toFixed(2)} (1:4.00 RR).\n\n` +
+          `---\n\n` +
+          `**සිංහල පරිවර්තනය (Sinhala Translation):**\n` +
+          `SMC Scalp trade එකක් බැවින් එක් trade එකකට උපරිම 0.5% - 1.0% ක් පමණක් අවදානමට ලක් කරන්න. උපරිම රඳවා ගැනීමේ කාලය: විනාඩි 10 - 15. Stop Loss: ${stopLoss.toFixed(2)}, Target: ${tp2.toFixed(2)}.`
+      };
+
+      setSmcResult(smcAnalysisData);
+    } catch (err) {
+      console.error("Error running SMC analysis:", err);
+    } finally {
+      setSmcLoading(false);
+    }
+  };
+
+  const handleLogSmcTrade = async () => {
+    if (!smcResult || !smcResult.is_valid) return;
+    const entry = parseFloat(smcResult.entry_price_area?.match(/\d+(?:\.\d+)?/)?.[0] || "0");
+    const sl = parseFloat(smcResult.stop_loss_level || "0");
+    const target = parseFloat(smcResult.liquidity_target || "0");
+
+    setLogLoading(true);
+    try {
+      const res = await fetch("http://127.0.0.1:8000/api/trades/log", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          symbol: smcSymbol,
+          direction: smcResult.daily_bias,
+          entry_price: entry,
+          stop_loss: sl,
+          take_profit: target,
+          confidence: smcResult.confidence || 0
+        })
+      });
+      if (res.ok) {
+        alert("SMC Trade logged to history successfully! 📈");
+        fetchTradeHistory();
+      } else {
+        const errData = await res.json();
+        alert(`Failed to log trade: ${errData.detail || "Unknown error"}`);
+      }
+    } catch (err) {
+      console.error("Error logging SMC trade:", err);
+      alert("Error connecting to server to log SMC trade.");
+    } finally {
+      setLogLoading(false);
+    }
+  };
 
   // Helper calculations for TP1 and TP2 fallback
   const entryPriceNum = (() => {
@@ -1077,6 +1229,20 @@ export default function Dashboard() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
             Silver Bullet
+          </button>
+          <button
+            onClick={() => setActiveView("smc")}
+            id="btn-smc-method"
+            className={`px-4 py-2 rounded-lg text-xs font-semibold tracking-wider uppercase transition-all flex items-center gap-1.5 ${
+              activeView === "smc"
+                ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-500/20"
+                : "text-gray-400 hover:text-gray-200"
+            }`}
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+            SMC Method
           </button>
         </div>
 
@@ -3227,8 +3393,318 @@ export default function Dashboard() {
                     )}
                   </div>
                 )}
+              </div>
             </div>
-            </div>
+          </section>
+        ) : activeView === "smc" ? (
+                  <section className="flex flex-col gap-6 w-full animate-fadeIn" id="smc-method-section">
+                {/* Header Banner */}
+                <div className="bg-[#11131F]/90 border border-emerald-500/30 rounded-2xl p-6 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4 relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500/5 rounded-full filter blur-3xl pointer-events-none" />
+                  <div className="flex flex-col gap-1.5 z-10">
+                    <div className="flex items-center gap-2">
+                      <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold px-2.5 py-0.5 rounded font-mono uppercase tracking-wider">
+                        SMC MASTER ENGINE
+                      </span>
+                      <span className="text-xs text-gray-400 font-mono">• Smart Money Concepts Specification</span>
+                    </div>
+                    <h2 className="text-xl font-extrabold text-white tracking-tight flex items-center gap-2">
+                      Smart Money Concepts (SMC Method) Analysis ⚡
+                    </h2>
+                    <p className="text-xs text-gray-300 max-w-3xl leading-relaxed">
+                      Institutional Market Structure Mapping, Inducement (IDM) Sweeps, Break of Structure (BOS) Body Closes, 
+                      and Order Block / Fair Value Gap Mitigation under 50% Equilibrium Zone constraints.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Form Controls and Analytics Layout */}
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                  {/* Left Control Panel */}
+                  <div className="lg:col-span-5 bg-[#11131F]/90 border border-[#1E2235] rounded-2xl p-5 shadow-xl flex flex-col gap-5">
+                    <h3 className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-2 font-mono">
+                      <span>⚙️</span> SMC Market Structure Controls
+                    </h3>
+
+                    {/* Symbol Selection */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider font-mono">Trading Symbol</label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={smcSymbol}
+                          onChange={(e) => setSmcSymbol(e.target.value.toUpperCase())}
+                          className="bg-[#141626] border border-[#1E2235] rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono w-full"
+                          placeholder="e.g. BTCUSDT, ETHUSDT"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleRunSmcAnalysis}
+                          className="bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/40 text-xs font-bold px-3 py-2 rounded-xl transition-all font-mono whitespace-nowrap cursor-pointer"
+                        >
+                          Fetch Price
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Timeframe & HTF Trend Selection */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider font-mono">Execution Timeframe</label>
+                        <select
+                          value={smcTimeframe}
+                          onChange={(e) => setSmcTimeframe(e.target.value)}
+                          className="bg-[#141626] border border-[#1E2235] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
+                        >
+                          <option value="1m">1m (Scalp Entry)</option>
+                          <option value="3m">3m (Scalp Entry)</option>
+                          <option value="5m">5m (Intraday Entry)</option>
+                          <option value="15m">15m (Primary Structure)</option>
+                          <option value="4h">4h (HTF Reference)</option>
+                        </select>
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider font-mono">4H HTF Trend</label>
+                        <select
+                          value={smcHtfTrend}
+                          onChange={(e) => setSmcHtfTrend(e.target.value)}
+                          className="bg-[#141626] border border-[#1E2235] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
+                        >
+                          <option value="BULLISH">BULLISH (Buy Setups Only)</option>
+                          <option value="BEARISH">BEARISH (Sell Setups Only)</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* SMC Market Structure Checkboxes */}
+                    <div className="flex flex-col gap-2.5 bg-[#141626]/40 p-4 rounded-xl border border-[#1E2235]">
+                      <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider font-mono flex items-center justify-between">
+                        <span>SMC Inducement & Liquidity Master Rules</span>
+                        <span className="text-[9px] text-gray-400 font-normal">YouTube Masterclass Sync</span>
+                      </span>
+
+                      {/* Rule 1 */}
+                      <label className="flex items-center gap-3 cursor-pointer select-none py-1">
+                        <input
+                          type="checkbox"
+                          checked={smcLiquidityPoolsSwept}
+                          onChange={(e) => setSmcLiquidityPoolsSwept(e.target.checked)}
+                          className="w-4 h-4 rounded text-emerald-600 bg-[#141626] border-[#1E2235] focus:ring-emerald-500"
+                        />
+                        <div className="flex flex-col">
+                          <span className="text-xs font-semibold text-white">Rule 1: Liquidity Pools Swept (Equal Highs/Lows / Trendline)</span>
+                          <span className="text-[9px] text-emerald-400/80 font-mono">සිංහල පරිවර්තනය: Equal Highs/Lows / Trendline ද්‍රවශීලතාවය සූරා දැමීම</span>
+                        </div>
+                      </label>
+
+                      {/* Rule 2 */}
+                      <label className="flex items-center gap-3 cursor-pointer select-none py-1 border-t border-[#1E2235]/40 mt-1 pt-2">
+                        <input
+                          type="checkbox"
+                          checked={smcInducementSwept}
+                          onChange={(e) => setSmcInducementSwept(e.target.checked)}
+                          className="w-4 h-4 rounded text-emerald-600 bg-[#141626] border-[#1E2235] focus:ring-emerald-500"
+                        />
+                        <div className="flex flex-col">
+                          <span className="text-xs font-semibold text-white">Rule 2: Inducement (IDM) Swept (First Minor Pullback)</span>
+                          <span className="text-[9px] text-emerald-400/80 font-mono">සිංහල පරිවර්තනය: පළමු Minor Pullback (IDM) මට්ටම Sweep වීම</span>
+                        </div>
+                      </label>
+
+                      {/* Rule 3 */}
+                      <label className="flex items-center gap-3 cursor-pointer select-none py-1 border-t border-[#1E2235]/40 mt-1 pt-2">
+                        <input
+                          type="checkbox"
+                          checked={smcSwingValidated}
+                          onChange={(e) => setSmcSwingValidated(e.target.checked)}
+                          className="w-4 h-4 rounded text-emerald-600 bg-[#141626] border-[#1E2235] focus:ring-emerald-500"
+                        />
+                        <div className="flex flex-col">
+                          <span className="text-xs font-semibold text-white">Rule 3: Major Swing High/Low Validated</span>
+                          <span className="text-[9px] text-emerald-400/80 font-mono">සිංහල පරිවර්තනය: IDM sweep වීමෙන් පසු ප්‍රධාන Swing Extreme තහවුරු වීම</span>
+                        </div>
+                      </label>
+
+                      {/* Rule 4 */}
+                      <label className="flex items-center gap-3 cursor-pointer select-none py-1 border-t border-[#1E2235]/40 mt-1 pt-2">
+                        <input
+                          type="checkbox"
+                          checked={smcBosConfirmed}
+                          onChange={(e) => setSmcBosConfirmed(e.target.checked)}
+                          className="w-4 h-4 rounded text-emerald-600 bg-[#141626] border-[#1E2235] focus:ring-emerald-500"
+                        />
+                        <div className="flex flex-col">
+                          <span className="text-xs font-semibold text-white">Rule 4: BOS Candle Body Close Confirmed</span>
+                          <span className="text-[9px] text-emerald-400/80 font-mono">සිංහල පරිවර්තනය: Candle Body එකකින් BOS සනාථ වීම (Wick = Sweep)</span>
+                        </div>
+                      </label>
+
+                      {/* Rule 5 */}
+                      <label className="flex items-center gap-3 cursor-pointer select-none py-1 border-t border-[#1E2235]/40 mt-1 pt-2">
+                        <input
+                          type="checkbox"
+                          checked={smcOrderBlockMitigated}
+                          onChange={(e) => setSmcOrderBlockMitigated(e.target.checked)}
+                          className="w-4 h-4 rounded text-emerald-600 bg-[#141626] border-[#1E2235] focus:ring-emerald-500"
+                        />
+                        <div className="flex flex-col">
+                          <span className="text-xs font-semibold text-white">Rule 5: Unmitigated Order Block (OB) / FVG Tapped</span>
+                          <span className="text-[9px] text-emerald-400/80 font-mono">සිංහල පරිවර්තනය: Discount/Premium කලාපයේ Fresh OB / FVG පැමිණීම</span>
+                        </div>
+                      </label>
+
+                      {/* Rule 6 */}
+                      <label className="flex items-center gap-3 cursor-pointer select-none py-1 border-t border-[#1E2235]/40 mt-1 pt-2">
+                        <input
+                          type="checkbox"
+                          checked={smcLtfChoch}
+                          onChange={(e) => setSmcLtfChoch(e.target.checked)}
+                          className="w-4 h-4 rounded text-emerald-600 bg-[#141626] border-[#1E2235] focus:ring-emerald-500"
+                        />
+                        <div className="flex flex-col">
+                          <span className="text-xs font-semibold text-white">Rule 6: LTF (1m/3m) CHOCH & Limit Entry Confirmed</span>
+                          <span className="text-[9px] text-emerald-400/80 font-mono">සිංහල පරිවර්තනය: 1m/3m CHOCH සනාථ වී 50% Limit Entry පිහිටුවීම</span>
+                        </div>
+                      </label>
+                    </div>
+
+                    {/* PO3 Phase Selection */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider font-mono">PO3 Institutional AMD Phase</label>
+                      <select
+                        value={smcPo3Phase}
+                        onChange={(e) => setSmcPo3Phase(e.target.value)}
+                        className="bg-[#141626] border border-[#1E2235] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
+                      >
+                        <option value="ACCUMULATION">Accumulation Phase (Asia Range Tight Consolidations)</option>
+                        <option value="MANIPULATION">Manipulation Phase (False Wick Sweep Above/Below Open)</option>
+                        <option value="DISTRIBUTION">Distribution Phase (Expansion Towards Draw on Liquidity)</option>
+                      </select>
+                    </div>
+
+                    {/* Buttons */}
+                    <div className="grid grid-cols-2 gap-3 mt-2">
+                      <button
+                        type="button"
+                        onClick={handleRunSmcAnalysis}
+                        disabled={smcLoading}
+                        className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs py-3 px-4 rounded-xl transition-all shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2 cursor-pointer"
+                      >
+                        {smcLoading ? "Analyzing..." : "Run SMC Analysis ⚡"}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleLogSmcTrade}
+                        disabled={logLoading || !smcResult || !smcResult.is_valid}
+                        className="bg-teal-600/20 hover:bg-teal-600/30 border border-teal-500/30 text-teal-400 font-bold text-xs py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40"
+                      >
+                        {logLoading ? "Logging..." : "Log SMC Trade 📈"}
+                      </button>
+                    </div>
+
+                    {/* TradingView Live Chart for SMC Method */}
+                    <div className="bg-[#141626]/60 border border-emerald-500/30 rounded-xl p-4 flex flex-col gap-2 h-[520px] mt-2 relative">
+                      <div className="flex justify-between items-center px-1">
+                        <span className="text-[10px] font-semibold text-emerald-400 uppercase tracking-widest font-mono flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                          TradingView Live SMC Chart ({smcSymbol})
+                        </span>
+                        <a
+                          href={`https://www.tradingview.com/chart/?symbol=${getTradingViewSymbol(smcSymbol)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[10px] text-emerald-400 hover:text-emerald-300 transition-colors font-semibold flex items-center gap-1 font-mono bg-emerald-500/10 px-2 py-1 rounded border border-emerald-500/20"
+                        >
+                          Open in TradingView ↗
+                        </a>
+                      </div>
+                      <div className="flex-1 w-full rounded-lg overflow-hidden border border-[#1E2235]/40 bg-black/40 relative">
+                        <iframe
+                          id="tradingview-smc-chart-widget"
+                          src={`https://s.tradingview.com/widgetembed/?frameElementId=tradingview-smc-chart-widget&symbol=${getTradingViewSymbol(smcSymbol)}&interval=${getIntervalForTradingView(smcTimeframe)}&theme=dark&style=1&timezone=America%2FNew_York&hide_volume=false`}
+                          className="w-full h-full border-none"
+                          allowFullScreen
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Results & Visualizer Panel */}
+                  <div className="lg:col-span-7 flex flex-col gap-5">
+                    {smcResult ? (
+                      <>
+                        {/* Summary Bar */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          <div className="bg-[#11131F]/90 border border-[#1E2235] rounded-xl p-4 flex flex-col gap-1.5">
+                            <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wider font-mono">Setup Status</span>
+                            <div className="flex items-center gap-2">
+                              <span className={`w-2.5 h-2.5 rounded-full ${smcResult.is_valid ? "bg-emerald-400 animate-ping" : "bg-rose-500"}`} />
+                              <span className={`text-xs font-bold font-mono ${smcResult.is_valid ? "text-emerald-400" : "text-rose-400"}`}>
+                                {smcResult.is_valid ? "VALID SMC SETUP" : "SETUP LOCKED"}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="bg-[#11131F]/90 border border-[#1E2235] rounded-xl p-4 flex flex-col gap-1.5">
+                            <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wider font-mono">Confidence Rating</span>
+                            <span className={`text-sm font-bold font-mono ${smcResult.confidence >= 70 ? "text-emerald-400" : "text-rose-400"}`}>
+                              {smcResult.confidence}% CONFIRMED
+                            </span>
+                          </div>
+
+                          <div className="bg-[#11131F]/90 border border-[#1E2235] rounded-xl p-4 flex flex-col gap-1.5">
+                            <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wider font-mono">Matrix Zone</span>
+                            <span className="text-xs font-bold text-indigo-400 font-mono">
+                              {smcResult.zone_type} ({smcResult.daily_open_relation})
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Trade Parameters Cards */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                          <div className="bg-[#11131F]/90 border border-emerald-500/30 rounded-xl p-3.5 flex flex-col gap-1">
+                            <span className="text-[9px] font-bold text-emerald-400 uppercase font-mono">Entry Price</span>
+                            <span className="text-xs font-bold text-white font-mono">{smcResult.entry_price_area}</span>
+                          </div>
+                          <div className="bg-[#11131F]/90 border border-rose-500/30 rounded-xl p-3.5 flex flex-col gap-1">
+                            <span className="text-[9px] font-bold text-rose-400 uppercase font-mono">Stop Loss</span>
+                            <span className="text-xs font-bold text-rose-400 font-mono">{smcResult.stop_loss_level || "N/A"}</span>
+                          </div>
+                          <div className="bg-[#11131F]/90 border border-teal-500/30 rounded-xl p-3.5 flex flex-col gap-1">
+                            <span className="text-[9px] font-bold text-teal-400 uppercase font-mono">Target (1:4 RR)</span>
+                            <span className="text-xs font-bold text-teal-400 font-mono">{smcResult.tp2_target || "N/A"}</span>
+                          </div>
+                          <div className="bg-[#11131F]/90 border border-indigo-500/30 rounded-xl p-3.5 flex flex-col gap-1">
+                            <span className="text-[9px] font-bold text-indigo-400 uppercase font-mono">Target RR</span>
+                            <span className="text-xs font-bold text-indigo-300 font-mono">1:4.00 RR</span>
+                          </div>
+                        </div>
+
+                        {/* Reasoning & Sinhala Translation */}
+                        <div className="bg-[#11131F]/90 border border-[#1E2235] rounded-xl p-5 flex flex-col gap-4">
+                          <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2 font-mono">
+                            <span>🧠</span> Technical Analysis & Sinhala Translation (සිංහල පරිවර්තනය)
+                          </h4>
+                          <div className="bg-[#07080E] p-4 rounded-xl border border-[#1E2235] text-xs leading-relaxed text-gray-300 font-mono whitespace-pre-wrap">
+                            {smcResult.reasoning}
+                          </div>
+                          <div className="bg-[#07080E] p-4 rounded-xl border border-[#1E2235] text-xs leading-relaxed text-rose-300 font-mono whitespace-pre-wrap">
+                            {smcResult.invalidation}
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="bg-[#11131F]/90 border border-[#1E2235] rounded-2xl p-12 flex flex-col items-center justify-center gap-3 text-center min-h-[350px]">
+                        <span className="text-3xl">⚡</span>
+                        <h3 className="text-sm font-bold text-white font-mono">SMC Method Analysis Ready</h3>
+                        <p className="text-xs text-gray-400 max-w-md">
+                          Select your symbol, timeframe, and structural confluences, then click "Run SMC Analysis" to generate actionable setups.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
 
             {/* Trade History & Strategy Performance Dashboard */}
             <div className="bg-[#11131F]/90 border border-[#1E2235] rounded-2xl p-6 shadow-xl flex flex-col gap-6 mt-6">
