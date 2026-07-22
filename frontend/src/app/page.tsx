@@ -381,6 +381,7 @@ export default function Dashboard() {
 
   // SMC Method States
   const [smcSymbol, setSmcSymbol] = useState("BTCUSDT");
+  const [smcStrategyModel, setSmcStrategyModel] = useState("double_mitigation");
   const [smcTimeframe, setSmcTimeframe] = useState("15m");
   const [smcHtfTrend, setSmcHtfTrend] = useState("BULLISH");
   const [smcLiquidityPoolsSwept, setSmcLiquidityPoolsSwept] = useState(true);
@@ -397,6 +398,7 @@ export default function Dashboard() {
   const [smcCurrentPrice, setSmcCurrentPrice] = useState<number | "">(64100);
   const [smcResult, setSmcResult] = useState<any | null>(null);
   const [monitoredCoins, setMonitoredCoins] = useState<any[]>([]);
+  const [livePrices, setLivePrices] = useState<Record<string, number>>({});
 
   // 5-Second Local API Watchlist Polling Loop
   useEffect(() => {
@@ -430,6 +432,44 @@ export default function Dashboard() {
 
     return () => clearInterval(intervalId);
   }, [monitoredCoins]);
+
+  // 5-Second Journal Trades Price Polling Loop
+  useEffect(() => {
+    if (tradeHistory.length === 0) return;
+
+    const fetchJournalPrices = async () => {
+      const uniqueSymbols = Array.from(new Set(tradeHistory.map((t: any) => t.symbol.toUpperCase())));
+      const priceMap: Record<string, number> = { ...livePrices };
+      let changed = false;
+
+      await Promise.all(
+        uniqueSymbols.map(async (symbol) => {
+          try {
+            const sym = getTradingViewSymbol(symbol);
+            const cleanSym = sym.includes(":") ? sym.split(":")[1] : sym;
+            const res = await fetch(`http://127.0.0.1:8000/api/market/price?symbol=${encodeURIComponent(cleanSym)}`);
+            if (res.ok) {
+              const data = await res.json();
+              if (data.current_price !== undefined) {
+                priceMap[symbol] = data.current_price;
+                changed = true;
+              }
+            }
+          } catch (e) {
+            console.error("Error fetching live price for journal symbol:", symbol, e);
+          }
+        })
+      );
+
+      if (changed) {
+        setLivePrices(priceMap);
+      }
+    };
+
+    fetchJournalPrices();
+    const intervalId = setInterval(fetchJournalPrices, 5000);
+    return () => clearInterval(intervalId);
+  }, [tradeHistory]);
 
   // Watchlist Local Strategy Recalculators
   const calculateCoinConfidence = (coin: any) => {
@@ -486,6 +526,7 @@ export default function Dashboard() {
       let fetchedPdl = Number(smcPdl) || 64000;
       let fetchedOpen = Number(smcOpen) || 64200;
 
+      let activeHtfTrend = smcHtfTrend;
       if (resPrice.ok) {
         const data = await resPrice.json();
         fetchedPrice = data.current_price || fetchedPrice;
@@ -496,12 +537,16 @@ export default function Dashboard() {
         setSmcPdh(fetchedPdh);
         setSmcPdl(fetchedPdl);
         setSmcOpen(fetchedOpen);
+        if (data.daily_bias) {
+          setSmcHtfTrend(data.daily_bias);
+          activeHtfTrend = data.daily_bias;
+        }
       }
 
       const isDiscount = fetchedPrice < (fetchedPdh + fetchedPdl) / 2;
       const isBelowOpen = fetchedPrice < fetchedOpen;
-      const isBullish = smcHtfTrend === "BULLISH";
-      const isBearish = smcHtfTrend === "BEARISH";
+      const isBullish = activeHtfTrend === "BULLISH";
+      const isBearish = activeHtfTrend === "BEARISH";
 
       let conf = 0;
       if (isBullish && isDiscount) conf += 15;
@@ -604,6 +649,13 @@ export default function Dashboard() {
       setSmcLoading(false);
     }
   };
+
+  // Trigger SMC analysis/fetch automatically on timeframe changes
+  useEffect(() => {
+    if (smcSymbol && smcSymbol.length >= 3) {
+      handleRunSmcAnalysis();
+    }
+  }, [smcTimeframe]);
 
   const handleLogSmcTrade = async () => {
     if (!smcResult || !smcResult.is_valid) return;
@@ -3385,7 +3437,7 @@ export default function Dashboard() {
                                 </div>
                               </div>
 
-                              {/* Step 16: HTF (4H) Trend Directional Alignment */}
+                              {/* Step 16: HTF (1H) Trend Directional Alignment */}
                               <div className="bg-[#07080E]/40 border border-[#1E2235]/40 rounded-xl p-3.5 flex items-start gap-3.5 hover:border-indigo-500/20 transition-all">
                                 <div className={`w-6 h-6 rounded-full shrink-0 flex items-center justify-center font-bold text-xs font-mono border ${
                                   sbResult.sb_step_16_htf_align_ok 
@@ -3396,7 +3448,7 @@ export default function Dashboard() {
                                 </div>
                                 <div className="flex flex-col gap-1 w-full">
                                   <div className="flex justify-between items-center">
-                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider font-mono">Step 16: HTF (4H) Trend Directional Alignment</span>
+                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider font-mono">Step 16: HTF (1H) Trend Directional Alignment</span>
                                     <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded font-mono ${
                                       sbResult.sb_step_16_htf_align_ok ? "bg-emerald-500/10 text-emerald-400" : "bg-[#1E2235]/30 text-gray-400"
                                     }`}>
@@ -3404,10 +3456,10 @@ export default function Dashboard() {
                                     </span>
                                   </div>
                                   <p className="text-xs text-white leading-relaxed mt-0.5">
-                                    {sbResult.sb_step_16_details ? sbResult.sb_step_16_details.split("|")[0].trim() : "HTF (4H) Trend Directional alignment check."}
+                                    {sbResult.sb_step_16_details ? sbResult.sb_step_16_details.split("|")[0].trim() : "HTF (1H) Trend Directional alignment check."}
                                   </p>
                                   <span className="text-[10px] text-indigo-300/80 font-sans">
-                                    {sbResult.sb_step_16_details ? (sbResult.sb_step_16_details.split("|")[1]?.trim() || "HTF (4H) ප්‍රවණතා දිශානති පෙළගැස්ම.") : "HTF (4H) ප්‍රවණතා දිශානති පෙළගැස්ම."}
+                                    {sbResult.sb_step_16_details ? (sbResult.sb_step_16_details.split("|")[1]?.trim() || "HTF (1H) ප්‍රවණතා දිශානති පෙළගැස්ම.") : "HTF (1H) ප්‍රවණතා දිශානති පෙළගැස්ම."}
                                   </span>
                                 </div>
                               </div>
@@ -3562,119 +3614,227 @@ export default function Dashboard() {
                         <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider font-mono">Execution Timeframe</label>
                         <select
                           value={smcTimeframe}
-                          onChange={(e) => setSmcTimeframe(e.target.value)}
+                          onChange={(e) => {
+                              const val = e.target.value;
+                              setSmcTimeframe(val);
+                              if (val === "1m") {
+                                setSmcStrategyModel("sniper_entry");
+                              }
+                            }}
                           className="bg-[#141626] border border-[#1E2235] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
                         >
                           <option value="1m">1m (Scalp Entry)</option>
                           <option value="3m">3m (Scalp Entry)</option>
                           <option value="5m">5m (Intraday Entry)</option>
                           <option value="15m">15m (Primary Structure)</option>
-                          <option value="4h">4h (HTF Reference)</option>
+                          <option value="1h">1h (HTF Reference)</option>
                         </select>
                       </div>
                       <div className="flex flex-col gap-1.5">
-                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider font-mono">4H HTF Trend</label>
+                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider font-mono">1H HTF Trend</label>
                         <select
                           value={smcHtfTrend}
                           onChange={(e) => setSmcHtfTrend(e.target.value)}
                           className="bg-[#141626] border border-[#1E2235] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
                         >
-                          <option value="BULLISH">BULLISH (Buy Setups Only)</option>
-                          <option value="BEARISH">BEARISH (Sell Setups Only)</option>
+                          <option value="BULLISH">BULLISH (Auto Selected)</option>
+                          <option value="BEARISH">BEARISH (Auto Selected)</option>
                         </select>
                       </div>
                     </div>
 
                     {/* SMC Market Structure Checkboxes */}
+                    {/* SMC Strategy Model Selection */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider font-mono">SMC Strategy Model</label>
+                      <select
+                        value={smcStrategyModel}
+                        onChange={(e) => setSmcStrategyModel(e.target.value)}
+                        className="bg-[#141626] border border-[#1E2235] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
+                      >
+                        <option value="double_mitigation">PO3 Double Mitigation Reversal Model (Crypto Roots)</option>
+                        <option value="sniper_entry">1m Sniper Entry Model (The Trading Geek)</option>
+                      </select>
+                    </div>
+
                     <div className="flex flex-col gap-2.5 bg-[#141626]/40 p-4 rounded-xl border border-[#1E2235]">
                       <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider font-mono flex items-center justify-between">
-                        <span>SMC Inducement & Liquidity Master Rules</span>
-                        <span className="text-[9px] text-gray-400 font-normal">YouTube Masterclass Sync</span>
+                        <span>{smcStrategyModel === "double_mitigation" ? "SMC Double Mitigation Reversal Rules" : "SMC 1m Sniper Entry Rules"}</span>
+                        <span className="text-[9px] text-gray-400 font-normal">YouTube Tutorial Sync</span>
                       </span>
 
-                      {/* Rule 1 */}
-                      <label className="flex items-center gap-3 cursor-pointer select-none py-1">
-                        <input
-                          type="checkbox"
-                          checked={smcLiquidityPoolsSwept}
-                          onChange={(e) => setSmcLiquidityPoolsSwept(e.target.checked)}
-                          className="w-4 h-4 rounded text-emerald-600 bg-[#141626] border-[#1E2235] focus:ring-emerald-500"
-                        />
-                        <div className="flex flex-col">
-                          <span className="text-xs font-semibold text-white">Rule 1: Liquidity Pools Swept (Equal Highs/Lows / Trendline)</span>
-                          <span className="text-[9px] text-emerald-400/80 font-mono">සිංහල පරිවර්තනය: Equal Highs/Lows / Trendline ද්‍රවශීලතාවය සූරා දැමීම</span>
-                        </div>
-                      </label>
+                      {smcStrategyModel === "double_mitigation" ? (
+                        <>
+                          {/* Rule 1 */}
+                          <label className="flex items-center gap-3 cursor-pointer select-none py-1">
+                            <input
+                              type="checkbox"
+                              checked={true}
+                              readOnly
+                              className="w-4 h-4 rounded text-emerald-600 bg-[#141626] border-[#1E2235] focus:ring-emerald-500 opacity-60"
+                            />
+                            <div className="flex flex-col">
+                              <span className="text-xs font-semibold text-white">Rule 1: HTF Trend Alignment & POI Mitigation</span>
+                              <span className="text-[9px] text-emerald-400/80 font-mono">සිංහල පරිවර්තනය: HTF Trend එක සහ 1H/15m POI කලාපය සනාථ වීම</span>
+                            </div>
+                          </label>
 
-                      {/* Rule 2 */}
-                      <label className="flex items-center gap-3 cursor-pointer select-none py-1 border-t border-[#1E2235]/40 mt-1 pt-2">
-                        <input
-                          type="checkbox"
-                          checked={smcInducementSwept}
-                          onChange={(e) => setSmcInducementSwept(e.target.checked)}
-                          className="w-4 h-4 rounded text-emerald-600 bg-[#141626] border-[#1E2235] focus:ring-emerald-500"
-                        />
-                        <div className="flex flex-col">
-                          <span className="text-xs font-semibold text-white">Rule 2: Inducement (IDM) Swept (First Minor Pullback)</span>
-                          <span className="text-[9px] text-emerald-400/80 font-mono">සිංහල පරිවර්තනය: පළමු Minor Pullback (IDM) මට්ටම Sweep වීම</span>
-                        </div>
-                      </label>
+                          {/* Rule 2 */}
+                          <label className="flex items-center gap-3 cursor-pointer select-none py-1 border-t border-[#1E2235]/40 mt-1 pt-2">
+                            <input
+                              type="checkbox"
+                              checked={true}
+                              readOnly
+                              className="w-4 h-4 rounded text-emerald-600 bg-[#141626] border-[#1E2235] focus:ring-emerald-500 opacity-60"
+                            />
+                            <div className="flex flex-col">
+                              <span className="text-xs font-semibold text-white">Rule 2: First Mitigation Lockout (Ignore Entry)</span>
+                              <span className="text-[9px] text-emerald-400/80 font-mono">සිංහල පරිවර්තනය: පළමු මිටිගේෂන් එකෙන් පසු ආක්‍රමණශීලී ලෙස එන්ට්‍රි නොගෙන සිටීම (Ignore)</span>
+                            </div>
+                          </label>
 
-                      {/* Rule 3 */}
-                      <label className="flex items-center gap-3 cursor-pointer select-none py-1 border-t border-[#1E2235]/40 mt-1 pt-2">
-                        <input
-                          type="checkbox"
-                          checked={smcSwingValidated}
-                          onChange={(e) => setSmcSwingValidated(e.target.checked)}
-                          className="w-4 h-4 rounded text-emerald-600 bg-[#141626] border-[#1E2235] focus:ring-emerald-500"
-                        />
-                        <div className="flex flex-col">
-                          <span className="text-xs font-semibold text-white">Rule 3: Major Swing High/Low Validated</span>
-                          <span className="text-[9px] text-emerald-400/80 font-mono">සිංහල පරිවර්තනය: IDM sweep වීමෙන් පසු ප්‍රධාන Swing Extreme තහවුරු වීම</span>
-                        </div>
-                      </label>
+                          {/* Rule 3 */}
+                          <label className="flex items-center gap-3 cursor-pointer select-none py-1 border-t border-[#1E2235]/40 mt-1 pt-2">
+                            <input
+                              type="checkbox"
+                              checked={smcLiquidityPoolsSwept}
+                              onChange={(e) => setSmcLiquidityPoolsSwept(e.target.checked)}
+                              className="w-4 h-4 rounded text-emerald-600 bg-[#141626] border-[#1E2235] focus:ring-emerald-500"
+                            />
+                            <div className="flex flex-col">
+                              <span className="text-xs font-semibold text-white">Rule 3: Second Mitigation Test (Double Tap Re-test)</span>
+                              <span className="text-[9px] text-emerald-400/80 font-mono">සිංහල පරිවර්තනය: මිල දෙවන වරටත් POI කලාපය re-test කිරීම සනාථ වීම</span>
+                            </div>
+                          </label>
 
-                      {/* Rule 4 */}
-                      <label className="flex items-center gap-3 cursor-pointer select-none py-1 border-t border-[#1E2235]/40 mt-1 pt-2">
-                        <input
-                          type="checkbox"
-                          checked={smcBosConfirmed}
-                          onChange={(e) => setSmcBosConfirmed(e.target.checked)}
-                          className="w-4 h-4 rounded text-emerald-600 bg-[#141626] border-[#1E2235] focus:ring-emerald-500"
-                        />
-                        <div className="flex flex-col">
-                          <span className="text-xs font-semibold text-white">Rule 4: BOS Candle Body Close Confirmed</span>
-                          <span className="text-[9px] text-emerald-400/80 font-mono">සිංහල පරිවර්තනය: Candle Body එකකින් BOS සනාථ වීම (Wick = Sweep)</span>
-                        </div>
-                      </label>
+                          {/* Rule 4 */}
+                          <label className="flex items-center gap-3 cursor-pointer select-none py-1 border-t border-[#1E2235]/40 mt-1 pt-2">
+                            <input
+                              type="checkbox"
+                              checked={smcInducementSwept}
+                              onChange={(e) => setSmcInducementSwept(e.target.checked)}
+                              className="w-4 h-4 rounded text-emerald-600 bg-[#141626] border-[#1E2235] focus:ring-emerald-500"
+                            />
+                            <div className="flex flex-col">
+                              <span className="text-xs font-semibold text-white">Rule 4: 1m Rejection Wick Confirmation (Wick &gt;= 35%)</span>
+                              <span className="text-[9px] text-emerald-400/80 font-mono">සිංහල පරිවර්තනය: 1m chart එකෙහි Rejection Wick එකක් පිහිටුවීම</span>
+                            </div>
+                          </label>
 
-                      {/* Rule 5 */}
-                      <label className="flex items-center gap-3 cursor-pointer select-none py-1 border-t border-[#1E2235]/40 mt-1 pt-2">
-                        <input
-                          type="checkbox"
-                          checked={smcOrderBlockMitigated}
-                          onChange={(e) => setSmcOrderBlockMitigated(e.target.checked)}
-                          className="w-4 h-4 rounded text-emerald-600 bg-[#141626] border-[#1E2235] focus:ring-emerald-500"
-                        />
-                        <div className="flex flex-col">
-                          <span className="text-xs font-semibold text-white">Rule 5: Unmitigated Order Block (OB) / FVG Tapped</span>
-                          <span className="text-[9px] text-emerald-400/80 font-mono">සිංහල පරිවර්තනය: Discount/Premium කලාපයේ Fresh OB / FVG පැමිණීම</span>
-                        </div>
-                      </label>
+                          {/* Rule 5 */}
+                          <label className="flex items-center gap-3 cursor-pointer select-none py-1 border-t border-[#1E2235]/40 mt-1 pt-2">
+                            <input
+                              type="checkbox"
+                              checked={smcSwingValidated}
+                              onChange={(e) => setSmcSwingValidated(e.target.checked)}
+                              className="w-4 h-4 rounded text-emerald-600 bg-[#141626] border-[#1E2235] focus:ring-emerald-500"
+                            />
+                            <div className="flex flex-col">
+                              <span className="text-xs font-semibold text-white">Rule 5: 1m MSS/CHoCH Shift with Displacement</span>
+                              <span className="text-[9px] text-emerald-400/80 font-mono">සිංහල පරිවර්තනය: 1m MSS (Market Structure Shift) සහ displacement එකක් සනාථ වීම</span>
+                            </div>
+                          </label>
 
-                      {/* Rule 6 */}
-                      <label className="flex items-center gap-3 cursor-pointer select-none py-1 border-t border-[#1E2235]/40 mt-1 pt-2">
-                        <input
-                          type="checkbox"
-                          checked={smcLtfChoch}
-                          onChange={(e) => setSmcLtfChoch(e.target.checked)}
-                          className="w-4 h-4 rounded text-emerald-600 bg-[#141626] border-[#1E2235] focus:ring-emerald-500"
-                        />
-                        <div className="flex flex-col">
-                          <span className="text-xs font-semibold text-white">Rule 6: LTF (1m/3m) CHOCH & Limit Entry Confirmed</span>
-                          <span className="text-[9px] text-emerald-400/80 font-mono">සිංහල පරිවර්තනය: 1m/3m CHOCH සනාථ වී 50% Limit Entry පිහිටුවීම</span>
-                        </div>
-                      </label>
+                          {/* Rule 6 */}
+                          <label className="flex items-center gap-3 cursor-pointer select-none py-1 border-t border-[#1E2235]/40 mt-1 pt-2">
+                            <input
+                              type="checkbox"
+                              checked={smcLtfChoch}
+                              onChange={(e) => setSmcLtfChoch(e.target.checked)}
+                              className="w-4 h-4 rounded text-emerald-600 bg-[#141626] border-[#1E2235] focus:ring-emerald-500"
+                            />
+                            <div className="flex flex-col">
+                              <span className="text-xs font-semibold text-white">Rule 6: FVG / OB Pullback Limit Entry Set</span>
+                              <span className="text-[9px] text-emerald-400/80 font-mono">සිංහල පරිවර්තනය: FVG / OB Pullback මට්ටමේ Limit Entry එකක් පිහිටුවීම</span>
+                            </div>
+                          </label>
+                        </>
+                      ) : (
+                        <>
+                          {/* Rule 1 */}
+                          <label className="flex items-center gap-3 cursor-pointer select-none py-1">
+                            <input
+                              type="checkbox"
+                              checked={true}
+                              readOnly
+                              className="w-4 h-4 rounded text-emerald-600 bg-[#141626] border-[#1E2235] focus:ring-emerald-500 opacity-60"
+                            />
+                            <div className="flex flex-col">
+                              <span className="text-xs font-semibold text-white">Rule 1: HTF 1H & 15m Trend Alignment</span>
+                              <span className="text-[9px] text-emerald-400/80 font-mono">සිංහල පරිවර්තනය: 1H Trend එක Uptrend නම් 15m Trend එකද Uptrend විය යුතුය</span>
+                            </div>
+                          </label>
+
+                          {/* Rule 2 */}
+                          <label className="flex items-center gap-3 cursor-pointer select-none py-1 border-t border-[#1E2235]/40 mt-1 pt-2">
+                            <input
+                              type="checkbox"
+                              checked={true}
+                              readOnly
+                              className="w-4 h-4 rounded text-emerald-600 bg-[#141626] border-[#1E2235] focus:ring-emerald-500 opacity-60"
+                            />
+                            <div className="flex flex-col">
+                              <span className="text-xs font-semibold text-white">Rule 2: 15m Downtrend Pullback Filter</span>
+                              <span className="text-[9px] text-emerald-400/80 font-mono">සිංහල පරිවර්තනය: 15m Down වුවහොත්, 1m downtrend pullback එක ඔස්සේ (Sell) හෝ 1m නැවත Up වන තෙක් බලා සිටීම</span>
+                            </div>
+                          </label>
+
+                          {/* Rule 3 */}
+                          <label className="flex items-center gap-3 cursor-pointer select-none py-1 border-t border-[#1E2235]/40 mt-1 pt-2">
+                            <input
+                              type="checkbox"
+                              checked={smcLiquidityPoolsSwept}
+                              onChange={(e) => setSmcLiquidityPoolsSwept(e.target.checked)}
+                              className="w-4 h-4 rounded text-emerald-600 bg-[#141626] border-[#1E2235] focus:ring-emerald-500"
+                            />
+                            <div className="flex flex-col">
+                              <span className="text-xs font-semibold text-white">Rule 3: 1m Liquidity Wick Sweep (Stop Loss Hunt)</span>
+                              <span className="text-[9px] text-emerald-400/80 font-mono">සිංහල පරිවර්තනය: සීමාන්තික මිල මට්ටමේ ඇති Stop Loss සූරා දැමීම (Wick Sweep)</span>
+                            </div>
+                          </label>
+
+                          {/* Rule 4 */}
+                          <label className="flex items-center gap-3 cursor-pointer select-none py-1 border-t border-[#1E2235]/40 mt-1 pt-2">
+                            <input
+                              type="checkbox"
+                              checked={smcSwingValidated}
+                              onChange={(e) => setSmcSwingValidated(e.target.checked)}
+                              className="w-4 h-4 rounded text-emerald-600 bg-[#141626] border-[#1E2235] focus:ring-emerald-500"
+                            />
+                            <div className="flex flex-col">
+                              <span className="text-xs font-semibold text-white">Rule 4: 1m CHoCH/MSS Shift with Displacement</span>
+                              <span className="text-[9px] text-emerald-400/80 font-mono">සිංහල පරිවර්තනය: 1m ප්‍රස්ථාරයේ අවසාන swing මට්ටම candle body එකකින් බිඳ වැටීම</span>
+                            </div>
+                          </label>
+
+                          {/* Rule 5 */}
+                          <label className="flex items-center gap-3 cursor-pointer select-none py-1 border-t border-[#1E2235]/40 mt-1 pt-2">
+                            <input
+                              type="checkbox"
+                              checked={smcLtfChoch}
+                              onChange={(e) => setSmcLtfChoch(e.target.checked)}
+                              className="w-4 h-4 rounded text-emerald-600 bg-[#141626] border-[#1E2235] focus:ring-emerald-500"
+                            />
+                            <div className="flex flex-col">
+                              <span className="text-xs font-semibold text-white">Rule 5: FVG / OB Pullback Limit Order Setup</span>
+                              <span className="text-[9px] text-emerald-400/80 font-mono">සිංහල පරිවර්තනය: FVG සීමාවේ හෝ OB මධ්‍ය ලක්ෂ්‍යයේ Limit Order එක පිහිටුවීම</span>
+                            </div>
+                          </label>
+
+                          {/* Rule 6 */}
+                          <label className="flex items-center gap-3 cursor-pointer select-none py-1 border-t border-[#1E2235]/40 mt-1 pt-2">
+                            <input
+                              type="checkbox"
+                              checked={true}
+                              readOnly
+                              className="w-4 h-4 rounded text-emerald-600 bg-[#141626] border-[#1E2235] focus:ring-emerald-500 opacity-60"
+                            />
+                            <div className="flex flex-col">
+                              <span className="text-xs font-semibold text-white">Rule 6: Tight Stop Loss & 10-15 Minutes Max Hold</span>
+                              <span className="text-[9px] text-emerald-400/80 font-mono">සිංහල පරිවර්තනය: Stop Loss එක manipulation extreme එකෙන් ඔබ්බට තබා විනාඩි 10-15ක් රඳවා ගැනීම</span>
+                            </div>
+                          </label>
+                        </>                      )}
                     </div>
 
                     {/* PO3 Phase Selection */}
@@ -4150,7 +4310,14 @@ export default function Dashboard() {
                           </td>
                           <td className="p-3 text-white font-bold">
                             <div className="flex flex-col gap-0.5">
-                              <span>{trade.symbol}</span>
+                              <div className="flex items-center gap-1.5">
+                                <span>{trade.symbol}</span>
+                                {livePrices[trade.symbol.toUpperCase()] !== undefined && (
+                                  <span className="text-[10px] text-emerald-400 font-semibold animate-pulse">
+                                    • ${livePrices[trade.symbol.toUpperCase()].toFixed(2)}
+                                  </span>
+                                )}
+                              </div>
                               {trade.confidence !== undefined && trade.confidence !== null && trade.confidence > 0 && (
                                 <span className="text-[9px] font-extrabold text-indigo-400 font-mono">
                                   {trade.confidence}% Conf.
@@ -4207,6 +4374,7 @@ export default function Dashboard() {
                             >
                               <option value="PENDING">PENDING ⏳</option>
                               <option value="ACTIVE">ACTIVE ⚡</option>
+                              <option value="RUNNING">RUNNING 🏃‍♂️</option>
                               <option value="WIN">WIN 🏆</option>
                               <option value="LOSS">LOSS ❌</option>
                             </select>

@@ -869,6 +869,7 @@ def update_trade_status(trade_id: int, status_update: Dict[str, str], db: Sessio
         db_trade.status = new_status
         db.commit()
         db.refresh(db_trade)
+    return db_trade
 @app.post("/api/trades/{trade_id}/update", response_model=LoggedTradeResponse)
 def update_logged_trade(trade_id: int, updates: Dict[str, Any], db: Session = Depends(get_db)):
     db_trade = db.query(LoggedTradeModel).filter(LoggedTradeModel.id == trade_id).first()
