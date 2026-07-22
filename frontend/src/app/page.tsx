@@ -76,7 +76,11 @@ export default function Dashboard() {
   };
 
   const handleLogTrade = async () => {
-    if (!sbResult || !sbResult.is_valid) return;
+    if (!sbResult) return;
+
+    const direction = (sbResult.daily_bias === "BULLISH" || sbResult.daily_bias === "BEARISH") 
+      ? sbResult.daily_bias 
+      : sbHtfTrend;
     
     const parsePrice = (val: any) => {
       if (val === null || val === undefined) return 0.0;
@@ -86,9 +90,12 @@ export default function Dashboard() {
       return matches ? Number(matches[0]) : 0.0;
     };
 
-    const entry = parsePrice(sbResult.entry_price_area);
-    const sl = parsePrice(sbResult.stop_loss_level);
-    const target = parsePrice(sbResult.liquidity_target) || (sbResult.daily_bias === "BULLISH" ? entry + (entry - sl) * 3 : entry - (sl - entry) * 3);
+    const entry = parsePrice(sbResult.entry_price_area) || (Number(sbCurrentPrice) || 0.0);
+    let sl = parsePrice(sbResult.stop_loss_level);
+    if (sl === 0) {
+      sl = direction === "BULLISH" ? entry * 0.9985 : entry * 1.0015;
+    }
+    let target = parsePrice(sbResult.liquidity_target) || (direction === "BULLISH" ? entry + (entry - sl) * 3 : entry - (sl - entry) * 3);
 
     // Confirm or edit trade values before logging
     const confirmedEntryStr = prompt(`Confirm/Edit Entry Price for ${sbSymbol}:`, entry.toFixed(4));
@@ -108,8 +115,8 @@ export default function Dashboard() {
     }
 
     const riskVal = Math.abs(confirmedEntry - confirmedSl);
-    const tp3rr = sbResult.daily_bias === "BULLISH" ? confirmedEntry + (riskVal * 3.0) : confirmedEntry - (riskVal * 3.0);
-    const tp2rr = sbResult.daily_bias === "BULLISH" ? confirmedEntry + (riskVal * 2.0) : confirmedEntry - (riskVal * 2.0);
+    const tp3rr = direction === "BULLISH" ? confirmedEntry + (riskVal * 3.0) : confirmedEntry - (riskVal * 3.0);
+    const tp2rr = direction === "BULLISH" ? confirmedEntry + (riskVal * 2.0) : confirmedEntry - (riskVal * 2.0);
 
     const targetPromptMsg = `Set Take-Profit (TP) Price:\n` +
       `- Standard 1:4 RR: ${target.toFixed(4)}\n` +
@@ -131,7 +138,7 @@ export default function Dashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           symbol: sbSymbol,
-          direction: sbResult.daily_bias,
+          direction: direction,
           entry_price: confirmedEntry,
           stop_loss: confirmedSl,
           take_profit: confirmedTarget,
@@ -405,8 +412,11 @@ export default function Dashboard() {
     if (monitoredCoins.length === 0) return;
 
     const intervalId = setInterval(async () => {
+      const currentCoins = [...monitoredCoins];
+      if (currentCoins.length === 0) return;
+
       const updated = await Promise.all(
-        monitoredCoins.map(async (coin) => {
+        currentCoins.map(async (coin) => {
           try {
             const sym = getTradingViewSymbol(coin.symbol);
             const cleanSym = sym.includes(":") ? sym.split(":")[1] : sym;
@@ -427,7 +437,20 @@ export default function Dashboard() {
           return coin;
         })
       );
-      setMonitoredCoins(updated);
+
+      setMonitoredCoins(prevCoins => {
+        // Only keep and update coins that are still in the list
+        return prevCoins.map(prevCoin => {
+          const match = updated.find(u => u.symbol === prevCoin.symbol);
+          return match ? {
+            ...prevCoin,
+            currentPrice: match.currentPrice,
+            pdh: match.pdh,
+            pdl: match.pdl,
+            open: match.open
+          } : prevCoin;
+        });
+      });
     }, 5000);
 
     return () => clearInterval(intervalId);
@@ -517,7 +540,7 @@ export default function Dashboard() {
   };
   const [smcLoading, setSmcLoading] = useState(false);
 
-  const handleRunSmcAnalysis = async () => {
+  const handleRunSmcAnalysis = async (addToWatchlist: boolean = false) => {
     setSmcLoading(true);
     try {
       const resPrice = await fetch(`${API_BASE}/market/price?symbol=${encodeURIComponent(smcSymbol.trim())}`);
@@ -612,34 +635,38 @@ export default function Dashboard() {
           `SMC Scalp trade එකක් බැවින් එක් trade එකකට උපරිම 0.5% - 1.0% ක් පමණක් අවදානමට ලක් කරන්න. උපරිම රඳවා ගැනීමේ කාලය: විනාඩි 10 - 15. Stop Loss: ${stopLoss.toFixed(2)}, Target: ${tp2.toFixed(2)}.`
       };
 
-      // Add to monitoredCoins watchlist
-      const coinSymbol = smcSymbol.toUpperCase().trim();
-      const existingIdx = monitoredCoins.findIndex((c: any) => c.symbol === coinSymbol);
-      const newMonitoredCoin = {
-        id: existingIdx >= 0 ? monitoredCoins[existingIdx].id : Date.now().toString(),
-        symbol: coinSymbol,
-        timeframe: smcTimeframe,
-        htfTrend: smcHtfTrend,
-        currentPrice: fetchedPrice,
-        open: fetchedOpen,
-        pdh: fetchedPdh,
-        pdl: fetchedPdl,
-        liquidityPoolsSwept: smcLiquidityPoolsSwept,
-        inducementSwept: smcInducementSwept,
-        swingValidated: smcSwingValidated,
-        bosConfirmed: smcBosConfirmed,
-        orderBlockMitigated: smcOrderBlockMitigated,
-        fvgMitigated: smcFvgMitigated,
-        ltfChoch: smcLtfChoch,
-        po3Phase: smcPo3Phase
-      };
+      // Add to monitoredCoins watchlist ONLY if explicitly requested
+      if (addToWatchlist) {
+        setMonitoredCoins(prevCoins => {
+          const coinSymbol = smcSymbol.toUpperCase().trim();
+          const existingIdx = prevCoins.findIndex((c: any) => c.symbol === coinSymbol);
+          const newMonitoredCoin = {
+            id: existingIdx >= 0 ? prevCoins[existingIdx].id : Date.now().toString(),
+            symbol: coinSymbol,
+            timeframe: smcTimeframe,
+            htfTrend: activeHtfTrend,
+            currentPrice: fetchedPrice,
+            open: fetchedOpen,
+            pdh: fetchedPdh,
+            pdl: fetchedPdl,
+            liquidityPoolsSwept: smcLiquidityPoolsSwept,
+            inducementSwept: smcInducementSwept,
+            swingValidated: smcSwingValidated,
+            bosConfirmed: smcBosConfirmed,
+            orderBlockMitigated: smcOrderBlockMitigated,
+            fvgMitigated: smcFvgMitigated,
+            ltfChoch: smcLtfChoch,
+            po3Phase: smcPo3Phase
+          };
 
-      if (existingIdx >= 0) {
-        const copy = [...monitoredCoins];
-        copy[existingIdx] = newMonitoredCoin;
-        setMonitoredCoins(copy);
-      } else {
-        setMonitoredCoins([...monitoredCoins, newMonitoredCoin]);
+          if (existingIdx >= 0) {
+            const copy = [...prevCoins];
+            copy[existingIdx] = newMonitoredCoin;
+            return copy;
+          } else {
+            return [...prevCoins, newMonitoredCoin];
+          }
+        });
       }
 
       setSmcResult(smcAnalysisData);
@@ -653,15 +680,51 @@ export default function Dashboard() {
   // Trigger SMC analysis/fetch automatically on timeframe changes
   useEffect(() => {
     if (smcSymbol && smcSymbol.length >= 3) {
-      handleRunSmcAnalysis();
+      handleRunSmcAnalysis(false);
     }
   }, [smcTimeframe]);
 
   const handleLogSmcTrade = async () => {
-    if (!smcResult || !smcResult.is_valid) return;
-    const entry = parseFloat(smcResult.entry_price_area?.match(/\d+(?:\.\d+)?/)?.[0] || "0");
-    const sl = parseFloat(smcResult.stop_loss_level || "0");
-    const target = parseFloat(smcResult.liquidity_target || "0");
+    if (!smcResult) return;
+
+    const direction = (smcResult.daily_bias === "BULLISH" || smcResult.daily_bias === "BEARISH") 
+      ? smcResult.daily_bias 
+      : smcHtfTrend;
+
+    const entry = parseFloat(smcResult.entry_price_area?.match(/\d+(?:\.\d+)?/)?.[0] || String(smcCurrentPrice || 0));
+    let sl = parseFloat(smcResult.stop_loss_level || "0");
+    if (isNaN(sl) || sl === 0) {
+      sl = direction === "BULLISH" ? entry * 0.9985 : entry * 1.0015;
+    }
+    let target = parseFloat(smcResult.liquidity_target || "0");
+    if (isNaN(target) || target === 0) {
+      target = direction === "BULLISH" ? entry + (entry - sl) * 3.0 : entry - (sl - entry) * 3.0;
+    }
+
+    // Confirm or edit trade values before logging
+    const confirmedEntryStr = prompt(`Confirm/Edit Entry Price for ${smcSymbol}:`, entry.toFixed(2));
+    if (confirmedEntryStr === null) return;
+    const confirmedEntry = parseFloat(confirmedEntryStr);
+    if (isNaN(confirmedEntry) || confirmedEntry <= 0) {
+      alert("Invalid Entry Price entered.");
+      return;
+    }
+
+    const confirmedSlStr = prompt(`Confirm/Edit Stop-Loss (SL) Price for ${smcSymbol}:`, sl.toFixed(2));
+    if (confirmedSlStr === null) return;
+    const confirmedSl = parseFloat(confirmedSlStr);
+    if (isNaN(confirmedSl) || confirmedSl <= 0) {
+      alert("Invalid Stop-Loss Price entered.");
+      return;
+    }
+
+    const confirmedTargetStr = prompt(`Confirm/Edit Take-Profit (TP) Price for ${smcSymbol}:`, target.toFixed(2));
+    if (confirmedTargetStr === null) return;
+    const confirmedTarget = parseFloat(confirmedTargetStr);
+    if (isNaN(confirmedTarget) || confirmedTarget <= 0) {
+      alert("Invalid Take-Profit Price entered.");
+      return;
+    }
 
     setLogLoading(true);
     try {
@@ -670,10 +733,10 @@ export default function Dashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           symbol: smcSymbol,
-          direction: smcResult.daily_bias,
-          entry_price: entry,
-          stop_loss: sl,
-          take_profit: target,
+          direction: direction,
+          entry_price: confirmedEntry,
+          stop_loss: confirmedSl,
+          take_profit: confirmedTarget,
           confidence: smcResult.confidence || 0
         })
       });
@@ -2493,7 +2556,7 @@ export default function Dashboard() {
                           <button
                             type="button"
                             onClick={handleLogTrade}
-                            disabled={logLoading || !sbResult || !sbResult.is_valid || (sbResult.daily_bias !== "BULLISH" && sbResult.daily_bias !== "BEARISH")}
+                            disabled={logLoading || !sbResult}
                             className="bg-emerald-600/20 hover:bg-emerald-600/30 disabled:opacity-40 disabled:hover:bg-emerald-600/20 border border-emerald-500/30 text-emerald-400 text-xs font-bold py-3 px-4 rounded-xl transition-all shadow-md flex items-center justify-center gap-1.5 md:col-span-2 cursor-pointer active:scale-95"
                           >
                             {logLoading ? "Logging Trade..." : "Log Trade 📈"}
@@ -3600,7 +3663,7 @@ export default function Dashboard() {
                         />
                         <button
                           type="button"
-                          onClick={handleRunSmcAnalysis}
+                          onClick={() => handleRunSmcAnalysis(false)}
                           className="bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/40 text-xs font-bold px-3 py-2 rounded-xl transition-all font-mono whitespace-nowrap cursor-pointer"
                         >
                           Fetch Price
@@ -3855,7 +3918,7 @@ export default function Dashboard() {
                     <div className="grid grid-cols-2 gap-3 mt-2">
                       <button
                         type="button"
-                        onClick={handleRunSmcAnalysis}
+                        onClick={() => handleRunSmcAnalysis(true)}
                         disabled={smcLoading}
                         className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs py-3 px-4 rounded-xl transition-all shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2 cursor-pointer"
                       >
@@ -3865,7 +3928,7 @@ export default function Dashboard() {
                       <button
                         type="button"
                         onClick={handleLogSmcTrade}
-                        disabled={logLoading || !smcResult || !smcResult.is_valid}
+                        disabled={logLoading || !smcResult}
                         className="bg-teal-600/20 hover:bg-teal-600/30 border border-teal-500/30 text-teal-400 font-bold text-xs py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40"
                       >
                         {logLoading ? "Logging..." : "Log SMC Trade 📈"}
@@ -4361,7 +4424,9 @@ export default function Dashboard() {
                                   ? "bg-rose-500/10 text-rose-400 border border-rose-500/20"
                                   : trade.status === "ACTIVE"
                                     ? "bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 animate-pulse"
-                                    : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                                    : trade.status === "INVALIDATED"
+                                      ? "bg-orange-500/10 text-orange-400 border border-orange-500/20"
+                                      : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
                             }`}>
                               {trade.status}
                             </span>
@@ -4377,6 +4442,7 @@ export default function Dashboard() {
                               <option value="RUNNING">RUNNING 🏃‍♂️</option>
                               <option value="WIN">WIN 🏆</option>
                               <option value="LOSS">LOSS ❌</option>
+                              <option value="INVALIDATED">INVALIDATED ❌</option>
                             </select>
                             
                             <button

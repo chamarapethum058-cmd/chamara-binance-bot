@@ -116,3 +116,10 @@ The bot must strictly enforce the following high-impact news rules:
 
 
 
+
+
+## 17. Counter-Bias Invalidation Protocol before Mitigation (New Rule)
+> [!IMPORTANT]
+> **COUNTER-BIAS INVALIDATION PROTOCOL BEFORE MITIGATION:**
+> 1. **Immediate Invalidation before Mitigation:** If a pending trade setup is logged but has not yet reached the entry price (pullback mitigation has not occurred), and a counter-market structure shift (e.g. Bearish CHoCH for a LONG setup, or Bullish CHoCH for a SHORT setup) occurs on the 1-minute (1m) or 3-minute (3m) chart, the setup must be immediately invalidated.
+> 2. **Journal State Update:** The status in the trade history must transition automatically to `INVALIDATED` and be locked out of execution to prevent stop-loss hits from counter-momentum.
