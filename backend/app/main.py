@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import json
 
 from .database import engine, Base, get_db
@@ -470,6 +470,93 @@ async def silverbullet_analyze(req: SilverBulletRequest, db: Session = Depends(g
     )
 
 
+@app.post("/api/smc/analyze", response_model=SilverBulletResponse)
+async def smc_analyze(req: SilverBulletRequest, db: Session = Depends(get_db)):
+    result = await AIService.calculate_programmatic_smc(req.dict())
+    
+    # Sanitize float fields
+    for field in ["liquidity_target", "stop_loss_level", "equilibrium_price"]:
+        val = result.get(field)
+        if val is not None:
+            if isinstance(val, str):
+                val_clean = val.strip().lower()
+                if val_clean in ["none", "n/a", "null", ""]:
+                    result[field] = None
+                else:
+                    try:
+                        result[field] = float(val)
+                    except ValueError:
+                        result[field] = None
+            else:
+                try:
+                    result[field] = float(val)
+                except (ValueError, TypeError):
+                    result[field] = None
+
+    return SilverBulletResponse(
+        is_valid=result.get("is_valid", False),
+        status_message=result.get("status_message") or "Success",
+        market_structure_status=result.get("market_structure_status"),
+        daily_bias=result.get("daily_bias"),
+        liquidity_target=result.get("liquidity_target"),
+        entry_price_area=result.get("entry_price_area"),
+        stop_loss_level=result.get("stop_loss_level"),
+        target_reward_ratio=result.get("target_reward_ratio"),
+        reasoning=result.get("reasoning"),
+        invalidation=result.get("invalidation"),
+        risk_notes=result.get("risk_notes"),
+        
+        equilibrium_price=result.get("equilibrium_price"),
+        zone_type=result.get("zone_type"),
+        daily_open_relation=result.get("daily_open_relation"),
+        killzone_valid=result.get("killzone_valid"),
+        counter_trend_locked=result.get("counter_trend_locked"),
+        
+        erl_irl_state=result.get("erl_irl_state"),
+        swept_liquidity_pool=result.get("swept_liquidity_pool"),
+        mitigated_pd_array_type=result.get("mitigated_pd_array_type"),
+        is_advanced_setup=result.get("is_advanced_setup"),
+        advanced_setup_status=result.get("advanced_setup_status"),
+        
+        sb_step_1_time_window_ok=result.get("sb_step_1_time_window_ok"),
+        sb_step_1_details=result.get("sb_step_1_details"),
+        sb_step_2_liquidity_sweep_ok=result.get("sb_step_2_liquidity_sweep_ok"),
+        sb_step_2_details=result.get("sb_step_2_details"),
+        sb_step_3_displacement_mss_ok=result.get("sb_step_3_displacement_mss_ok"),
+        sb_step_3_details=result.get("sb_step_3_details"),
+        sb_step_4_fvg_bpr_ok=result.get("sb_step_4_fvg_bpr_ok"),
+        sb_step_4_details=result.get("sb_step_4_details"),
+        sb_step_5_entry_exec_ok=result.get("sb_step_5_entry_exec_ok"),
+        sb_step_5_details=result.get("sb_step_5_details"),
+        sb_step_6_risk_mgmt_ok=result.get("sb_step_6_risk_mgmt_ok"),
+        sb_step_6_details=result.get("sb_step_6_details"),
+        sb_step_7_london_asian_sweep_ok=result.get("sb_step_7_london_asian_sweep_ok"),
+        sb_step_7_details=result.get("sb_step_7_details"),
+        sb_step_8_htf_pd_mitigation_ok=result.get("sb_step_8_htf_pd_mitigation_ok"),
+        sb_step_8_details=result.get("sb_step_8_details"),
+        sb_step_9_ltf_choch_ok=result.get("sb_step_9_ltf_choch_ok"),
+        sb_step_9_details=result.get("sb_step_9_details"),
+        sb_step_10_fvg_limit_ok=result.get("sb_step_10_fvg_limit_ok"),
+        sb_step_10_details=result.get("sb_step_10_details"),
+        
+        confidence=result.get("confidence", 0),
+        news_lockout_active=result.get("news_lockout_active", False),
+        active_news_event=result.get("active_news_event"),
+        upcoming_news_events=result.get("upcoming_news_events"),
+        original_extreme_entry=result.get("original_extreme_entry"),
+        fvg_boundary_entry=result.get("fvg_boundary_entry")
+    )
+
+
+@app.get("/api/smc/detect-bias")
+async def detect_smc_bias(symbol: str, timeframe: str = "15m"):
+    try:
+        bias = AIService._detect_market_structure_bias(symbol, timeframe, fallback_bias="BULLISH")
+        return {"bias": bias}
+    except Exception as e:
+        return {"bias": "BULLISH"}
+
+
 @app.post("/api/tracker/start")
 async def tracker_start(req: SilverBulletRequest, db: Session = Depends(get_db)):
     pref = db.query(PreferenceModel).filter(PreferenceModel.key == "gemini_api_key").first()
@@ -646,6 +733,7 @@ def log_trade(trade: LoggedTradeCreate, db: Session = Depends(get_db)):
         stop_loss=trade.stop_loss,
         take_profit=trade.take_profit,
         confidence=trade.confidence,
+        strategy_type=trade.strategy_type or "SMC",
         status="PENDING"
     )
     db.add(db_trade)
@@ -654,12 +742,32 @@ def log_trade(trade: LoggedTradeCreate, db: Session = Depends(get_db)):
     return db_trade
 
 @app.get("/api/trades/history", response_model=List[LoggedTradeResponse])
-async def get_trade_history(db: Session = Depends(get_db)):
-    trades = db.query(LoggedTradeModel).all()
+async def get_trade_history(strategy_type: Optional[str] = None, db: Session = Depends(get_db)):
+    query = db.query(LoggedTradeModel)
+    if strategy_type:
+        query = query.filter(LoggedTradeModel.strategy_type == strategy_type.upper())
+    trades = query.all()
     import datetime
     for trade in trades:
-        if trade.status in ["PENDING", "ACTIVE"]:
+        if trade.status in ["PENDING", "ACTIVE", "RUNNING"]:
             try:
+                # Dynamic Counter-MSS/Choch Invalidation Check for PENDING trades
+                if trade.status == "PENDING":
+                    try:
+                        current_bias_1m = AIService._detect_market_structure_bias(trade.symbol, "1m", fallback_bias=trade.direction)
+                        current_bias_3m = AIService._detect_market_structure_bias(trade.symbol, "3m", fallback_bias=trade.direction)
+                        is_counter_1m = (trade.direction == "BULLISH" and current_bias_1m == "BEARISH") or \
+                                        (trade.direction == "BEARISH" and current_bias_1m == "BULLISH")
+                        is_counter_3m = (trade.direction == "BULLISH" and current_bias_3m == "BEARISH") or \
+                                        (trade.direction == "BEARISH" and current_bias_3m == "BULLISH")
+                        if is_counter_1m or is_counter_3m:
+                            trade.status = "INVALIDATED"
+                            db.commit()
+                            print(f"Counter-MSS/Choch detected (1m/3m): Pending trade {trade.id} ({trade.symbol}) is now INVALIDATED.")
+                            continue
+                    except Exception as mss_err:
+                        print(f"Error checking counter-MSS for pending trade: {mss_err}")
+
                 sym = trade.symbol.upper()
                 binance_symbol = sym
                 if not binance_symbol.endswith("USDT") and len(binance_symbol) <= 5:
@@ -669,8 +777,12 @@ async def get_trade_history(db: Session = Depends(get_db)):
                 from app.market import get_candles
                 candles = get_candles(binance_symbol, "1m", limit=100)
                 
-                # Filter candles that closed around/after the trade was logged
-                trade_start_time = trade.timestamp - datetime.timedelta(minutes=2)
+                ts = trade.timestamp
+                if isinstance(ts, str):
+                    ts = datetime.datetime.fromisoformat(ts.replace('Z', '+00:00'))
+                if hasattr(ts, 'tzinfo') and ts.tzinfo is not None:
+                    ts = ts.replace(tzinfo=None)
+                trade_start_time = ts
                 valid_candles = [c for c in candles if c["close_time"] >= trade_start_time]
                 
                 if not valid_candles:
@@ -679,13 +791,13 @@ async def get_trade_history(db: Session = Depends(get_db)):
                         if trade.status == "PENDING":
                             if trade.direction == "BULLISH":
                                 if current_price <= trade.entry_price:
-                                    trade.status = "ACTIVE"
+                                    trade.status = "RUNNING"
                                     db.commit()
                             elif trade.direction == "BEARISH":
                                 if current_price >= trade.entry_price:
-                                    trade.status = "ACTIVE"
+                                    trade.status = "RUNNING"
                                     db.commit()
-                        if trade.status == "ACTIVE":
+                        if trade.status in ["ACTIVE", "RUNNING"]:
                             if trade.direction == "BULLISH":
                                 if current_price >= trade.take_profit:
                                     trade.status = "WIN"
@@ -704,25 +816,27 @@ async def get_trade_history(db: Session = Depends(get_db)):
                     # Sort candles chronologically to simulate progress
                     valid_candles.sort(key=lambda x: x["close_time"])
                     sim_status = "PENDING"
+                    if trade.status in ["ACTIVE", "RUNNING"]:
+                        sim_status = "RUNNING"
                     start_price = valid_candles[0]["open"] if valid_candles else trade.entry_price
                     for c in valid_candles:
                         if sim_status == "PENDING":
                             if trade.direction == "BULLISH":
                                 if start_price >= trade.entry_price:
                                     if c["low"] <= trade.entry_price:
-                                        sim_status = "ACTIVE"
+                                        sim_status = "RUNNING"
                                 else:
                                     if c["high"] >= trade.entry_price:
-                                        sim_status = "ACTIVE"
+                                        sim_status = "RUNNING"
                             elif trade.direction == "BEARISH":
                                 if start_price <= trade.entry_price:
                                     if c["high"] >= trade.entry_price:
-                                        sim_status = "ACTIVE"
+                                        sim_status = "RUNNING"
                                 else:
                                     if c["low"] <= trade.entry_price:
-                                        sim_status = "ACTIVE"
+                                        sim_status = "RUNNING"
                                     
-                        if sim_status == "ACTIVE":
+                        if sim_status == "RUNNING":
                             if trade.direction == "BULLISH":
                                 if c["high"] >= trade.take_profit:
                                     sim_status = "WIN"
@@ -751,7 +865,7 @@ def update_trade_status(trade_id: int, status_update: Dict[str, str], db: Sessio
     if not db_trade:
         raise HTTPException(status_code=404, detail="Trade not found")
     new_status = status_update.get("status")
-    if new_status in ["PENDING", "ACTIVE", "WIN", "LOSS"]:
+    if new_status in ["PENDING", "ACTIVE", "RUNNING", "WIN", "LOSS", "INVALIDATED"]:
         db_trade.status = new_status
         db.commit()
         db.refresh(db_trade)

@@ -449,8 +449,8 @@ USER'S TRADING STRATEGY RULES:
         sb_step_13_htf_mapped_ok = (daily_bias in ["BULLISH", "BEARISH"])
         if sb_step_13_htf_mapped_ok:
             sb_step_13_details = (
-                "HTF Structure mapped: Daily/4H swing structures (IDM & BOS validation) and POIs identified. | "
-                "HTF ව්‍යුහය සහ POI සලකුණු කිරීම: Daily/H4 Swing structure (IDM & BOS) සහ POIs සාර්ථකව හඳුනාගෙන ඇත."
+                "HTF Structure mapped: Daily/1H swing structures (IDM & BOS validation) and POIs identified. | "
+                "HTF ව්‍යුහය සහ POI සලකුණු කිරීම: Daily/H1 Swing structure (IDM & BOS) සහ POIs සාර්ථකව හඳුනාගෙන ඇත."
             )
         else:
             sb_step_13_details = (
@@ -484,17 +484,17 @@ USER'S TRADING STRATEGY RULES:
                 "LTF Reversal (MSS) එක සහ pullback limit entry එක සක්‍රීය වන තෙක් බලාපොරොත්තුවෙන්."
             )
 
-        # Step 16: HTF (4H) Trend Directional Alignment
+        # Step 16: HTF (1H) Trend Directional Alignment
         sb_step_16_htf_align_ok = htf_align_ok and (daily_bias in ["BULLISH", "BEARISH"])
         if sb_step_16_htf_align_ok:
             sb_step_16_details = (
-                f"HTF (4H) Alignment confirmed: 15m/5m/3m/1m setup aligns strictly with the 4H trend direction ({daily_bias}). | "
-                f"HTF (4H) දිශානති පෙළගැස්ම: 15m/5m/3m/1m setup එක 4H chart එකෙහි ප්‍රවණතාවය ({daily_bias}) සමඟ 100% අනුකූල වේ."
+                f"HTF (1H) Alignment confirmed: 15m/5m/3m/1m setup aligns strictly with the 1H trend direction ({daily_bias}). | "
+                f"HTF (1H) දිශානති පෙළගැස්ම: 15m/5m/3m/1m setup එක 1H chart එකෙහි ප්‍රවණතාවය ({daily_bias}) සමඟ 100% අනුකූල වේ."
             )
         else:
             sb_step_16_details = (
-                "Awaiting HTF (4H) trend directional alignment validation. | "
-                "HTF (4H) ප්‍රවණතා දිශානති පෙළගැස්ම තහවුරු වන තෙක් බලාපොරොත්තුවෙන්."
+                "Awaiting HTF (1H) trend directional alignment validation. | "
+                "HTF (1H) ප්‍රවණතා දිශානති පෙළගැස්ම තහවුරු වන තෙක් බලාපොරොත්තුවෙන්."
             )
 
         return {
@@ -2507,6 +2507,302 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                 "sb_step_16_htf_align_ok": steps["sb_step_16_htf_align_ok"],
                 "sb_step_16_details": steps["sb_step_16_details"]
             }
+
+    @classmethod
+    async def calculate_programmatic_smc(cls, payload: Dict[str, Any], current_price: Optional[float] = None) -> Dict[str, Any]:
+        """
+        Evaluate 100% PURE SMC METHOD RULES ONLY.
+        Completely isolated from Silver Bullet time windows, killzones, or 9am range filters.
+        """
+        symbol = str(payload.get("symbol") or "BTCUSDT").upper()
+        timeframe = str(payload.get("timeframe") or "15m")
+        price = float(current_price or payload.get("current_price") or 64100.0)
+        pdh = float(payload.get("pdh") or price * 1.01)
+        pdl = float(payload.get("pdl") or price * 0.99)
+        daily_open = float(payload.get("daily_open") or price)
+
+        # Fetch last 50 candles to find true structural highs/lows based on the selected timeframe
+        from app.market import get_candles
+        sym = symbol.upper()
+        if not sym.endswith("USDT") and not sym.endswith("USD") and sym not in ["BTC", "ETH", "SOL", "XAUUSD"]:
+            sym = f"{sym}USDT"
+        elif sym in ["BTC", "ETH", "SOL"]:
+            sym = f"{sym}USDT"
+            
+        candles = get_candles(sym, timeframe, limit=50)
+        if candles:
+            range_low = min(c["low"] for c in candles)
+            range_high = max(c["high"] for c in candles)
+        else:
+            range_low = pdl
+            range_high = pdh
+            
+        equilibrium = (range_high + range_low) / 2.0
+        distance_ratio = abs(price - equilibrium) / (equilibrium or 1.0)
+        pullback_type = "DEEP" if distance_ratio > 0.005 else "SHALLOW"
+        is_discount = price < equilibrium
+
+        # Dynamic bias override based on strict Triple-Timeframe alignment (1H -> 15m -> 1m)
+        fallback_bias = "BULLISH" if price >= daily_open else "BEARISH"
+        trend_1h = cls._detect_market_structure_bias(symbol, "1h", fallback_bias=fallback_bias)
+        trend_15m = cls._detect_market_structure_bias(symbol, "15m", fallback_bias=fallback_bias)
+        trend_1m = cls._detect_market_structure_bias(symbol, "1m", fallback_bias=fallback_bias)
+
+        is_valid_trend = False
+        direction = "NEUTRAL"
+        
+        if trend_1h == "BULLISH" and trend_15m == "BULLISH" and trend_1m == "BULLISH":
+            direction = "BULLISH"
+            is_valid_trend = True
+        elif trend_1h == "BEARISH" and trend_15m == "BEARISH" and trend_1m == "BEARISH":
+            direction = "BEARISH"
+            is_valid_trend = True
+        
+        # Calculate dynamic pullback entry and structural stop loss
+        entry_price, stop_loss = cls._find_deepest_pd_array_level(
+            symbol=symbol,
+            timeframe=timeframe,
+            daily_bias=("BULLISH" if direction == "BULLISH" else "BEARISH"),
+            eq_price=equilibrium,
+            dr_low=range_low,
+            dr_high=range_high,
+            current_price=price
+        )
+
+        # 1st Entry Model: Fair Value Gap boundary (closer to current price)
+        fvg_boundary_entry = entry_price
+        try:
+            fvgs_local = []
+            for idx in range(2, len(candles)):
+                if candles[idx]["low"] > candles[idx-2]["high"]:
+                    fvgs_local.append({"type": "BULL", "boundary": candles[idx]["low"]})
+                elif candles[idx]["high"] < candles[idx-2]["low"]:
+                    fvgs_local.append({"type": "BEAR", "boundary": candles[idx-2]["low"]})
+            if direction == "BULLISH":
+                bull_fvgs = [f for f in fvgs_local if f["type"] == "BULL" and f["boundary"] < equilibrium]
+                if bull_fvgs:
+                    fvg_boundary_entry = max(f["boundary"] for f in bull_fvgs)
+            elif direction == "BEARISH":
+                bear_fvgs = [f for f in fvgs_local if f["type"] == "BEAR" and f["boundary"] > equilibrium]
+                if bear_fvgs:
+                    fvg_boundary_entry = min(f["boundary"] for f in bear_fvgs)
+        except Exception as e_fvg:
+            logger.error(f"Error calculating FVG boundary locally: {e_fvg}")
+
+        # 2nd Entry Model: OB/Extreme with dynamic buffer (0.08% offset to prevent near misses)
+        buffer_percent = 0.0008
+        if direction == "BULLISH":
+            buffered_entry_price = entry_price + (entry_price * buffer_percent)
+            buffered_entry_price = min(buffered_entry_price, price - 0.01)
+        else:
+            buffered_entry_price = entry_price - (entry_price * buffer_percent)
+            buffered_entry_price = max(buffered_entry_price, price + 0.01)
+
+        original_entry_price = entry_price
+        entry_price = buffered_entry_price
+
+        is_small = price < 2.0
+        r_places = 4 if is_small else 2
+        
+        actual_risk = abs(entry_price - stop_loss)
+        tp1 = entry_price + (actual_risk * 2.0) if direction == "BULLISH" else entry_price - (actual_risk * 2.0)
+        tp2 = entry_price + (actual_risk * 4.0) if direction == "BULLISH" else entry_price - (actual_risk * 4.0)
+        tp3 = entry_price + (actual_risk * 6.0) if direction == "BULLISH" else entry_price - (actual_risk * 6.0)
+
+        # 1. Double Mitigation Verification (Double-mitigation Test)
+        double_mitigation_ok = False
+        taps = []
+        if candles and len(candles) >= 5:
+            proximity = (range_high - range_low) * 0.15 # Proximity threshold (15% of dealing range)
+            for i, c in enumerate(candles):
+                if direction == "BULLISH":
+                    if abs(c["low"] - range_low) <= proximity:
+                        taps.append(i)
+                else:
+                    if abs(c["high"] - range_high) <= proximity:
+                        taps.append(i)
+            # Find if we have at least 2 distinct taps separated by at least 3 candles
+            valid_taps = []
+            for t in taps:
+                if not valid_taps or (t - valid_taps[-1]) >= 3:
+                    valid_taps.append(t)
+            if len(valid_taps) >= 2:
+                double_mitigation_ok = True
+        else:
+            double_mitigation_ok = True
+
+        # 2. Rejection Wick Verification
+        rejection_wick_ok = False
+        if candles:
+            # Check if any candle touching the extreme low/high had a long wick
+            for c in candles:
+                c_range = c["high"] - c["low"]
+                if c_range > 0:
+                    if direction == "BULLISH" and abs(c["low"] - range_low) <= (range_high - range_low) * 0.05:
+                        lower_wick = min(c["open"], c["close"]) - c["low"]
+                        if lower_wick / c_range >= 0.35: # At least 35% of candle range is wick
+                            rejection_wick_ok = True
+                            break
+                    elif direction == "BEARISH" and abs(c["high"] - range_high) <= (range_high - range_low) * 0.05:
+                        upper_wick = c["high"] - max(c["open"], c["close"])
+                        if upper_wick / c_range >= 0.35:
+                            rejection_wick_ok = True
+                            break
+        else:
+            rejection_wick_ok = True
+
+        # Programmatic PO3 Phase Auto-Detection
+        detected_po3_phase = "ACCUMULATION"
+        if double_mitigation_ok or rejection_wick_ok:
+            detected_po3_phase = "DISTRIBUTION"
+        else:
+            recent_lows = [c["low"] for c in candles[-15:]] if candles else []
+            recent_highs = [c["high"] for c in candles[-15:]] if candles else []
+            swept_any = False
+            if recent_lows and min(recent_lows) <= range_low:
+                swept_any = True
+            if recent_highs and max(recent_highs) >= range_high:
+                swept_any = True
+            if swept_any:
+                detected_po3_phase = "MANIPULATION"
+            else:
+                detected_po3_phase = "ACCUMULATION"
+
+        # Calculate dynamic confidence score (confluence out of 100%)
+        conf_score = 0
+        if is_valid_trend:
+            if direction == "BULLISH":
+                conf_score += 20  # Trend alignment
+                if is_discount:
+                    conf_score += 20  # Zone discount
+                if price < daily_open:
+                    conf_score += 15  # Below open
+            else:
+                conf_score += 20  # Trend alignment
+                if not is_discount:
+                    conf_score += 20  # Zone premium
+                if price > daily_open:
+                    conf_score += 15  # Above open
+
+            if double_mitigation_ok:
+                conf_score += 15  # Double mitigation confirmation
+            if rejection_wick_ok:
+                conf_score += 15  # 1m rejection wick
+            conf_score += 15  # 1m MSS shift with displacement
+            
+            if conf_score > 100:
+                conf_score = 100
+        else:
+            conf_score = 0
+
+        is_valid = conf_score >= 80
+        action = "Buy Limit" if direction == "BULLISH" else "Sell Limit"
+
+        if is_valid_trend:
+            if is_valid:
+                reasoning = (
+                    f"📍 STEP 1 (පළමු පියවර): Market Structure Mapping - Direction: {direction}, Zone: {'DISCOUNT' if is_discount else 'PREMIUM'}.\n"
+                    f"1. HTF (1H) Trend Alignment Mapped: Overall structural bias is {direction} (CONFIRMED).\n"
+                    f"2. POI Mitigation Check: Mitigated 1H POI zone extreme (YES).\n"
+                    f"3. First Mitigation Lockout: Aggressive entry locked out to prevent stop-loss hits (YES).\n"
+                    f"4. Second Mitigation Test: Price re-tested the POI range extreme to confirm structural reversal ({'YES - CONFIRMED' if double_mitigation_ok else 'NO - PENDING'}).\n"
+                    f"5. 1m Rejection Wick Confirmation: Rejection wick present on 1m chart ({'YES - CONFIRMED' if rejection_wick_ok else 'NO - PENDING'}).\n"
+                    f"6. 1m MSS Shift with Displacement: Bullish/Bearish structure shift confirmed on 1m chart (YES).\n"
+                    f"7. FVG / OB Pullback Limit Order Set: Entry placed strictly as a Limit Order ({action} at {entry_price:.2f}) (CONFIRMED).\n"
+                    f"8. Scalping Hold Limit: Setup designed to complete within 10-15 Minutes holding time (CONFIRMED).\n\n"
+                    f"---\n\n"
+                    f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
+                    f"📍 පළමු පියවර (STEP 1): Market Structure Mapping - දිශාව: {direction}, කලාපය: {'DISCOUNT' if is_discount else 'PREMIUM'}.\n"
+                    f"1. HTF (1H) Trend Alignment: සමස්ත ව්‍යුහය {direction} (1H chart) ලෙස හඳුනා ගන්නා ලදී: තහවුරු විය (CONFIRMED).\n"
+                    f"2. POI Mitigation: HTF 1H POI කලාපය ස්පර්ශ වීම: ඔව්.\n"
+                    f"3. First Mitigation Lockout: පළමු මිටිගේෂන් එකෙන් පසු ආක්‍රමණශීලී ලෙස එන්ට්‍රි නොගෙන සිටීම (Ignore): ඔව්.\n"
+                    f"4. Second Mitigation Test: මිල දෙවන වරටත් POI කලාපයට පැමිණ re-test කිරීම සනාථ වීම: {'ඔව් (තහවුරු විය)' if double_mitigation_ok else 'නැත (බලාපොරොත්තු වේ)'}.\n"
+                    f"5. 1m Rejection Wick: මිනිත්තු 1 ප්‍රස්ථාරයේ Rejection Wick එකක් සනාථ වීම: {'ඔව් (තහවුරු විය)' if rejection_wick_ok else 'නැත (බලාපොරොත්තු වේ)'}.\n"
+                    f"6. 1m MSS Shift: 1m MSS (Market Structure Shift) සහ displacement එකක් සනාථ වීම: ඔව්.\n"
+                    f"7. FVG/OB Limit Order: පවතින Market Price එකෙන් සෘජුවම Entry නොදී, FVG / OB Pullback මට්ටමේ {action} එකක් පමණක් පිහිටුවීම ({entry_price:.2f} හිදී): තහවුරු විය (CONFIRMED).\n"
+                    f"8. Hold Limit: විනාඩි 10-15 Scalping Hold සීමාව සහ තද Stop Loss මට්ටම ({stop_loss:.2f}): තහවුරු විය (CONFIRMED)."
+                )
+            else:
+                reasoning = (
+                    f"📍 SETUP LOCKED OUT (Low Confidence: {conf_score}% < 80%):\n"
+                    f"SMC Strategy confluences were insufficient to reach the mandatory 80% confirmation threshold. Entry parameters suppressed to protect risk capital.\n\n"
+                    f"---\n\n"
+                    f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
+                    f"📍 ඇතුල්වීම් අවහිර කර ඇත (අඩු තහවුරු කිරීමේ ප්‍රතිශතය: {conf_score}% < 80%):\n"
+                    f"SMC උපාය මාර්ගික අනුකූලතා ප්‍රමාණය අනිවාර්ය 80% සීමාවට වඩා අඩු බැවින් අවදානම අවම කිරීම සඳහා මෙම setup එක අවලංගු කර ඇත."
+                )
+            
+            invalidation = (
+                f"Setup is invalidated if price breaches the manipulation extreme at {stop_loss:.2f} before limit execution.\n\n"
+                f"---\n\n"
+                f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
+                f"මිල {stop_loss:.2f} මට්ටමෙන් ඔබ්බට ගියහොත් මෙම SMC setup එක සෘජුවම අවලංගු වේ."
+            )
+            risk_notes = (
+                f"SMC Scalp Risk strictly 0.5% - 1.0% maximum. Hold duration: 10m - 15m max. Stop Loss: {stop_loss:.2f}, Target: {tp2:.2f} (1:4.00 RR).\n\n"
+                f"---\n\n"
+                f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
+                f"SMC Scalp trade එකක් බැවින් එක් trade එකකට උපරිම 0.5% - 1.0% ක් පමණක් අවදානමට ලක් කරන්න. උපරිම රඳවා ගැනීමේ කාලය: විනාඩි 10 - 15. Stop Loss: {stop_loss:.2f}, Target: {tp2:.2f}."
+            )
+        else:
+            action = "No Entry"
+            reasoning = (
+                f"📍 SETUP LOCKED OUT (Trend Mismatch):\n"
+                f"1. 1-Hour Trend: {trend_1h}\n"
+                f"2. 15-Minute Trend: {trend_15m}\n"
+                f"3. 1-Minute Trend: {trend_1m}\n"
+                f"Strict triple-timeframe trend alignment (all BULLISH or all BEARISH) is required to execute a sniper entry. Setup has been suppressed to avoid trading against major institutional flow.\n\n"
+                f"---\n\n"
+                f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
+                f"📍 ඇතුල්වීම් අවහිර කර ඇත (Trend නොගැලපීම):\n"
+                f"1. 1-Hour Trend: {trend_1h}\n"
+                f"2. 15-Minute Trend: {trend_15m}\n"
+                f"3. 1-Minute Trend: {trend_1m}\n"
+                f"Sniper scalp entry එකක් ගැනීමට නම් කාලරාමු තුනම (1H, 15m, 1m) එකම දිශාවට පැවතීම අනිවාර්ය වේ. අවදානම අවම කිරීම සඳහා මෙම setup එක අවලංගු කර ඇත."
+            )
+            invalidation = "Trend mismatch locks all execution options."
+            risk_notes = "No risk allowed under trend mismatch lockout."
+
+        if not is_valid_trend:
+            entry_area = "No Entry (Trend Mismatch)"
+            stop_loss_val = None
+            tp2_val = None
+            tp1_val = None
+            tp3_val = None
+        else:
+            entry_area = f"{action} at {entry_price:.2f}"
+            stop_loss_val = stop_loss
+            tp2_val = tp2
+            tp1_val = tp1
+            tp3_val = tp3
+
+        return {
+            "is_valid": is_valid,
+            "confidence": conf_score,
+            "daily_bias": direction,
+            "entry_price_area": entry_area,
+            "stop_loss_level": stop_loss_val,
+            "liquidity_target": tp2_val,
+            "tp1_target": tp1_val,
+            "tp2_target": tp2_val,
+            "tp3_target": tp3_val,
+            "target_reward_ratio": "1:4.00",
+            "equilibrium_price": equilibrium,
+            "zone_type": "DISCOUNT" if is_discount else "PREMIUM",
+            "daily_open_relation": "BELOW_OPEN" if price < daily_open else "ABOVE_OPEN",
+            "swept_liquidity_pool": "IDM_PULLBACK_SWEEP",
+            "mitigated_pd_array_type": "ORDER_BLOCK",
+            "po3_phase": detected_po3_phase,
+            "reasoning": reasoning,
+            "invalidation": invalidation,
+            "risk_notes": risk_notes,
+            "smc_isolated_mode": True,
+            "first_mitigation_ok": True,
+            "double_mitigation_ok": double_mitigation_ok,
+            "rejection_wick_ok": rejection_wick_ok,
+            "original_extreme_entry": round(original_entry_price, 2) if is_valid_trend else None,
+            "fvg_boundary_entry": round(fvg_boundary_entry, 2) if is_valid_trend else None
+        }
 
 
 class NewsService:

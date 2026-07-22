@@ -40,11 +40,11 @@ The bot must track the following session hours mapped between New York Time and 
 5. **Asian Liquidity Sweep & HTF Array:** Confirm that Asian Session liquidity is swept during the London Open window, and HTF PD Array (PDL, PDH, PWH, PWL, HTF-FVG, HTF-OB, HTF-BB) is mitigated.
 6. **Checklist Validation:** All 6 steps must evaluate individually and dynamically in the Validation Tree.
 
-## 6. 70% Minimum Confirmation Rate Constraint
+## 6. 80% Minimum Confirmation Rate Constraint
 The bot must strictly enforce the following confidence scoring boundaries:
 1. **Confidence Score Calculation:** Calculate a strategy confidence score out of 100% based on rule confluences (Trend alignment: 20%, Optimal matrix zone discount/premium: 20%, Daily Open alignment: 15%, Active Silver Bullet window: 15%, Wick Liquidity sweep: 15%, and LTF Shift/MSS with FVG: 15%).
-2. **70% Minimum Filter:** Only deliver trade setups that achieve a confidence score of 70% or higher.
-3. **Low-Confidence Entry Lockout:** If confidence is below 70%, the bot must suppress and lockout the setup, returning "No Entry (Confidence < 70%)" to prevent low-probability trades and shield the user from unnecessary stop losses. Display this confirmation percentage on the frontend page next to the Entry Price Area card.
+2. **80% Minimum Filter:** Only deliver trade setups that achieve a confidence score of 80% or higher.
+3. **Low-Confidence Entry Lockout:** If confidence is below 80%, the bot must suppress and lockout the setup, returning "No Entry (Confidence < 80%)" to prevent low-probability trades and shield the user from unnecessary stop losses. Display this confirmation percentage on the frontend page next to the Entry Price Area card.
 
 ## 7. Automated Economic News Lockout Constraint
 The bot must strictly enforce the following high-impact news rules:
@@ -103,12 +103,15 @@ The bot must strictly enforce the following high-impact news rules:
 > 3. **Lower High (LH) Rule:** The highest point reached by the price between the previous confirmed Lower Low and the new candle body close that caused the BOS is marked as the valid Lower High (LH).
 > 4. **Sub-structure vs Major Structure Filter:** Internal pullback channels (corrective flags) must not be mapped as major swings. Only breaks of major validated Lower Highs/Swing Highs qualify as structural shift reversals (MSS/Choch).
 
-## 16. Higher Timeframe (4H) Directional Alignment Protocol (New Rule)
+## 16. Higher Timeframe (1H) Directional Alignment Protocol (New Rule)
 > [!IMPORTANT]
-> **HTF (4H) DIRECTIONAL ALIGNMENT RULES:**
-> 1. **Baseline Trend Timeframe:** Use the 4-Hour (4H) chart as the primary Higher Timeframe (HTF) trend reference to establish Daily Bias.
-> 2. **Strict Directional Lockout:** When the 4H chart is in a downtrend (bearish market structure), only Sell setups are allowed on lower timeframes (15m/5m/3m/1m). All Buy setups must be suppressed. When the 4H chart is in an uptrend (bullish market structure), only Buy setups are allowed on lower timeframes, and all Sell setups must be suppressed. Counter-trend executions are strictly forbidden to ensure high-accuracy setups (90-100% accuracy rate).
-> 3. **Timeframe Drilling Sequence:** Analyze 4H (HTF Bias & POI) -> 15m/5m (LTF Structure & Pullback mapping) -> 15m/3m/1m (LTF Entry confirmations).
+> **HTF (1H) DIRECTIONAL ALIGNMENT RULES:**
+> 1. **Baseline Trend Timeframe:** Use the 1-Hour (1H) chart as the primary Higher Timeframe (HTF) trend reference to establish Daily Bias.
+> 2. **Strict Triple-Timeframe Alignment Lockout:** When executing a 1-minute (1m) scalp sniper entry:
+>    - **Buy setup (Uptrend):** Allowed ONLY when 1H, 15m, and 1m trends are all BULLISH (Uptrend).
+>    - **Sell setup (Downtrend):** Allowed ONLY when 1H, 15m, and 1m trends are all BEARISH (Downtrend).
+>    - **Strict Lockout:** If there is any mismatch (e.g., 1H is BULLISH but 15m or 1m is BEARISH), the setup must be immediately suppressed and locked out (`No Entry`) to protect against counter-market momentum.
+> 3. **Timeframe Drilling Sequence:** Analyze 1H (HTF Bias & POI) -> 15m (LTF Structure & Pullback mapping) -> 1m (LTF Entry confirmations).
 
 
 

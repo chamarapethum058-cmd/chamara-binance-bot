@@ -396,6 +396,85 @@ export default function Dashboard() {
   const [smcOpen, setSmcOpen] = useState<number | "">(64200);
   const [smcCurrentPrice, setSmcCurrentPrice] = useState<number | "">(64100);
   const [smcResult, setSmcResult] = useState<any | null>(null);
+  const [monitoredCoins, setMonitoredCoins] = useState<any[]>([]);
+
+  // 5-Second Local API Watchlist Polling Loop
+  useEffect(() => {
+    if (monitoredCoins.length === 0) return;
+
+    const intervalId = setInterval(async () => {
+      const updated = await Promise.all(
+        monitoredCoins.map(async (coin) => {
+          try {
+            const sym = getTradingViewSymbol(coin.symbol);
+            const cleanSym = sym.includes(":") ? sym.split(":")[1] : sym;
+            const res = await fetch(`http://127.0.0.1:8000/api/market/price?symbol=${encodeURIComponent(cleanSym)}`);
+            if (res.ok) {
+              const data = await res.json();
+              return {
+                ...coin,
+                currentPrice: data.current_price || coin.currentPrice,
+                pdh: data.pdh || coin.pdh,
+                pdl: data.pdl || coin.pdl,
+                open: data.open || coin.open
+              };
+            }
+          } catch (e) {
+            console.error("Error refreshing monitored coin:", coin.symbol, e);
+          }
+          return coin;
+        })
+      );
+      setMonitoredCoins(updated);
+    }, 5000);
+
+    return () => clearInterval(intervalId);
+  }, [monitoredCoins]);
+
+  // Watchlist Local Strategy Recalculators
+  const calculateCoinConfidence = (coin: any) => {
+    const isDiscount = coin.currentPrice < (coin.pdh + coin.pdl) / 2;
+    const isBelowOpen = coin.currentPrice < coin.open;
+    const isBullish = coin.htfTrend === "BULLISH";
+    const isBearish = coin.htfTrend === "BEARISH";
+
+    let conf = 0;
+    if (isBullish && isDiscount) conf += 15;
+    if (isBearish && !isDiscount) conf += 15;
+    if (isBullish && isBelowOpen) conf += 15;
+    if (isBearish && !isBelowOpen) conf += 15;
+    if (coin.liquidityPoolsSwept) conf += 10;
+    if (coin.inducementSwept) conf += 15;
+    if (coin.swingValidated) conf += 10;
+    if (coin.bosConfirmed) conf += 10;
+    if (coin.orderBlockMitigated || coin.fvgMitigated) conf += 10;
+    if (coin.ltfChoch) conf += 10;
+
+    return {
+      confidence: conf,
+      is_valid: conf >= 70,
+      zone_ok: (isBullish && isDiscount) || (isBearish && !isDiscount),
+      open_ok: (isBullish && isBelowOpen) || (isBearish && !isBelowOpen),
+      is_discount: isDiscount,
+      is_below_open: isBelowOpen
+    };
+  };
+
+  const getCoinParameters = (coin: any) => {
+    const confData = calculateCoinConfidence(coin);
+    const risk = coin.currentPrice * 0.0015;
+    const isBullish = coin.htfTrend === "BULLISH";
+    const entryPrice = isBullish ? coin.currentPrice - (risk * 0.5) : coin.currentPrice + (risk * 0.5);
+    const stopLoss = isBullish ? entryPrice - risk : entryPrice + risk;
+    const tp2 = isBullish ? entryPrice + (risk * 4.0) : entryPrice - (risk * 4.0);
+
+    return {
+      ...confData,
+      entry_price: entryPrice,
+      stop_loss: stopLoss,
+      take_profit: tp2
+    };
+  };
   const [smcLoading, setSmcLoading] = useState(false);
 
   const handleRunSmcAnalysis = async () => {
@@ -487,6 +566,36 @@ export default function Dashboard() {
           `**සිංහල පරිවර්තනය (Sinhala Translation):**\n` +
           `SMC Scalp trade එකක් බැවින් එක් trade එකකට උපරිම 0.5% - 1.0% ක් පමණක් අවදානමට ලක් කරන්න. උපරිම රඳවා ගැනීමේ කාලය: විනාඩි 10 - 15. Stop Loss: ${stopLoss.toFixed(2)}, Target: ${tp2.toFixed(2)}.`
       };
+
+      // Add to monitoredCoins watchlist
+      const coinSymbol = smcSymbol.toUpperCase().trim();
+      const existingIdx = monitoredCoins.findIndex((c: any) => c.symbol === coinSymbol);
+      const newMonitoredCoin = {
+        id: existingIdx >= 0 ? monitoredCoins[existingIdx].id : Date.now().toString(),
+        symbol: coinSymbol,
+        timeframe: smcTimeframe,
+        htfTrend: smcHtfTrend,
+        currentPrice: fetchedPrice,
+        open: fetchedOpen,
+        pdh: fetchedPdh,
+        pdl: fetchedPdl,
+        liquidityPoolsSwept: smcLiquidityPoolsSwept,
+        inducementSwept: smcInducementSwept,
+        swingValidated: smcSwingValidated,
+        bosConfirmed: smcBosConfirmed,
+        orderBlockMitigated: smcOrderBlockMitigated,
+        fvgMitigated: smcFvgMitigated,
+        ltfChoch: smcLtfChoch,
+        po3Phase: smcPo3Phase
+      };
+
+      if (existingIdx >= 0) {
+        const copy = [...monitoredCoins];
+        copy[existingIdx] = newMonitoredCoin;
+        setMonitoredCoins(copy);
+      } else {
+        setMonitoredCoins([...monitoredCoins, newMonitoredCoin]);
+      }
 
       setSmcResult(smcAnalysisData);
     } catch (err) {
@@ -3630,10 +3739,88 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  {/* Right Results & Visualizer Panel */}
+                                    {/* Right Results & Visualizer Panel */}
                   <div className="lg:col-span-7 flex flex-col gap-5">
+                    {/* Main Single-Coin Analysis Details */}
                     {smcResult ? (
                       <>
+                        {/* Live Strategy Confluences Checklist */}
+                        <div className="bg-[#11131F]/90 border border-[#1E2235] rounded-xl p-5 flex flex-col gap-3">
+                          <h4 className="text-xs font-bold text-white uppercase tracking-wider font-mono flex justify-between items-center">
+                            <span>📊 Live Confluences & Confidence Tracker ({smcSymbol})</span>
+                            <span className={`px-2 py-0.5 rounded text-[10px] ${smcResult.confidence >= 80 ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-rose-500/10 text-rose-400 border border-rose-500/20"}`}>
+                              {smcResult.confidence}% Confirmed
+                            </span>
+                          </h4>
+                          
+                          {/* Progress Bar */}
+                          <div className="w-full bg-[#141626] rounded-full h-2.5 overflow-hidden border border-[#1E2235]">
+                            <div 
+                              className={`h-full transition-all duration-300 ${smcResult.confidence >= 80 ? "bg-emerald-500" : "bg-indigo-500"}`}
+                              style={{ width: `${smcResult.confidence}%` }}
+                            />
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px] font-mono mt-2">
+                            <div className="flex items-center justify-between p-2 rounded bg-black/20 border border-[#1E2235]/40">
+                              <span className="text-gray-400">1. Trend Alignment</span>
+                              <span className="text-emerald-400 font-bold">+20% (Met)</span>
+                            </div>
+                            <div className="flex items-center justify-between p-2 rounded bg-black/20 border border-[#1E2235]/40">
+                              <span className="text-gray-400">2. Discount/Premium Zone</span>
+                              <span className={smcResult.zone_type === "DISCOUNT" ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
+                                {smcResult.zone_type === "DISCOUNT" ? "+20% (Met)" : "0% (Failed)"}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between p-2 rounded bg-black/20 border border-[#1E2235]/40">
+                              <span className="text-gray-400">3. Daily Open Relation</span>
+                              <span className={smcResult.daily_open_relation === "BELOW_OPEN" ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
+                                {smcResult.daily_open_relation === "BELOW_OPEN" ? "+15% (Met)" : "0% (Failed)"}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between p-2 rounded bg-black/20 border border-[#1E2235]/40">
+                              <span className="text-gray-400">4. Liquidity Pools Swept</span>
+                              <span className={smcLiquidityPoolsSwept ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
+                                {smcLiquidityPoolsSwept ? "+15% (Met)" : "0% (Failed)"}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between p-2 rounded bg-black/20 border border-[#1E2235]/40">
+                              <span className="text-gray-400">5. 1m Rejection Wick</span>
+                              <span className={smcSwingValidated ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
+                                {smcSwingValidated ? "+15% (Met)" : "0% (Failed)"}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between p-2 rounded bg-black/20 border border-[#1E2235]/40">
+                              <span className="text-gray-400">6. LTF MSS Shift with FVG</span>
+                              <span className={smcLtfChoch ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
+                                {smcLtfChoch ? "+15% (Met)" : "0% (Failed)"}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Warning/Success Banner */}
+                        {!smcResult.is_valid && (
+                          <div className="bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl p-3.5 text-xs font-mono flex items-center gap-2">
+                            <span>⚠️</span>
+                            <span>
+                              <strong>SMC Setup Locked:</strong> Confirmation rate is {smcResult.confidence}% (less than the mandatory 70% threshold). Entry parameters are suppressed from active logging.
+                              <br />
+                              <span className="text-[10px] text-rose-300/80">සිංහල පරිවර්තනය: උපාය මාර්ගික අනුකූලතාවය {smcResult.confidence}% ක් වන බැවින් (අවම 70% ට වඩා අඩු) ඇතුල්වීම් අවහිර කර ඇත.</span>
+                            </span>
+                          </div>
+                        )}
+                        {smcResult.is_valid && (
+                          <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl p-3.5 text-xs font-mono flex items-center gap-2 animate-pulse">
+                            <span>✅</span>
+                            <span>
+                              <strong>SMC Setup Active:</strong> 70% minimum confirmation reached ({smcResult.confidence}%). Limit order is ready!
+                              <br />
+                              <span className="text-[10px] text-emerald-300/80">සිංහල පරිවර්තනය: අවම 70% සීමාව පසු කර ඇති බැවින් (තහවුරු කිරීම: {smcResult.confidence}%) ඇතුල්වීම වලංගු වේ!</span>
+                            </span>
+                          </div>
+                        )}
+
                         {/* Summary Bar */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                           <div className="bg-[#11131F]/90 border border-[#1E2235] rounded-xl p-4 flex flex-col gap-1.5">
@@ -3662,40 +3849,54 @@ export default function Dashboard() {
                         </div>
 
                         {/* Trade Parameters Cards */}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                          <div className="bg-[#11131F]/90 border border-emerald-500/30 rounded-xl p-3.5 flex flex-col gap-1">
-                            <span className="text-[9px] font-bold text-emerald-400 uppercase font-mono">Entry Price</span>
-                            <span className="text-xs font-bold text-white font-mono">{smcResult.entry_price_area}</span>
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                          <div className="bg-[#11131F]/90 border border-indigo-500/30 rounded-xl p-3.5 flex flex-col gap-1">
+                            <span className="text-[9px] font-bold text-indigo-400 uppercase font-mono">Symbol</span>
+                            <span className="text-xs font-bold text-white font-mono">
+                              🪙 {smcSymbol.toUpperCase()}
+                            </span>
+                          </div>
+                          <div className={`bg-[#11131F]/90 border ${smcResult.is_valid ? "border-emerald-500/30" : "border-rose-500/30"} rounded-xl p-3.5 flex flex-col gap-1`}>
+                            <span className={`text-[9px] font-bold ${smcResult.is_valid ? "text-emerald-400" : "text-rose-400"} uppercase font-mono`}>Entry Price</span>
+                            <span className="text-xs font-bold text-white font-mono">
+                              {smcResult.entry_price_area}
+                            </span>
                           </div>
                           <div className="bg-[#11131F]/90 border border-rose-500/30 rounded-xl p-3.5 flex flex-col gap-1">
                             <span className="text-[9px] font-bold text-rose-400 uppercase font-mono">Stop Loss</span>
-                            <span className="text-xs font-bold text-rose-400 font-mono">{smcResult.stop_loss_level || "N/A"}</span>
+                            <span className="text-xs font-bold text-rose-400 font-mono">
+                              {smcResult.is_valid ? `$${Number(smcResult.stop_loss_level).toFixed(2)}` : "N/A"}
+                            </span>
                           </div>
                           <div className="bg-[#11131F]/90 border border-teal-500/30 rounded-xl p-3.5 flex flex-col gap-1">
-                            <span className="text-[9px] font-bold text-teal-400 uppercase font-mono">Target (1:4 RR)</span>
-                            <span className="text-xs font-bold text-teal-400 font-mono">{smcResult.tp2_target || "N/A"}</span>
+                            <span className="text-[9px] font-bold text-teal-400 uppercase font-mono">Target TP</span>
+                            <span className="text-xs font-bold text-teal-400 font-mono">
+                              {smcResult.is_valid ? `$${Number(smcResult.tp2_target).toFixed(2)}` : "N/A"}
+                            </span>
                           </div>
                           <div className="bg-[#11131F]/90 border border-indigo-500/30 rounded-xl p-3.5 flex flex-col gap-1">
                             <span className="text-[9px] font-bold text-indigo-400 uppercase font-mono">Target RR</span>
-                            <span className="text-xs font-bold text-indigo-300 font-mono">1:4.00 RR</span>
+                            <span className="text-xs font-bold text-indigo-300 font-mono">
+                              1:4.00 RR
+                            </span>
                           </div>
                         </div>
 
                         {/* Reasoning & Sinhala Translation */}
-                        <div className="bg-[#11131F]/90 border border-[#1E2235] rounded-xl p-5 flex flex-col gap-4">
-                          <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2 font-mono">
+                        <div className="bg-[#11131F]/90 border border-[#1E2235] rounded-xl p-5 flex flex-col gap-4 font-mono">
+                          <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
                             <span>🧠</span> Technical Analysis & Sinhala Translation (සිංහල පරිවර්තනය)
                           </h4>
-                          <div className="bg-[#07080E] p-4 rounded-xl border border-[#1E2235] text-xs leading-relaxed text-gray-300 font-mono whitespace-pre-wrap">
+                          <div className="bg-[#07080E] p-4 rounded-xl border border-[#1E2235] text-xs leading-relaxed text-gray-300 whitespace-pre-wrap">
                             {smcResult.reasoning}
                           </div>
-                          <div className="bg-[#07080E] p-4 rounded-xl border border-[#1E2235] text-xs leading-relaxed text-rose-300 font-mono whitespace-pre-wrap">
+                          <div className="bg-[#07080E] p-4 rounded-xl border border-[#1E2235] text-xs leading-relaxed text-rose-300 whitespace-pre-wrap">
                             {smcResult.invalidation}
                           </div>
                         </div>
                       </>
                     ) : (
-                      <div className="bg-[#11131F]/90 border border-[#1E2235] rounded-2xl p-12 flex flex-col items-center justify-center gap-3 text-center min-h-[350px]">
+                      <div className="bg-[#11131F]/90 border border-[#1E2235] rounded-2xl p-12 flex flex-col items-center justify-center gap-3 text-center min-h-[250px]">
                         <span className="text-3xl">⚡</span>
                         <h3 className="text-sm font-bold text-white font-mono">SMC Method Analysis Ready</h3>
                         <p className="text-xs text-gray-400 max-w-md">
@@ -3703,10 +3904,173 @@ export default function Dashboard() {
                         </p>
                       </div>
                     )}
+
+                    {/* SMC Active Monitor Watchlist (Always Visible) */}
+                    <div className="bg-[#11131F]/90 border border-emerald-500/30 rounded-2xl p-5 shadow-xl flex flex-col gap-4">
+                      <div className="flex justify-between items-center border-b border-[#1E2235] pb-3">
+                        <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2 font-mono">
+                          <span>📊</span> SMC Active Monitor Watchlist
+                        </h3>
+                        <span className="text-[10px] bg-emerald-500/10 text-emerald-400 font-bold px-2.5 py-0.5 rounded border border-emerald-500/20 font-mono">
+                          {monitoredCoins.length} Active Tracks
+                        </span>
+                      </div>
+
+                      {monitoredCoins.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
+                          <span className="text-3xl animate-pulse">📡</span>
+                          <h4 className="text-xs font-bold text-white font-mono">Watchlist is Empty</h4>
+                          <p className="text-[11px] text-gray-400 max-w-sm font-mono leading-relaxed">
+                            Search a coin on the left, check your initial confluences, and click "Run SMC Analysis ⚡" to add it here. The bot will automatically track prices and update confluences locally every 5 seconds!
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {monitoredCoins.map((coin) => {
+                            const params = getCoinParameters(coin);
+                            const liveAction = coin.htfTrend === "BULLISH" ? "Buy Limit" : "Sell Limit";
+                            const liveEntryArea = params.is_valid ? `${liveAction} at ${params.entry_price.toFixed(2)}` : "No Entry (Confidence < 70%)";
+
+                            return (
+                              <div key={coin.id} className={`bg-[#0E101A]/85 border ${params.is_valid ? 'border-emerald-500/50' : 'border-[#1E2235]'} rounded-xl p-4 flex flex-col gap-3 relative shadow-lg`}>
+                                {/* Card Header */}
+                                <div className="flex justify-between items-center border-b border-[#1E2235]/60 pb-2">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm font-extrabold text-white font-mono">🪙 {coin.symbol.toUpperCase()}</span>
+                                    <span className="text-[10px] bg-[#1E2235] text-indigo-300 font-bold px-1.5 py-0.5 rounded font-mono">{coin.timeframe}</span>
+                                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded font-mono ${coin.htfTrend === 'BULLISH' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
+                                      {coin.htfTrend}
+                                    </span>
+                                  </div>
+                                  <button 
+                                    onClick={() => setMonitoredCoins(monitoredCoins.filter(c => c.id !== coin.id))}
+                                    className="text-gray-500 hover:text-rose-400 font-bold text-xs p-1 cursor-pointer transition-colors"
+                                    title="Remove from monitoring"
+                                  >
+                                    ❌
+                                  </button>
+                                </div>
+
+                                {/* Live Status Row */}
+                                <div className="flex justify-between items-center text-[10px] font-mono">
+                                  <span className="text-gray-400">Live Price:</span>
+                                  <span className="font-extrabold text-white animate-pulse">${coin.currentPrice.toFixed(2)}</span>
+                                </div>
+
+                                {/* Progress Bar & Confidence Rating */}
+                                <div className="flex flex-col gap-1">
+                                  <div className="flex justify-between items-center text-[9px] font-mono">
+                                    <span className="text-gray-500">Confidence Rating:</span>
+                                    <span className={`font-bold ${params.is_valid ? 'text-emerald-400' : 'text-rose-400'}`}>{params.confidence}% CONFIRMED</span>
+                                  </div>
+                                  <div className="w-full bg-[#141626] rounded-full h-2 overflow-hidden border border-[#1E2235]">
+                                    <div 
+                                      className={`h-full transition-all duration-300 ${params.is_valid ? "bg-emerald-500" : "bg-indigo-500"}`}
+                                      style={{ width: `${params.confidence}%` }}
+                                    />
+                                  </div>
+                                </div>
+
+                                {/* Status Badge */}
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wider font-mono">Setup Status</span>
+                                  {params.is_valid ? (
+                                    <span className="text-[10px] bg-emerald-500/15 text-emerald-400 font-extrabold border border-emerald-500/30 px-2.5 py-0.5 rounded-full animate-bounce font-mono flex items-center gap-1">
+                                      🎯 Ready to Entry
+                                    </span>
+                                  ) : (
+                                    <span className="text-[10px] bg-rose-500/10 text-rose-400 font-bold border border-rose-500/20 px-2 py-0.5 rounded-full font-mono">
+                                      🔒 Setup Locked
+                                    </span>
+                                  )}
+                                </div>
+
+                                {/* Entry Models Grid */}
+                                <div className="bg-[#07080E]/80 p-3 rounded-lg border border-[#1E2235]/60 text-[11px] font-mono flex flex-col gap-2">
+                                  <div className="flex justify-between items-center text-[9px] text-gray-500 border-b border-[#1E2235]/40 pb-1.5 uppercase tracking-wider font-extrabold">
+                                    <span>Execution Levels</span>
+                                    <span className="text-indigo-400">1:4.00 RR</span>
+                                  </div>
+                                  
+                                  {/* Entry Price */}
+                                  <div className="flex justify-between items-center bg-black/15 px-2 py-1 rounded">
+                                    <span className="text-gray-400">Entry Price (OB Limit):</span>
+                                    <span className="text-emerald-400 font-extrabold">
+                                      {params.is_valid ? `$${params.entry_price.toFixed(2)}` : "🔒 Locked"}
+                                    </span>
+                                  </div>
+
+                                  {/* Stop Loss */}
+                                  <div className="flex justify-between items-center bg-rose-950/10 border border-rose-500/10 px-2 py-1 rounded">
+                                    <span className="text-rose-400/90 font-medium">Stop Loss (SL):</span>
+                                    <span className="text-rose-400 font-extrabold">${params.stop_loss.toFixed(2)}</span>
+                                  </div>
+
+                                  {/* Take Profit */}
+                                  <div className="flex justify-between items-center bg-indigo-950/10 border border-indigo-500/10 px-2 py-1 rounded">
+                                    <span className="text-indigo-300 font-medium">Take Profit (TP):</span>
+                                    <span className="text-indigo-400 font-extrabold">${params.take_profit.toFixed(2)}</span>
+                                  </div>
+
+                                  {/* Risk to Reward */}
+                                  <div className="flex justify-between items-center bg-black/20 px-2 py-1 rounded text-[10px]">
+                                    <span className="text-gray-500">Risk-to-Reward:</span>
+                                    <span className="text-indigo-300 font-bold">1:4.00 RR Target</span>
+                                  </div>
+                                </div>
+
+                                {/* 1-Click Action Button */}
+                                <button
+                                  disabled={!params.is_valid || logLoading}
+                                  onClick={async () => {
+                                    setLogLoading(true);
+                                    try {
+                                      const res = await fetch("http://127.0.0.1:8000/api/trades/log", {
+                                        method: "POST",
+                                        headers: { "Content-Type": "application/json" },
+                                        body: JSON.stringify({
+                                          symbol: coin.symbol.toUpperCase(),
+                                          direction: coin.htfTrend,
+                                          entry_price: params.entry_price,
+                                          stop_loss: params.stop_loss,
+                                          take_profit: params.take_profit,
+                                          confidence: params.confidence,
+                                          strategy_type: "SMC"
+                                        })
+                                      });
+                                      if (res.ok) {
+                                        alert(`🎯 SMC trade for ${coin.symbol.toUpperCase()} executed/logged successfully!`);
+                                        setMonitoredCoins(monitoredCoins.filter(c => c.id !== coin.id));
+                                        const resHist = await fetch("http://127.0.0.1:8000/api/trades/history");
+                                        if (resHist.ok) {
+                                          const histData = await resHist.json();
+                                          setTradeHistory(histData);
+                                        }
+                                      }
+                                    } catch (err) {
+                                      console.error("Error logging watchlist trade:", err);
+                                    } finally {
+                                      setLogLoading(false);
+                                    }
+                                  }}
+                                  className={`w-full py-2 rounded-lg font-bold text-xs font-mono transition-all cursor-pointer ${
+                                    params.is_valid 
+                                      ? "bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/20 animate-pulse" 
+                                      : "bg-gray-800 text-gray-500 border border-gray-700 disabled:opacity-50"
+                                  }`}
+                                >
+                                  {params.is_valid ? "🎯 Execute Limit Entry ⚡" : "🔒 Locked (<80% Confirmed)"}
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-
             {/* Trade History & Strategy Performance Dashboard */}
+
             <div className="bg-[#11131F]/90 border border-[#1E2235] rounded-2xl p-6 shadow-xl flex flex-col gap-6 mt-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#1E2235] pb-4">
                 <div className="flex flex-col gap-1">

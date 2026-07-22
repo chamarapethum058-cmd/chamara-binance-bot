@@ -173,6 +173,10 @@ class SilverBulletResponse(BaseModel):
     news_lockout_active: bool = False
     active_news_event: Optional[str] = None
     upcoming_news_events: Optional[List[dict]] = None
+    
+    # SMC Dual Entry fields
+    original_extreme_entry: Optional[float] = None
+    fvg_boundary_entry: Optional[float] = None
 
 class LoggedTradeCreate(BaseModel):
     symbol: str
@@ -181,6 +185,7 @@ class LoggedTradeCreate(BaseModel):
     stop_loss: float
     take_profit: float
     confidence: Optional[int] = None
+    strategy_type: Optional[str] = "SMC"
 
 class LoggedTradeResponse(BaseModel):
     id: int
@@ -191,6 +196,7 @@ class LoggedTradeResponse(BaseModel):
     take_profit: float
     status: str
     confidence: Optional[int] = None
+    strategy_type: Optional[str] = "SMC"
     timestamp: datetime
 
     class Config:
