@@ -411,6 +411,27 @@ export default function Dashboard() {
   const [monitoredCoins, setMonitoredCoins] = useState<any[]>([]);
   const [livePrices, setLivePrices] = useState<Record<string, number>>({});
 
+  // Load monitoredCoins from localStorage on client-side mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("smc_monitored_coins");
+      if (saved) {
+        try {
+          setMonitoredCoins(JSON.parse(saved));
+        } catch (e) {
+          console.error("Failed to parse saved monitored coins:", e);
+        }
+      }
+    }
+  }, []);
+
+  // Save monitoredCoins to localStorage when they change
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("smc_monitored_coins", JSON.stringify(monitoredCoins));
+    }
+  }, [monitoredCoins]);
+
   // 5-Second Local API Watchlist Polling Loop
   useEffect(() => {
     if (monitoredCoins.length === 0) return;
