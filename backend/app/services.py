@@ -313,7 +313,17 @@ USER'S TRADING STRATEGY RULES:
             return response.text.strip()
         except Exception as e:
             logger.error(f"Gemini API chat failed: {e}")
-            return f"Error contacting AI Brain: {str(e)}"
+            err_msg = str(e)
+            if "401" in err_msg or "API_KEY_INVALID" in err_msg or "unauthenticated" in err_msg.lower() or "invalid API key" in err_msg.lower():
+                return (
+                    "⚠️ INVALID GEMINI API KEY:\n"
+                    "The configured Gemini API Key is invalid, unauthorized, or expired. Please click the Settings gear icon ⚙️ at the top right of the page and update your API Key with a valid one.\n\n"
+                    "---\n\n"
+                    "**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
+                    "⚠️ වලංගු නොවන GEMINI API KEY එකක්:\n"
+                    "පද්ධතියට ඇතුළත් කර ඇති Gemini API Key එක වැරදි හෝ කල් ඉකුත් වී ඇත. කරුණාකර පිටුවේ ඉහළ දකුණු කෙළවරේ ඇති Settings gear icon ⚙️ එක ක්ලික් කර නිවැරදි API Key එකක් ඇතුළත් කරන්න."
+                )
+            return f"Error contacting AI Brain: {err_msg}"
 
     @classmethod
     def _get_sb_steps(

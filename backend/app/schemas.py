@@ -122,6 +122,7 @@ class SilverBulletResponse(BaseModel):
     daily_open_relation: Optional[str] = None # "ABOVE_OPEN", "BELOW_OPEN", "N/A"
     killzone_valid: Optional[bool] = None
     counter_trend_locked: Optional[bool] = None
+    po3_phase: Optional[str] = None
     
     # Antigravity Master Spec fields
     erl_irl_state: Optional[str] = None
@@ -186,6 +187,7 @@ class LoggedTradeCreate(BaseModel):
     take_profit: float
     confidence: Optional[int] = None
     strategy_type: Optional[str] = "SMC"
+    timeframe: Optional[str] = "1m"
 
 class LoggedTradeResponse(BaseModel):
     id: int
@@ -197,6 +199,7 @@ class LoggedTradeResponse(BaseModel):
     status: str
     confidence: Optional[int] = None
     strategy_type: Optional[str] = "SMC"
+    timeframe: Optional[str] = "1m"
     timestamp: datetime
 
     class Config:

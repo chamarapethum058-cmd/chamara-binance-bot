@@ -142,7 +142,8 @@ export default function Dashboard() {
           entry_price: confirmedEntry,
           stop_loss: confirmedSl,
           take_profit: confirmedTarget,
-          confidence: sbResult.confidence || 0
+          confidence: sbResult.confidence || 0,
+          timeframe: selectedTimeframe
         })
       });
       if (res.ok) {
@@ -737,7 +738,8 @@ export default function Dashboard() {
           entry_price: confirmedEntry,
           stop_loss: confirmedSl,
           take_profit: confirmedTarget,
-          confidence: smcResult.confidence || 0
+          confidence: smcResult.confidence || 0,
+          timeframe: smcTimeframe
         })
       });
       if (res.ok) {
@@ -3694,14 +3696,16 @@ export default function Dashboard() {
                         </select>
                       </div>
                       <div className="flex flex-col gap-1.5">
-                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider font-mono">1H HTF Trend</label>
+                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider font-mono">1m/15m/1h Trend Alignment</label>
                         <select
+                          disabled={true}
                           value={smcHtfTrend}
                           onChange={(e) => setSmcHtfTrend(e.target.value)}
-                          className="bg-[#141626] border border-[#1E2235] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
+                          className="bg-[#141626] border border-[#1E2235] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono opacity-80 cursor-not-allowed"
                         >
-                          <option value="BULLISH">BULLISH (Auto Selected)</option>
-                          <option value="BEARISH">BEARISH (Auto Selected)</option>
+                          <option value="BULLISH">BULLISH (Auto Mapped)</option>
+                          <option value="BEARISH">BEARISH (Auto Mapped)</option>
+                          <option value="NEUTRAL">NEUTRAL (Mismatch Lockout)</option>
                         </select>
                       </div>
                     </div>
@@ -3987,18 +3991,36 @@ export default function Dashboard() {
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px] font-mono mt-2">
                             <div className="flex items-center justify-between p-2 rounded bg-black/20 border border-[#1E2235]/40">
                               <span className="text-gray-400">1. Trend Alignment</span>
-                              <span className="text-emerald-400 font-bold">+20% (Met)</span>
+                              <span className={smcResult.daily_bias !== "NEUTRAL" && smcResult.confidence > 0 ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
+                                {smcResult.daily_bias !== "NEUTRAL" && smcResult.confidence > 0 ? "+20% (Met)" : "0% (Failed)"}
+                              </span>
                             </div>
                             <div className="flex items-center justify-between p-2 rounded bg-black/20 border border-[#1E2235]/40">
                               <span className="text-gray-400">2. Discount/Premium Zone</span>
-                              <span className={smcResult.zone_type === "DISCOUNT" ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
-                                {smcResult.zone_type === "DISCOUNT" ? "+20% (Met)" : "0% (Failed)"}
+                              <span className={
+                                (smcResult.daily_bias === "BULLISH" && smcResult.zone_type === "DISCOUNT") || 
+                                (smcResult.daily_bias === "BEARISH" && smcResult.zone_type === "PREMIUM")
+                                  ? "text-emerald-400 font-bold" 
+                                  : "text-rose-400 font-bold"
+                              }>
+                                {(smcResult.daily_bias === "BULLISH" && smcResult.zone_type === "DISCOUNT") || 
+                                 (smcResult.daily_bias === "BEARISH" && smcResult.zone_type === "PREMIUM")
+                                  ? "+20% (Met)" 
+                                  : "0% (Failed)"}
                               </span>
                             </div>
                             <div className="flex items-center justify-between p-2 rounded bg-black/20 border border-[#1E2235]/40">
                               <span className="text-gray-400">3. Daily Open Relation</span>
-                              <span className={smcResult.daily_open_relation === "BELOW_OPEN" ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
-                                {smcResult.daily_open_relation === "BELOW_OPEN" ? "+15% (Met)" : "0% (Failed)"}
+                              <span className={
+                                (smcResult.daily_bias === "BULLISH" && smcResult.daily_open_relation === "BELOW_OPEN") || 
+                                (smcResult.daily_bias === "BEARISH" && smcResult.daily_open_relation === "ABOVE_OPEN")
+                                  ? "text-emerald-400 font-bold" 
+                                  : "text-rose-400 font-bold"
+                              }>
+                                {(smcResult.daily_bias === "BULLISH" && smcResult.daily_open_relation === "BELOW_OPEN") || 
+                                 (smcResult.daily_bias === "BEARISH" && smcResult.daily_open_relation === "ABOVE_OPEN")
+                                  ? "+15% (Met)" 
+                                  : "0% (Failed)"}
                               </span>
                             </div>
                             <div className="flex items-center justify-between p-2 rounded bg-black/20 border border-[#1E2235]/40">
@@ -4258,7 +4280,8 @@ export default function Dashboard() {
                                           stop_loss: params.stop_loss,
                                           take_profit: params.take_profit,
                                           confidence: params.confidence,
-                                          strategy_type: "SMC"
+                                          strategy_type: "SMC",
+                                          timeframe: coin.timeframe
                                         })
                                       });
                                       if (res.ok) {

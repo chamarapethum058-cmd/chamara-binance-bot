@@ -251,7 +251,48 @@ _gemini_status_cache = {"status": "UNKNOWN", "details": "", "timestamp": 0.0}
 
 @app.get("/api/preferences/gemini-status")
 async def get_gemini_status(db: Session = Depends(get_db)):
-    return {"status": "VALID", "details": "Local engine active. No Gemini API Key required!"}
+    pref = db.query(PreferenceModel).filter(PreferenceModel.key == "gemini_api_key").first()
+    api_key = pref.value if pref else None
+    if not api_key:
+        return {
+            "status": "MISSING", 
+            "details": "Gemini API Key is missing. Enter it in Settings to enable AI features. | Gemini API Key එක ඇතුලත් කර නැත."
+        }
+    
+    import time
+    global _gemini_status_cache
+    now = time.time()
+    if _gemini_status_cache["status"] != "UNKNOWN" and (now - _gemini_status_cache["timestamp"]) < 120:
+        return _gemini_status_cache
+        
+    try:
+        from google import genai
+        client = genai.Client(api_key=api_key)
+        client.models.generate_content(
+            model="gemini-3.5-flash",
+            contents="hi"
+        )
+        _gemini_status_cache = {
+            "status": "VALID", 
+            "details": "Gemini API connection is active and valid. | Gemini සම්බන්ධතාවය සක්‍රිය සහ වලංගු වේ.",
+            "timestamp": now
+        }
+    except Exception as e:
+        err_str = str(e)
+        if "401" in err_str or "API_KEY_INVALID" in err_str or "unauthenticated" in err_str.lower() or "invalid API key" in err_str.lower():
+            _gemini_status_cache = {
+                "status": "INVALID",
+                "details": "Gemini API Key is invalid or expired. Please update it in Settings. | API Key එක වැරදි හෝ කල් ඉකුත් වී ඇත.",
+                "timestamp": now
+            }
+        else:
+            _gemini_status_cache = {
+                "status": "ERROR",
+                "details": f"API Error: {err_str} | API දෝෂයකි: {err_str}",
+                "timestamp": now
+            }
+            
+    return _gemini_status_cache
 
 @app.post("/api/preferences", response_model=PreferenceResponse)
 def set_preference(pref: PreferenceCreate, db: Session = Depends(get_db)):
@@ -544,7 +585,8 @@ async def smc_analyze(req: SilverBulletRequest, db: Session = Depends(get_db)):
         active_news_event=result.get("active_news_event"),
         upcoming_news_events=result.get("upcoming_news_events"),
         original_extreme_entry=result.get("original_extreme_entry"),
-        fvg_boundary_entry=result.get("fvg_boundary_entry")
+        fvg_boundary_entry=result.get("fvg_boundary_entry"),
+        po3_phase=result.get("po3_phase")
     )
 
 
@@ -668,7 +710,16 @@ async def get_market_price(symbol: str):
                 if len(data) >= 2:
                     prev_candle = data[0]
                     curr_candle = data[1]
-                    daily_bias = AIService._detect_market_structure_bias(symbol_upper, "4h", "BULLISH")
+                    fallback_bias = "BULLISH" if float(curr_candle[4]) >= float(prev_candle[1]) else "BEARISH"
+                    trend_1h = AIService._detect_market_structure_bias(symbol_upper, "1h", fallback_bias=fallback_bias)
+                    trend_15m = AIService._detect_market_structure_bias(symbol_upper, "15m", fallback_bias=fallback_bias)
+                    trend_1m = AIService._detect_market_structure_bias(symbol_upper, "1m", fallback_bias=fallback_bias)
+                    if trend_1h == "BULLISH" and trend_15m == "BULLISH" and trend_1m == "BULLISH":
+                        daily_bias = "BULLISH"
+                    elif trend_1h == "BEARISH" and trend_15m == "BEARISH" and trend_1m == "BEARISH":
+                        daily_bias = "BEARISH"
+                    else:
+                        daily_bias = "NEUTRAL"
                     return {
                         "symbol": symbol_upper,
                         "pdh": float(prev_candle[2]),
@@ -684,12 +735,30 @@ async def get_market_price(symbol: str):
         # 3. Fallback: try Yahoo Finance as {symbol}-USD
         try:
             res_data = await fetch_yahoo_finance(f"{symbol_upper}-USD")
-            res_data["daily_bias"] = AIService._detect_market_structure_bias(symbol_upper, "4h", "BULLISH")
+            trend_1h = AIService._detect_market_structure_bias(symbol_upper, "1h", fallback_bias="BULLISH")
+            trend_15m = AIService._detect_market_structure_bias(symbol_upper, "15m", fallback_bias="BULLISH")
+            trend_1m = AIService._detect_market_structure_bias(symbol_upper, "1m", fallback_bias="BULLISH")
+            if trend_1h == "BULLISH" and trend_15m == "BULLISH" and trend_1m == "BULLISH":
+                daily_bias = "BULLISH"
+            elif trend_1h == "BEARISH" and trend_15m == "BEARISH" and trend_1m == "BEARISH":
+                daily_bias = "BEARISH"
+            else:
+                daily_bias = "NEUTRAL"
+            res_data["daily_bias"] = daily_bias
             return res_data
         except Exception:
             try:
                 res_data = await fetch_yahoo_finance(symbol_upper)
-                res_data["daily_bias"] = AIService._detect_market_structure_bias(symbol_upper, "4h", "BULLISH")
+                trend_1h = AIService._detect_market_structure_bias(symbol_upper, "1h", fallback_bias="BULLISH")
+                trend_15m = AIService._detect_market_structure_bias(symbol_upper, "15m", fallback_bias="BULLISH")
+                trend_1m = AIService._detect_market_structure_bias(symbol_upper, "1m", fallback_bias="BULLISH")
+                if trend_1h == "BULLISH" and trend_15m == "BULLISH" and trend_1m == "BULLISH":
+                    daily_bias = "BULLISH"
+                elif trend_1h == "BEARISH" and trend_15m == "BEARISH" and trend_1m == "BEARISH":
+                    daily_bias = "BEARISH"
+                else:
+                    daily_bias = "NEUTRAL"
+                res_data["daily_bias"] = daily_bias
                 return res_data
             except Exception as e:
                 raise HTTPException(status_code=400, detail=f"Failed to fetch market data for {symbol}: {str(e)}")
@@ -734,6 +803,7 @@ def log_trade(trade: LoggedTradeCreate, db: Session = Depends(get_db)):
         take_profit=trade.take_profit,
         confidence=trade.confidence,
         strategy_type=trade.strategy_type or "SMC",
+        timeframe=trade.timeframe or "1m",
         status="PENDING"
     )
     db.add(db_trade)
@@ -754,16 +824,27 @@ async def get_trade_history(strategy_type: Optional[str] = None, db: Session = D
                 # Dynamic Counter-MSS/Choch Invalidation Check for PENDING trades
                 if trade.status == "PENDING":
                     try:
-                        current_bias_1m = AIService._detect_market_structure_bias(trade.symbol, "1m", fallback_bias=trade.direction)
-                        current_bias_3m = AIService._detect_market_structure_bias(trade.symbol, "3m", fallback_bias=trade.direction)
-                        is_counter_1m = (trade.direction == "BULLISH" and current_bias_1m == "BEARISH") or \
-                                        (trade.direction == "BEARISH" and current_bias_1m == "BULLISH")
-                        is_counter_3m = (trade.direction == "BULLISH" and current_bias_3m == "BEARISH") or \
-                                        (trade.direction == "BEARISH" and current_bias_3m == "BULLISH")
-                        if is_counter_1m or is_counter_3m:
+                        # For 1m scalp entries, check 15m trend for counter-bias to allow normal 1m pullbacks.
+                        # For 15m entries, check 1H trend.
+                        tf = "15m" if (trade.timeframe or "1m") == "1m" else "1h"
+                        current_bias = AIService._detect_market_structure_bias(trade.symbol, tf, fallback_bias=trade.direction)
+                        is_counter = (trade.direction == "BULLISH" and current_bias == "BEARISH") or \
+                                     (trade.direction == "BEARISH" and current_bias == "BULLISH")
+                        
+                        # Invalidate if current price breaches the stop loss level before entry is hit
+                        is_sl_breached = False
+                        current_price = await fetch_current_price_for_symbol(trade.symbol)
+                        if current_price > 0:
+                            if trade.direction == "BULLISH" and current_price < trade.stop_loss:
+                                is_sl_breached = True
+                            elif trade.direction == "BEARISH" and current_price > trade.stop_loss:
+                                is_sl_breached = True
+                                
+                        if is_counter or is_sl_breached:
                             trade.status = "INVALIDATED"
                             db.commit()
-                            print(f"Counter-MSS/Choch detected (1m/3m): Pending trade {trade.id} ({trade.symbol}) is now INVALIDATED.")
+                            reason = f"{tf} counter-trend" if is_counter else "Stop loss breached before entry"
+                            print(f"Counter-MSS/Choch detected: Pending trade {trade.id} ({trade.symbol}) is now INVALIDATED ({reason}).")
                             continue
                     except Exception as mss_err:
                         print(f"Error checking counter-MSS for pending trade: {mss_err}")

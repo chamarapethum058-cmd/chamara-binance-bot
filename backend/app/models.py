@@ -46,4 +46,5 @@ class LoggedTradeModel(Base):
     status = Column(String, default="PENDING")  # PENDING, WIN, LOSS
     confidence = Column(Integer, nullable=True)  # Confirmation percentage (e.g. 85)
     strategy_type = Column(String, default="SMC")  # "SMC" vs "SILVER_BULLET"
+    timeframe = Column(String, default="1m")
     timestamp = Column(DateTime, default=datetime.utcnow)

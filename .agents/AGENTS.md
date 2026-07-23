@@ -112,14 +112,12 @@ The bot must strictly enforce the following high-impact news rules:
 >    - **Sell setup (Downtrend):** Allowed ONLY when 1H, 15m, and 1m trends are all BEARISH (Downtrend).
 >    - **Strict Lockout:** If there is any mismatch (e.g., 1H is BULLISH but 15m or 1m is BEARISH), the setup must be immediately suppressed and locked out (`No Entry`) to protect against counter-market momentum.
 > 3. **Timeframe Drilling Sequence:** Analyze 1H (HTF Bias & POI) -> 15m (LTF Structure & Pullback mapping) -> 1m (LTF Entry confirmations).
-
-
-
-
-
+> 4. **Auto-Selection Protocol:** If 1H, 15m, and 1m timeframes are all down, the system must automatically select BEARISH bias and output Sell entries. If all three are up, it must automatically select BULLISH bias and output Long entries. If there is a trend mismatch, the system must auto-select NEUTRAL and lockout all entries.
 
 ## 17. Counter-Bias Invalidation Protocol before Mitigation (New Rule)
 > [!IMPORTANT]
 > **COUNTER-BIAS INVALIDATION PROTOCOL BEFORE MITIGATION:**
-> 1. **Immediate Invalidation before Mitigation:** If a pending trade setup is logged but has not yet reached the entry price (pullback mitigation has not occurred), and a counter-market structure shift (e.g. Bearish CHoCH for a LONG setup, or Bullish CHoCH for a SHORT setup) occurs on the 1-minute (1m) or 3-minute (3m) chart, the setup must be immediately invalidated.
-> 2. **Journal State Update:** The status in the trade history must transition automatically to `INVALIDATED` and be locked out of execution to prevent stop-loss hits from counter-momentum.
+> 1. **Immediate Invalidation before Mitigation:** If a pending trade setup is logged but has not yet reached the entry price (pullback mitigation has not occurred), the system monitors for invalidation.
+> 2. **Timeframe Isolation:** The invalidation check evaluates ONLY the trade's HTF trend filter (e.g., checking 15m trend for 1m scalp entries, and 1H trend for 15m entries) to allow normal 1m pullbacks without false invalidation. 3m charts are ignored.
+> 3. **Stop Loss Breach Lock:** The trade is immediately invalidated if the current price breaches the stop loss/manipulation extreme before execution.
+> 4. **Journal State Update:** The status in the trade history must transition automatically to `INVALIDATED` and be locked out of execution to prevent stop-loss hits from counter-momentum.
