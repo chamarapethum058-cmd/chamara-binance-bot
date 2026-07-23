@@ -705,6 +705,19 @@ export default function Dashboard() {
     }
   };
 
+  const handleResetSearch = () => {
+    setSmcSymbol("");
+    setSmcCurrentPrice("");
+    setSmcPdh("");
+    setSmcPdl("");
+    setSmcOpen("");
+    setSmcTrend1m("");
+    setSmcTrend15m("");
+    setSmcTrend1h("");
+    setSmcResult(null);
+    setSmcHtfTrend("BULLISH");
+  };
+
   // Trigger SMC analysis/fetch automatically on timeframe changes
   useEffect(() => {
     if (smcSymbol && smcSymbol.length >= 3) {
@@ -3696,6 +3709,13 @@ export default function Dashboard() {
                           className="bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/40 text-xs font-bold px-3 py-2 rounded-xl transition-all font-mono whitespace-nowrap cursor-pointer"
                         >
                           Fetch Price
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleResetSearch}
+                          className="bg-[#1E2235] hover:bg-[#2A2F4A] text-gray-300 border border-[#2D334D] text-xs font-bold px-3 py-2 rounded-xl transition-all font-mono whitespace-nowrap cursor-pointer flex items-center gap-1"
+                        >
+                          <span>🔄</span> Reset
                         </button>
                       </div>
                     </div>
