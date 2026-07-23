@@ -4153,13 +4153,53 @@ export default function Dashboard() {
 
                         {/* Warning/Success Banner */}
                         {!smcResult.is_valid && (
-                          <div className="bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl p-3.5 text-xs font-mono flex items-center gap-2">
-                            <span>⚠️</span>
-                            <span>
-                              <strong>SMC Setup Locked:</strong> Confirmation rate is {smcResult.confidence}% (less than the mandatory 70% threshold). Entry parameters are suppressed from active logging.
-                              <br />
-                              <span className="text-[10px] text-rose-300/80">සිංහල පරිවර්තනය: උපාය මාර්ගික අනුකූලතාවය {smcResult.confidence}% ක් වන බැවින් (අවම 70% ට වඩා අඩු) ඇතුල්වීම් අවහිර කර ඇත.</span>
-                            </span>
+                          <div className="flex flex-col gap-3">
+                            <div className="bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl p-3.5 text-xs font-mono flex items-center gap-2">
+                              <span>⚠️</span>
+                              <span>
+                                <strong>SMC Setup Locked:</strong> Confirmation rate is {smcResult.confidence}% (less than the mandatory 70% threshold). Entry parameters are suppressed from active logging.
+                                <br />
+                                <span className="text-[10px] text-rose-300/80">සිංහල පරිවර්තනය: උපාය මාර්ගික අනුකූලතාවය {smcResult.confidence}% ක් වන බැවින් (අවම 70% ට වඩා අඩු) ඇතුල්වීම් අවහිර කර ඇත.</span>
+                              </span>
+                            </div>
+
+                            {/* Required Target Price Conditions */}
+                            <div className="bg-rose-950/15 border border-rose-500/15 rounded-xl p-3.5 text-xs font-mono flex flex-col gap-2">
+                              <div className="text-rose-300 font-bold uppercase tracking-wider text-[10px] flex items-center gap-1.5 border-b border-rose-500/10 pb-1.5">
+                                <span>🎯</span> REQUIRED PRICE TRIGGERS (ඇතුළත් වීමට අවශ්‍ය මිල සීමාවන්):
+                              </div>
+                              <div className="flex flex-col gap-2 text-gray-300">
+                                {smcHtfTrend === "BULLISH" ? (
+                                  <>
+                                    <div className="flex justify-between items-center gap-2">
+                                      <span>• Point 2 (Discount Zone):</span>
+                                      <span className="text-rose-400 font-semibold">Price &lt; ${(smcResult.equilibrium_price || 0).toFixed(4)}</span>
+                                    </div>
+                                    <div className="text-[10px] text-rose-300/60 pl-3">සිංහල: මිල මීට වඩා අඩු විය යුතුය.</div>
+
+                                    <div className="flex justify-between items-center gap-2 mt-1">
+                                      <span>• Point 3 (Daily Open Relation):</span>
+                                      <span className="text-rose-400 font-semibold">Price &lt; ${(Number(smcOpen) || 0).toFixed(4)}</span>
+                                    </div>
+                                    <div className="text-[10px] text-rose-300/60 pl-3">සිංහල: මිල Daily Open එකට වඩා අඩු විය යුතුය.</div>
+                                  </>
+                                ) : (
+                                  <>
+                                    <div className="flex justify-between items-center gap-2">
+                                      <span>• Point 2 (Premium Zone):</span>
+                                      <span className="text-emerald-400 font-semibold">Price &gt; ${(smcResult.equilibrium_price || 0).toFixed(4)}</span>
+                                    </div>
+                                    <div className="text-[10px] text-emerald-300/60 pl-3">සිංහල: මිල මීට වඩා වැඩි විය යුතුය.</div>
+
+                                    <div className="flex justify-between items-center gap-2 mt-1">
+                                      <span>• Point 3 (Daily Open Relation):</span>
+                                      <span className="text-emerald-400 font-semibold">Price &gt; ${(Number(smcOpen) || 0).toFixed(4)}</span>
+                                    </div>
+                                    <div className="text-[10px] text-emerald-300/60 pl-3">සිංහල: මිල Daily Open එකට වඩා වැඩි විය යුතුය.</div>
+                                  </>
+                                )}
+                              </div>
+                            </div>
                           </div>
                         )}
                         {smcResult.is_valid && (
