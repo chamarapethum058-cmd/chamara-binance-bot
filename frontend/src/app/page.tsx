@@ -1401,7 +1401,7 @@ export default function Dashboard() {
     if (sym.includes(":")) {
       return sym;
     }
-    const hasUsdt = sym.endsWith("USDT") || sym.endsWith("USD");
+    const hasUsdt = sym.endsWith("USDT") || sym.endsWith("USD") || sym.endsWith("USDT.P") || sym.endsWith("USD.P");
     return `BINANCE:${sym}${hasUsdt ? "" : "USDT"}`;
   };
 
