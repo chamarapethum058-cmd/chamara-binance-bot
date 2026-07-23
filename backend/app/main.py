@@ -692,7 +692,21 @@ async def get_market_price(symbol: str):
     yahoo_symbol = SYMBOL_MAP.get(symbol_upper)
     if yahoo_symbol:
         try:
-            return await fetch_yahoo_finance(yahoo_symbol)
+            res_data = await fetch_yahoo_finance(yahoo_symbol)
+            trend_1h = AIService._detect_market_structure_bias(symbol_upper, "1h", fallback_bias="BULLISH")
+            trend_15m = AIService._detect_market_structure_bias(symbol_upper, "15m", fallback_bias="BULLISH")
+            trend_1m = AIService._detect_market_structure_bias(symbol_upper, "1m", fallback_bias="BULLISH")
+            if trend_1h == "BULLISH" and trend_15m == "BULLISH" and trend_1m == "BULLISH":
+                daily_bias = "BULLISH"
+            elif trend_1h == "BEARISH" and trend_15m == "BEARISH" and trend_1m == "BEARISH":
+                daily_bias = "BEARISH"
+            else:
+                daily_bias = "NEUTRAL"
+            res_data["daily_bias"] = daily_bias
+            res_data["trend_1m"] = trend_1m
+            res_data["trend_15m"] = trend_15m
+            res_data["trend_1h"] = trend_1h
+            return res_data
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Failed to fetch Yahoo Finance: {str(e)}")
             
@@ -727,7 +741,10 @@ async def get_market_price(symbol: str):
                         "open": float(prev_candle[1]),
                         "close": float(prev_candle[4]),
                         "current_price": float(curr_candle[4]),
-                        "daily_bias": daily_bias
+                        "daily_bias": daily_bias,
+                        "trend_1m": trend_1m,
+                        "trend_15m": trend_15m,
+                        "trend_1h": trend_1h
                     }
         except Exception:
             pass
@@ -745,6 +762,9 @@ async def get_market_price(symbol: str):
             else:
                 daily_bias = "NEUTRAL"
             res_data["daily_bias"] = daily_bias
+            res_data["trend_1m"] = trend_1m
+            res_data["trend_15m"] = trend_15m
+            res_data["trend_1h"] = trend_1h
             return res_data
         except Exception:
             try:
@@ -759,6 +779,9 @@ async def get_market_price(symbol: str):
                 else:
                     daily_bias = "NEUTRAL"
                 res_data["daily_bias"] = daily_bias
+                res_data["trend_1m"] = trend_1m
+                res_data["trend_15m"] = trend_15m
+                res_data["trend_1h"] = trend_1h
                 return res_data
             except Exception as e:
                 raise HTTPException(status_code=400, detail=f"Failed to fetch market data for {symbol}: {str(e)}")

@@ -404,6 +404,9 @@ export default function Dashboard() {
   const [smcPdl, setSmcPdl] = useState<number | "">(64000);
   const [smcOpen, setSmcOpen] = useState<number | "">(64200);
   const [smcCurrentPrice, setSmcCurrentPrice] = useState<number | "">(64100);
+  const [smcTrend1m, setSmcTrend1m] = useState<string>("");
+  const [smcTrend15m, setSmcTrend15m] = useState<string>("");
+  const [smcTrend1h, setSmcTrend1h] = useState<string>("");
   const [smcResult, setSmcResult] = useState<any | null>(null);
   const [monitoredCoins, setMonitoredCoins] = useState<any[]>([]);
   const [livePrices, setLivePrices] = useState<Record<string, number>>({});
@@ -565,6 +568,9 @@ export default function Dashboard() {
           setSmcHtfTrend(data.daily_bias);
           activeHtfTrend = data.daily_bias;
         }
+        if (data.trend_1m) setSmcTrend1m(data.trend_1m);
+        if (data.trend_15m) setSmcTrend15m(data.trend_15m);
+        if (data.trend_1h) setSmcTrend1h(data.trend_1h);
       }
 
       const isDiscount = fetchedPrice < (fetchedPdh + fetchedPdl) / 2;
@@ -3707,6 +3713,51 @@ export default function Dashboard() {
                           <option value="BEARISH">BEARISH (Auto Mapped)</option>
                           <option value="NEUTRAL">NEUTRAL (Mismatch Lockout)</option>
                         </select>
+                      </div>
+                    </div>
+
+                    {/* Timeframe Trend Alignment Details */}
+                    <div className="bg-[#141626]/50 border border-[#1E2235] rounded-xl p-3.5 flex flex-col gap-2">
+                      <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider font-mono flex items-center gap-1.5">
+                        <span>📊</span> Timeframe Trend Details ({smcSymbol || "No Coin Selected"})
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className={`flex flex-col items-center justify-center p-2 rounded-lg border ${
+                          smcTrend1m === "BULLISH" 
+                            ? "bg-emerald-500/5 border-emerald-500/25 text-emerald-400" 
+                            : smcTrend1m === "BEARISH"
+                            ? "bg-rose-500/5 border-rose-500/25 text-rose-400"
+                            : "bg-[#11131F] border-[#1E2235] text-gray-500"
+                        }`}>
+                          <span className="text-[10px] font-bold font-mono text-gray-400">1m</span>
+                          <span className="text-xs font-black tracking-wider mt-0.5 flex items-center gap-1 font-mono">
+                            {smcTrend1m === "BULLISH" ? "🟢 BUY" : smcTrend1m === "BEARISH" ? "🔴 SELL" : "⏳ PENDING"}
+                          </span>
+                        </div>
+                        <div className={`flex flex-col items-center justify-center p-2 rounded-lg border ${
+                          smcTrend15m === "BULLISH" 
+                            ? "bg-emerald-500/5 border-emerald-500/25 text-emerald-400" 
+                            : smcTrend15m === "BEARISH"
+                            ? "bg-rose-500/5 border-rose-500/25 text-rose-400"
+                            : "bg-[#11131F] border-[#1E2235] text-gray-500"
+                        }`}>
+                          <span className="text-[10px] font-bold font-mono text-gray-400">15m</span>
+                          <span className="text-xs font-black tracking-wider mt-0.5 flex items-center gap-1 font-mono">
+                            {smcTrend15m === "BULLISH" ? "🟢 BUY" : smcTrend15m === "BEARISH" ? "🔴 SELL" : "⏳ PENDING"}
+                          </span>
+                        </div>
+                        <div className={`flex flex-col items-center justify-center p-2 rounded-lg border ${
+                          smcTrend1h === "BULLISH" 
+                            ? "bg-emerald-500/5 border-emerald-500/25 text-emerald-400" 
+                            : smcTrend1h === "BEARISH"
+                            ? "bg-rose-500/5 border-rose-500/25 text-rose-400"
+                            : "bg-[#11131F] border-[#1E2235] text-gray-500"
+                        }`}>
+                          <span className="text-[10px] font-bold font-mono text-gray-400">1h</span>
+                          <span className="text-xs font-black tracking-wider mt-0.5 flex items-center gap-1 font-mono">
+                            {smcTrend1h === "BULLISH" ? "🟢 BUY" : smcTrend1h === "BEARISH" ? "🔴 SELL" : "⏳ PENDING"}
+                          </span>
+                        </div>
                       </div>
                     </div>
 
