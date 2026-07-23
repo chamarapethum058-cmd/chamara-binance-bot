@@ -584,10 +584,10 @@ export default function Dashboard() {
       setSmcSymbol(searchSymbol);
 
       const resPrice = await fetch(`${API_BASE}/market/price?symbol=${encodeURIComponent(searchSymbol)}`);
-      let fetchedPrice = Number(smcCurrentPrice) || 64100;
-      let fetchedPdh = Number(smcPdh) || 65000;
-      let fetchedPdl = Number(smcPdl) || 64000;
-      let fetchedOpen = Number(smcOpen) || 64200;
+      let fetchedPrice = Number(smcCurrentPrice) || 0;
+      let fetchedPdh = Number(smcPdh) || 0;
+      let fetchedPdl = Number(smcPdl) || 0;
+      let fetchedOpen = Number(smcOpen) || 0;
 
       let activeHtfTrend = smcHtfTrend;
       if (resPrice.ok) {
@@ -3724,7 +3724,17 @@ export default function Dashboard() {
                         <input
                           type="text"
                           value={smcSymbol}
-                          onChange={(e) => setSmcSymbol(e.target.value.toUpperCase())}
+                          onChange={(e) => {
+                            setSmcSymbol(e.target.value.toUpperCase());
+                            setSmcResult(null);
+                            setSmcCurrentPrice("");
+                            setSmcPdh("");
+                            setSmcPdl("");
+                            setSmcOpen("");
+                            setSmcTrend1m("");
+                            setSmcTrend15m("");
+                            setSmcTrend1h("");
+                          }}
                           className="bg-[#141626] border border-[#1E2235] rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono w-full"
                           placeholder="e.g. BTCUSDT, ETHUSDT"
                         />
