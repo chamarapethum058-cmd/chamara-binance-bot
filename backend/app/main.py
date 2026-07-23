@@ -690,7 +690,8 @@ async def fetch_yahoo_finance(yahoo_symbol: str):
 
 @app.get("/api/market/price")
 async def get_market_price(symbol: str):
-    symbol_upper = symbol.strip().upper()
+    original_symbol = symbol.strip().upper()
+    symbol_upper = original_symbol
     if symbol_upper.endswith(".P"):
         symbol_upper = symbol_upper[:-2]
     if not symbol_upper:
@@ -714,6 +715,7 @@ async def get_market_price(symbol: str):
             res_data["trend_1m"] = trend_1m
             res_data["trend_15m"] = trend_15m
             res_data["trend_1h"] = trend_1h
+            res_data["symbol"] = original_symbol
             return res_data
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Failed to fetch Yahoo Finance: {str(e)}")
@@ -743,7 +745,7 @@ async def get_market_price(symbol: str):
                     else:
                         daily_bias = "NEUTRAL"
                     return {
-                        "symbol": symbol_upper,
+                        "symbol": original_symbol,
                         "pdh": float(prev_candle[2]),
                         "pdl": float(prev_candle[3]),
                         "open": float(prev_candle[1]),
@@ -773,6 +775,7 @@ async def get_market_price(symbol: str):
             res_data["trend_1m"] = trend_1m
             res_data["trend_15m"] = trend_15m
             res_data["trend_1h"] = trend_1h
+            res_data["symbol"] = original_symbol
             return res_data
         except Exception:
             try:
@@ -790,6 +793,7 @@ async def get_market_price(symbol: str):
                 res_data["trend_1m"] = trend_1m
                 res_data["trend_15m"] = trend_15m
                 res_data["trend_1h"] = trend_1h
+                res_data["symbol"] = original_symbol
                 return res_data
             except Exception as e:
                 raise HTTPException(status_code=400, detail=f"Failed to fetch market data for {symbol}: {str(e)}")

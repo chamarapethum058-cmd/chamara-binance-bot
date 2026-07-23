@@ -568,7 +568,22 @@ export default function Dashboard() {
   const handleRunSmcAnalysis = async (addToWatchlist: boolean = false) => {
     setSmcLoading(true);
     try {
-      const resPrice = await fetch(`${API_BASE}/market/price?symbol=${encodeURIComponent(smcSymbol.trim())}`);
+      let searchSymbol = smcSymbol.toUpperCase().trim();
+      if (searchSymbol) {
+        const isForexOrCommodity = ["GOLD", "XAUUSD", "XAU/USD", "EURUSD", "EUR/USD", "GBPUSD", "GBP/USD", "USDJPY"].includes(searchSymbol);
+        if (!isForexOrCommodity) {
+          if (!searchSymbol.endsWith(".P")) {
+            if (searchSymbol.endsWith("USDT")) {
+              searchSymbol = searchSymbol + ".P";
+            } else {
+              searchSymbol = searchSymbol + "USDT.P";
+            }
+          }
+        }
+      }
+      setSmcSymbol(searchSymbol);
+
+      const resPrice = await fetch(`${API_BASE}/market/price?symbol=${encodeURIComponent(searchSymbol)}`);
       let fetchedPrice = Number(smcCurrentPrice) || 64100;
       let fetchedPdh = Number(smcPdh) || 65000;
       let fetchedPdl = Number(smcPdl) || 64000;
