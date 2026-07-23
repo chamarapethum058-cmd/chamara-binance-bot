@@ -1236,6 +1236,8 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
         try:
             # Format symbol
             sym = symbol.upper()
+            if sym.endswith(".P"):
+                sym = sym[:-2]
             if not sym.endswith("USDT") and not sym.endswith("USD") and sym not in ["BTC", "ETH", "SOL", "XAUUSD"]:
                 sym = f"{sym}USDT"
             elif sym in ["BTC", "ETH", "SOL"]:
@@ -1383,6 +1385,8 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
         from app.market import get_candles
         try:
             sym = symbol.upper()
+            if sym.endswith(".P"):
+                sym = sym[:-2]
             if not sym.endswith("USDT") and not sym.endswith("USD") and sym not in ["BTC", "ETH", "SOL", "XAUUSD"]:
                 sym = f"{sym}USDT"
             elif sym in ["BTC", "ETH", "SOL"]:
@@ -2550,6 +2554,8 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
         # Fetch last 50 candles to find true structural highs/lows based on the selected timeframe
         from app.market import get_candles
         sym = symbol.upper()
+        if sym.endswith(".P"):
+            sym = sym[:-2]
         if not sym.endswith("USDT") and not sym.endswith("USD") and sym not in ["BTC", "ETH", "SOL", "XAUUSD"]:
             sym = f"{sym}USDT"
         elif sym in ["BTC", "ETH", "SOL"]:

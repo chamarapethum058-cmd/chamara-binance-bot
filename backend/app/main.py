@@ -691,6 +691,8 @@ async def fetch_yahoo_finance(yahoo_symbol: str):
 @app.get("/api/market/price")
 async def get_market_price(symbol: str):
     symbol_upper = symbol.strip().upper()
+    if symbol_upper.endswith(".P"):
+        symbol_upper = symbol_upper[:-2]
     if not symbol_upper:
         raise HTTPException(status_code=400, detail="Symbol parameter is required")
         
@@ -794,6 +796,8 @@ async def get_market_price(symbol: str):
 
 async def fetch_current_price_for_symbol(symbol: str) -> float:
     symbol_upper = symbol.upper()
+    if symbol_upper.endswith(".P"):
+        symbol_upper = symbol_upper[:-2]
     yahoo_symbol = SYMBOL_MAP.get(symbol_upper)
     if yahoo_symbol:
         try:
