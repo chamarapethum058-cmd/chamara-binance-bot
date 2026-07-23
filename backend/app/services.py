@@ -323,6 +323,17 @@ USER'S TRADING STRATEGY RULES:
                     "⚠️ වලංගු නොවන GEMINI API KEY එකක්:\n"
                     "පද්ධතියට ඇතුළත් කර ඇති Gemini API Key එක වැරදි හෝ කල් ඉකුත් වී ඇත. කරුණාකර පිටුවේ ඉහළ දකුණු කෙළවරේ ඇති Settings gear icon ⚙️ එක ක්ලික් කර නිවැරදි API Key එකක් ඇතුළත් කරන්න."
                 )
+            elif "429" in err_msg or "resource_exhausted" in err_msg.lower() or "quota" in err_msg.lower() or "limit" in err_msg.lower():
+                return (
+                    "⚠️ GEMINI API RATE LIMIT REACHED (429 RESOURCE EXHAUSTED):\n"
+                    "You have reached Gemini's free tier limit (usually 15-20 requests per minute). Please wait 1 to 2 minutes for the quota to reset, then try again.\n"
+                    "To avoid this limit, you can enable billing (Pay-As-You-Go) in your Google AI Studio account, which raises the limit significantly for free/cheap usage.\n\n"
+                    "---\n\n"
+                    "**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
+                    "⚠️ GEMINI API සීමාව ඉක්මවා ඇත (429 RATE LIMIT):\n"
+                    "Gemini API නොමිලේ ලබාදෙන සීමාව (විනාඩියකට උපරිම 15-20 වාරයක්) ඔබ විසින් ඉක්මවා ඇත. කරුණාකර විනාඩි 1ක් හෝ 2ක් රැඳී සිට නැවත උත්සාහ කරන්න.\n"
+                    "මෙම සීමාව මඟහරවා ගැනීමට, ඔබගේ Google AI Studio ගිණුමට billing ක්‍රමයක් එකතු කිරීමෙන් (Pay-As-You-Go) මෙම සීමාව විශාල ලෙස වැඩි කර ගත හැක."
+                )
             return f"Error contacting AI Brain: {err_msg}"
 
     @classmethod
