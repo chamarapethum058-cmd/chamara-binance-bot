@@ -11,6 +11,16 @@ if settings.DATABASE_URL.startswith("sqlite"):
 else:
     engine = create_engine(settings.DATABASE_URL)
 
+# Enable WAL mode for SQLite to prevent locking
+if settings.DATABASE_URL.startswith("sqlite"):
+    from sqlalchemy import event
+    @event.listens_for(engine, "connect")
+    def set_sqlite_pragma(dbapi_connection, connection_record):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA synchronous=NORMAL")
+        cursor.close()
+
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()

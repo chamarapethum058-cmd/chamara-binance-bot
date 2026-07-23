@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from typing import List, Dict, Any, Optional
 import json
 
-from .database import engine, Base, get_db
+from .database import engine, Base, get_db, SessionLocal
 from .models import StrategyModel, AnalysisModel, PreferenceModel, LoggedTradeModel
 from .schemas import (
     StrategyCreate, StrategyResponse, 
@@ -35,7 +35,7 @@ app.add_middleware(
 # Initialize default strategy if empty
 @app.on_event("startup")
 def startup_populate():
-    db = next(get_db())
+    db = SessionLocal()
     
     # Check if SMC exists, if not seed it
     smc_exists = db.query(StrategyModel).filter(StrategyModel.name == "SMC (Smart Money Concepts)").first()
@@ -168,6 +168,7 @@ The engine must strictly monitor setups only during these three independent oper
         db.add(db_pref)
         db.commit()
         print("Default Gemini API Key preference seeded from settings (.env).")
+    db.close()
 
 @app.get("/api/health")
 def health_check():
