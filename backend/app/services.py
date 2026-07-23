@@ -171,7 +171,7 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
         try:
             client = genai.Client(api_key=active_key)
             response = client.models.generate_content(
-                model='gemini-3.5-flash',
+                model='gemini-2.0-flash',
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     response_mime_type="application/json"
@@ -245,7 +245,7 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                 f"Text to translate:\n{text}"
             )
             response = client.models.generate_content(
-                model='gemini-3.5-flash',
+                model='gemini-2.0-flash',
                 contents=prompt
             )
             return response.text.strip()
@@ -311,7 +311,7 @@ USER'S TRADING STRATEGY RULES:
             contents.append(types.Content(role="user", parts=[types.Part(text=message)]))
             
             response = client.models.generate_content(
-                model='gemini-3.5-flash',
+                model='gemini-2.0-flash',
                 contents=contents
             )
             return response.text.strip()
@@ -844,7 +844,7 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
         try:
             client = genai.Client(api_key=active_key)
             response = client.models.generate_content(
-                model='gemini-3.5-flash',
+                model='gemini-2.0-flash',
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     response_mime_type="application/json"
