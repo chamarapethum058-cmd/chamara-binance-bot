@@ -264,11 +264,19 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
     ) -> str:
         """
         Engage in chat conversation with Gemini about the trading strategy and current market context.
-        Falls back automatically to local Ollama server if Gemini is unavailable or rate-limited.
+        Runs strictly on Gemini API.
         """
-        import httpx
         active_key = api_key or settings.GEMINI_API_KEY
-        
+        if not active_key:
+            return (
+                "⚠️ GEMINI API KEY NOT CONFIGURED:\n"
+                "Please click the Settings gear icon ⚙️ at the top right of the page and enter a valid Gemini API Key to chat with the AI Trading Assistant.\n\n"
+                "---\n\n"
+                "**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
+                "⚠️ GEMINI API KEY එක සකසා නොමැත:\n"
+                "කරුණාකර පිටුවේ ඉහළ දකුණු කෙළවරේ ඇති Settings gear icon ⚙️ එක ක්ලික් කර AI සහයකයා සමඟ සම්බන්ධ වීමට වලංගු Gemini API Key එකක් ඇතුළත් කරන්න."
+            )
+            
         # System prompt instructions
         system_prompt = f"""
 You are the AI Brain of Project Falcon, a Personal AI Trading Assistant.
@@ -290,60 +298,6 @@ USER'S TRADING STRATEGY RULES:
 {analysis_context}
 """
 
-        # 1. Attempt to run local Ollama server first if no Gemini key is provided
-        if not active_key:
-            try:
-                async with httpx.AsyncClient() as client:
-                    check_res = await client.get("http://localhost:11434/", timeout=1.0)
-                    if check_res.status_code == 200:
-                        ollama_messages = [
-                            {"role": "system", "content": system_prompt},
-                            {"role": "assistant", "content": "Understood. I am Project Falcon AI Brain. I will follow your guidelines and active strategy rules."}
-                        ]
-                        for msg in chat_history:
-                            role = "user" if msg.get("sender") == "user" else "assistant"
-                            ollama_messages.append({"role": role, "content": msg.get("text", "")})
-                        ollama_messages.append({"role": "user", "content": message})
-                        
-                        payload = {
-                            "model": "llama3",
-                            "messages": ollama_messages,
-                            "stream": False
-                        }
-                        
-                        models_res = await client.get("http://localhost:11434/api/tags", timeout=2.0)
-                        if models_res.status_code == 200:
-                            models_data = models_res.json()
-                            installed_models = [m["name"] for m in models_data.get("models", [])]
-                            if installed_models:
-                                if "llama3:latest" in installed_models:
-                                    payload["model"] = "llama3:latest"
-                                elif "llama3" in installed_models:
-                                    payload["model"] = "llama3"
-                                else:
-                                    payload["model"] = installed_models[0]
-                                    
-                        response = await client.post("http://localhost:11434/api/chat", json=payload, timeout=30.0)
-                        if response.status_code == 200:
-                            data = response.json()
-                            return data.get("message", {}).get("content", "").strip()
-            except Exception as ollama_err:
-                logger.error(f"Local Ollama chat attempt failed: {ollama_err}")
-            
-            return (
-                "⚠️ NO ACTIVE AI CONNECTION:\n"
-                "1. Google Gemini: No API Key is configured in settings.\n"
-                "2. Local Ollama: Attempted to connect to http://localhost:11434 but it is not running or no models are installed.\n\n"
-                "Please either enter a valid Gemini API Key in Settings ⚙️, or start your local Ollama server with 'ollama run llama3' to chat!\n\n"
-                "---\n\n"
-                "**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
-                "⚠️ සක්‍රිය AI සේවාවන් කිසිවක් හමු නොවීය:\n"
-                "1. Google Gemini: settings තුළ API Key එකක් ඇතුළත් කර නොමැත.\n"
-                "2. Local Ollama: http://localhost:11434 වෙත සම්බන්ධ වීමට උත්සාහ කළ නමුත් Ollama ක්‍රියාත්මක නොවේ.\n\n"
-                "කරුණාකර Settings ⚙️ වෙත ගොස් Gemini API Key එකක් ඇතුළත් කරන්න, නැතහොත් ඔබගේ පරිගණකයේ 'ollama run llama3' මඟින් Ollama සක්‍රිය කරන්න!"
-            )
-            
-        # 2. Try Gemini API if key is present
         try:
             client = genai.Client(api_key=active_key)
             contents = [
@@ -362,48 +316,9 @@ USER'S TRADING STRATEGY RULES:
             )
             return response.text.strip()
         except Exception as e:
-            logger.error(f"Gemini API chat failed, attempting Ollama fallback: {e}")
+            logger.error(f"Gemini API chat failed: {e}")
             err_msg = str(e)
             
-            # Fallback to local Ollama if Gemini key fails / rate limits
-            try:
-                async with httpx.AsyncClient() as client_fallback:
-                    check_res = await client_fallback.get("http://localhost:11434/", timeout=1.0)
-                    if check_res.status_code == 200:
-                        ollama_messages = [
-                            {"role": "system", "content": system_prompt},
-                            {"role": "assistant", "content": "Understood. I am Project Falcon AI Brain. I will follow your guidelines and active strategy rules."}
-                        ]
-                        for msg in chat_history:
-                            role = "user" if msg.get("sender") == "user" else "assistant"
-                            ollama_messages.append({"role": role, "content": msg.get("text", "")})
-                        ollama_messages.append({"role": "user", "content": message})
-                        
-                        payload = {
-                            "model": "llama3",
-                            "messages": ollama_messages,
-                            "stream": False
-                        }
-                        
-                        models_res = await client_fallback.get("http://localhost:11434/api/tags", timeout=2.0)
-                        if models_res.status_code == 200:
-                            models_data = models_res.json()
-                            installed_models = [m["name"] for m in models_data.get("models", [])]
-                            if installed_models:
-                                if "llama3:latest" in installed_models:
-                                    payload["model"] = "llama3:latest"
-                                elif "llama3" in installed_models:
-                                    payload["model"] = "llama3"
-                                else:
-                                    payload["model"] = installed_models[0]
-                                    
-                        response = await client_fallback.post("http://localhost:11434/api/chat", json=payload, timeout=30.0)
-                        if response.status_code == 200:
-                            data = response.json()
-                            return data.get("message", {}).get("content", "").strip()
-            except Exception as fallback_err:
-                logger.error(f"Ollama fallback after Gemini error failed: {fallback_err}")
-                
             if "401" in err_msg or "API_KEY_INVALID" in err_msg or "unauthenticated" in err_msg.lower() or "invalid API key" in err_msg.lower():
                 return (
                     "⚠️ INVALID GEMINI API KEY:\n"
@@ -411,18 +326,18 @@ USER'S TRADING STRATEGY RULES:
                     "---\n\n"
                     "**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
                     "⚠️ වලංගු නොවන GEMINI API KEY එකක්:\n"
-                    "පද්ධතියට ඇතුළත් කර ඇති Gemini API Key එක වැရදි හෝ කල් ඉකුත් වී ඇත. කරුණාකර පිටුවේ ඉහළ දකුණු කෙළවරේ ඇති Settings gear icon ⚙️ එක ක්ලික් කර නිවැරදි API Key එකක් ඇතුළත් කරන්න."
+                    "පද්ධතියට ඇතුළත් කර ඇති Gemini API Key එක වැරදි හෝ කල් ඉකුත් වී ඇත. කරුණාකර පිටුවේ ඉහළ දකුණු කෙළවරේ ඇති Settings gear icon ⚙️ එක ක්ලික් කර නිවැරදි API Key එකක් ඇතුළත් කරන්න."
                 )
             elif "429" in err_msg or "resource_exhausted" in err_msg.lower() or "quota" in err_msg.lower() or "limit" in err_msg.lower():
                 return (
                     "⚠️ GEMINI API RATE LIMIT REACHED (429 RESOURCE EXHAUSTED):\n"
                     "You have reached Gemini's free tier limit (usually 15-20 requests per minute). Please wait 1 to 2 minutes for the quota to reset, then try again.\n"
-                    "To avoid this limit, you can enable billing (Pay-As-You-Go) in your Google AI Studio account, or start a local Ollama model to chat without rate limits.\n\n"
+                    "To avoid this limit, you can enable billing (Pay-As-You-Go) in your Google AI Studio account, which raises the limit significantly for free/cheap usage.\n\n"
                     "---\n\n"
                     "**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
                     "⚠️ GEMINI API සීමාව ඉක්මවා ඇත (429 RATE LIMIT):\n"
                     "Gemini API නොමිලේ ලබාදෙන සීමාව (විනාඩියකට උපරිම 15-20 වාරයක්) ඔබ විසින් ඉක්මවා ඇත. කරුණාකර විනාඩි 1ක් හෝ 2ක් රැඳී සිට නැවත උත්සාහ කරන්න.\n"
-                    "මෙම සීමාව මඟහරවා ගැනීමට, ඔබගේ Google AI Studio ගිණුමට billing ක්‍රමයක් එකතු කරන්න (Pay-As-You-Go), නැතහොත් දේශීයව Ollama සජීවීව ක්‍රියාත්මක කරන්න."
+                    "මෙම සීමාව මඟහරවා ගැනීමට, ඔබගේ Google AI Studio ගිණුමට billing ක්‍රමයක් එකතු කිරීමෙන් (Pay-As-You-Go) මෙම සීමාව විශාල ලෙස වැඩි කර ගත හැක."
                 )
             return f"Error contacting AI Brain: {err_msg}"
 
