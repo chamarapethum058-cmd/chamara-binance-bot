@@ -637,16 +637,16 @@ export default function Dashboard() {
 
       const action = isBullish ? "Buy Limit" : "Sell Limit";
 
-      const smcAnalysisData = {
+       const smcAnalysisData = {
         is_valid: isSetupValid,
         confidence: conf,
         daily_bias: direction,
-        entry_price_area: isSetupValid ? `${action} at ${entryPrice.toFixed(2)}` : "No Entry (Confidence < 70%)",
-        stop_loss_level: isSetupValid ? stopLoss.toFixed(2) : null,
-        liquidity_target: isSetupValid ? tp2.toFixed(2) : null,
-        tp1_target: isSetupValid ? tp1.toFixed(2) : null,
-        tp2_target: isSetupValid ? tp2.toFixed(2) : null,
-        tp3_target: isSetupValid ? tp3.toFixed(2) : null,
+        entry_price_area: isSetupValid ? `${action} at ${formatPrice(entryPrice)}` : "No Entry (Confidence < 70%)",
+        stop_loss_level: isSetupValid ? formatPrice(stopLoss) : null,
+        liquidity_target: isSetupValid ? formatPrice(tp2) : null,
+        tp1_target: isSetupValid ? formatPrice(tp1) : null,
+        tp2_target: isSetupValid ? formatPrice(tp2) : null,
+        tp3_target: isSetupValid ? formatPrice(tp3) : null,
         target_reward_ratio: "1:4.00",
         equilibrium_price: (fetchedPdh + fetchedPdl) / 2,
         zone_type: isDiscount ? "DISCOUNT" : "PREMIUM",
@@ -668,14 +668,14 @@ export default function Dashboard() {
           `4. නීතිය 4 (BOS Body Close): Candle Body එකකින් BOS සනාථ වීම: ${smcBosConfirmed ? "ඔව්" : "නැත"}.\n` +
           `5. නීතිය 5 (Unmitigated POI): ${isDiscount ? "DISCOUNT" : "PREMIUM"} කලාපයේ Fresh Order Block / FVG කලාපයට මිල පැමිණීම: ${smcOrderBlockMitigated || smcFvgMitigated ? "ඔව්" : "නැත"}.\n` +
           `6. නීතිය 6 (LTF Entry Confirmation): 1m/3m/5m CHOCH සනාථ වී FVG / Order Block 50% මට්ටමේ Limit Order එක පිහිටුවීම.`,
-        invalidation: `Setup is invalidated if price breaches the manipulation extreme at ${stopLoss.toFixed(2)} before limit execution.\n\n` +
+        invalidation: `Setup is invalidated if price breaches the manipulation extreme at ${formatPrice(stopLoss)} before limit execution.\n\n` +
           `---\n\n` +
           `**සිංහල පරිවර්තනය (Sinhala Translation):**\n` +
-          `මිල ${stopLoss.toFixed(2)} මට්ටමෙන් ඔබ්බට ගියහොත් මෙම SMC setup එක සෘජුවම අවලංගු වේ.`,
-        risk_notes: `SMC Scalp Risk strictly 0.5% - 1.0% maximum. Hold duration: 10m - 15m max. Stop Loss: ${stopLoss.toFixed(2)}, Target: ${tp2.toFixed(2)} (1:4.00 RR).\n\n` +
+          `මිල ${formatPrice(stopLoss)} මට්ටමෙන් ඔබ්බට ගියහොත් මෙම SMC setup එක සෘජුවම අවලංගු වේ.`,
+        risk_notes: `SMC Scalp Risk strictly 0.5% - 1.0% maximum. Hold duration: 10m - 15m max. Stop Loss: ${formatPrice(stopLoss)}, Target: ${formatPrice(tp2)} (1:4.00 RR).\n\n` +
           `---\n\n` +
           `**සිංහල පරිවර්තනය (Sinhala Translation):**\n` +
-          `SMC Scalp trade එකක් බැවින් එක් trade එකකට උපරිම 0.5% - 1.0% ක් පමණක් අවදානමට ලක් කරන්න. උපරිම රඳවා ගැනීමේ කාලය: විනාඩි 10 - 15. Stop Loss: ${stopLoss.toFixed(2)}, Target: ${tp2.toFixed(2)}.`
+          `SMC Scalp trade එකක් බැවින් එක් trade එකකට උපරිම 0.5% - 1.0% ක් පමණක් අවදානමට ලක් කරන්න. උපරිම රඳවා ගැනීමේ කාලය: විනාඩි 10 - 15. Stop Loss: ${formatPrice(stopLoss)}, Target: ${formatPrice(tp2)}.`
       };
 
       // Add to monitoredCoins watchlist ONLY if explicitly requested
@@ -1403,6 +1403,16 @@ export default function Dashboard() {
     }
     const hasUsdt = sym.endsWith("USDT") || sym.endsWith("USD") || sym.endsWith("USDT.P") || sym.endsWith("USD.P");
     return `BINANCE:${sym}${hasUsdt ? "" : "USDT"}`;
+  };
+
+  const formatPrice = (val: any) => {
+    const num = Number(val);
+    if (isNaN(num)) return "N/A";
+    if (num === 0) return "0.00";
+    if (num >= 100) return num.toFixed(2);
+    if (num >= 1) return num.toFixed(4);
+    if (num >= 0.01) return num.toFixed(5);
+    return num.toFixed(7);
   };
 
   const getOverlayLevels = () => {
@@ -4257,13 +4267,13 @@ export default function Dashboard() {
                           <div className="bg-[#11131F]/90 border border-rose-500/30 rounded-xl p-3.5 flex flex-col gap-1">
                             <span className="text-[9px] font-bold text-rose-400 uppercase font-mono">Stop Loss</span>
                             <span className="text-xs font-bold text-rose-400 font-mono">
-                              {smcResult.is_valid ? `$${Number(smcResult.stop_loss_level).toFixed(2)}` : "N/A"}
+                              {smcResult.is_valid ? `$${smcResult.stop_loss_level}` : "N/A"}
                             </span>
                           </div>
                           <div className="bg-[#11131F]/90 border border-teal-500/30 rounded-xl p-3.5 flex flex-col gap-1">
                             <span className="text-[9px] font-bold text-teal-400 uppercase font-mono">Target TP</span>
                             <span className="text-xs font-bold text-teal-400 font-mono">
-                              {smcResult.is_valid ? `$${Number(smcResult.tp2_target).toFixed(2)}` : "N/A"}
+                              {smcResult.is_valid ? `$${smcResult.tp2_target}` : "N/A"}
                             </span>
                           </div>
                           <div className="bg-[#11131F]/90 border border-indigo-500/30 rounded-xl p-3.5 flex flex-col gap-1">
@@ -4320,9 +4330,7 @@ export default function Dashboard() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           {monitoredCoins.map((coin) => {
                             const params = getCoinParameters(coin);
-                            const liveAction = coin.htfTrend === "BULLISH" ? "Buy Limit" : "Sell Limit";
-                            const liveEntryArea = params.is_valid ? `${liveAction} at ${params.entry_price.toFixed(2)}` : "No Entry (Confidence < 70%)";
-
+                            
                             return (
                               <div key={coin.id} className={`bg-[#0E101A]/85 border ${params.is_valid ? 'border-emerald-500/50' : 'border-[#1E2235]'} rounded-xl p-4 flex flex-col gap-3 relative shadow-lg`}>
                                 {/* Card Header */}
@@ -4346,7 +4354,7 @@ export default function Dashboard() {
                                 {/* Live Status Row */}
                                 <div className="flex justify-between items-center text-[10px] font-mono">
                                   <span className="text-gray-400">Live Price:</span>
-                                  <span className="font-extrabold text-white animate-pulse">${coin.currentPrice.toFixed(2)}</span>
+                                  <span className="font-extrabold text-white animate-pulse">${formatPrice(coin.currentPrice)}</span>
                                 </div>
 
                                 {/* Progress Bar & Confidence Rating */}
@@ -4388,20 +4396,20 @@ export default function Dashboard() {
                                   <div className="flex justify-between items-center bg-black/15 px-2 py-1 rounded">
                                     <span className="text-gray-400">Entry Price (OB Limit):</span>
                                     <span className="text-emerald-400 font-extrabold">
-                                      {params.is_valid ? `$${params.entry_price.toFixed(2)}` : "🔒 Locked"}
+                                      {params.is_valid ? `$${formatPrice(params.entry_price)}` : "🔒 Locked"}
                                     </span>
                                   </div>
 
                                   {/* Stop Loss */}
                                   <div className="flex justify-between items-center bg-rose-950/10 border border-rose-500/10 px-2 py-1 rounded">
                                     <span className="text-rose-400/90 font-medium">Stop Loss (SL):</span>
-                                    <span className="text-rose-400 font-extrabold">${params.stop_loss.toFixed(2)}</span>
+                                    <span className="text-rose-400 font-extrabold">${formatPrice(params.stop_loss)}</span>
                                   </div>
 
                                   {/* Take Profit */}
                                   <div className="flex justify-between items-center bg-indigo-950/10 border border-indigo-500/10 px-2 py-1 rounded">
                                     <span className="text-indigo-300 font-medium">Take Profit (TP):</span>
-                                    <span className="text-indigo-400 font-extrabold">${params.take_profit.toFixed(2)}</span>
+                                    <span className="text-indigo-400 font-extrabold">${formatPrice(params.take_profit)}</span>
                                   </div>
 
                                   {/* Risk to Reward */}
