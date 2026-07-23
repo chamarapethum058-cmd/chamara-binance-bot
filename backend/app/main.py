@@ -266,53 +266,26 @@ async def get_gemini_status(db: Session = Depends(get_db)):
         return _gemini_status_cache
         
     try:
-        import httpx
-        if api_key.startswith("AQ."):
-            # Check status via raw HTTP request with Authorization Bearer header
-            url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
-            headers = {
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json"
-            }
-            payload = {
-                "contents": [{"parts": [{"text": "hi"}]}]
-            }
-            res = httpx.post(url, headers=headers, json=payload, timeout=10.0)
-            if res.status_code == 200:
-                _gemini_status_cache = {
-                    "status": "VALID",
-                    "details": "Gemini API connection is active and valid. | Gemini සම්බන්ධතාවය සක්‍රිය සහ වලංගු වේ.",
-                    "timestamp": now
-                }
-            else:
-                err_msg = res.text
-                try:
-                    err_data = res.json()
-                    err_reason = err_data.get("error", {}).get("details", [{}])[0].get("reason", "")
-                    if err_reason == "API_KEY_SERVICE_BLOCKED":
-                        err_msg = "API_KEY_SERVICE_BLOCKED (API key is blocked or Generative Language API is disabled in GCP Console)"
-                except Exception:
-                    pass
-                _gemini_status_cache = {
-                    "status": "INVALID",
-                    "details": f"API Error: {err_msg} | API දෝෂයකි: {err_msg}",
-                    "timestamp": now
-                }
-        else:
-            from google import genai
-            client = genai.Client(api_key=api_key)
-            client.models.generate_content(
-                model="gemini-2.0-flash",
-                contents="hi"
-            )
-            _gemini_status_cache = {
-                "status": "VALID",
-                "details": "Gemini API connection is active and valid. | Gemini සම්බන්ධතාවය සක්‍රිය සහ වලංගු වේ.",
-                "timestamp": now
-            }
+        from google import genai
+        client = genai.Client(api_key=api_key)
+        client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents="hi"
+        )
+        _gemini_status_cache = {
+            "status": "VALID",
+            "details": "Gemini API connection is active and valid. | Gemini සම්බන්ධතාවය සක්‍රිය සහ වලංගු වේ.",
+            "timestamp": now
+        }
     except Exception as e:
         err_str = str(e)
-        if "401" in err_str or "API_KEY_INVALID" in err_str or "unauthenticated" in err_str.lower() or "invalid API key" in err_str.lower():
+        if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "quota" in err_str.lower():
+            _gemini_status_cache = {
+                "status": "VALID",
+                "details": "Gemini API Key is valid, but currently rate-limited (429 Resource Exhausted). | API Key එක වලංගු වේ, නමුත් සීමාව ඉක්මවා ඇත.",
+                "timestamp": now
+            }
+        elif "401" in err_str or "API_KEY_INVALID" in err_str or "unauthenticated" in err_str.lower() or "invalid API key" in err_str.lower():
             _gemini_status_cache = {
                 "status": "INVALID",
                 "details": "Gemini API Key is invalid or expired. Please update it in Settings. | API Key එක වැරදි හෝ කල් ඉකුත් වී ඇත.",

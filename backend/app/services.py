@@ -168,48 +168,21 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
             logger.warning("GEMINI_API_KEY not configured. Falling back to mock technical analysis.")
             return cls._get_mock_analysis(symbol, timeframe, current_price)
             
-        if active_key.startswith("AQ."):
-            import httpx
-            try:
-                url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
-                headers = {
-                    "Authorization": f"Bearer {active_key}",
-                    "Content-Type": "application/json"
-                }
-                payload = {
-                    "contents": [{"parts": [{"text": prompt}]}],
-                    "generationConfig": {
-                        "responseMimeType": "application/json"
-                    }
-                }
-                res = httpx.post(url, headers=headers, json=payload, timeout=30.0)
-                if res.status_code == 200:
-                    res_json = res.json()
-                    candidates = res_json.get("candidates", [])
-                    if candidates:
-                        text_parts = candidates[0].get("content", {}).get("parts", [])
-                        if text_parts:
-                            result = json.loads(text_parts[0].get("text", "").strip())
-                            return result
-                raise Exception(f"HTTP {res.status_code}: {res.text}")
-            except Exception as e:
-                logger.error(f"Raw HTTP Gemini analysis failed: {e}. Falling back to mock analysis.")
-                return cls._get_mock_analysis(symbol, timeframe, current_price)
-        else:
-            try:
-                client = genai.Client(api_key=active_key)
-                response = client.models.generate_content(
-                    model='gemini-2.0-flash',
-                    contents=prompt,
-                    config=types.GenerateContentConfig(
-                        response_mime_type="application/json"
-                    )
+        try:
+            client = genai.Client(api_key=active_key)
+            response = client.models.generate_content(
+                model='gemini-2.0-flash',
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json"
                 )
-                result = json.loads(response.text.strip())
-                return result
-            except Exception as e:
-                logger.error(f"Gemini API analysis failed: {e}. Falling back to mock analysis.")
-                return cls._get_mock_analysis(symbol, timeframe, current_price)
+            )
+            
+            result = json.loads(response.text.strip())
+            return result
+        except Exception as e:
+            logger.error(f"Gemini API analysis failed: {e}. Falling back to mock analysis.")
+            return cls._get_mock_analysis(symbol, timeframe, current_price)
 
     @classmethod
     def _get_mock_analysis(cls, symbol: str, timeframe: str, current_price: float) -> Dict[str, Any]:
@@ -262,47 +235,23 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
             logger.warning("GEMINI_API_KEY not configured. Cannot translate text.")
             return ""
             
-        prompt = (
-            "You are an expert English to Sinhala translator specializing in financial markets and trading terminology. "
-            "Translate the following English technical analysis or trading guidance into clear, natural, and accurate Sinhala. "
-            "Ensure that terms like Order Block, CHOCH, BOS, or Fair Value Gap are translated naturally or kept as recognizable terms in Sinhala script where appropriate (e.g. 'Order Block (ඕඩර් බ්ලොක්)'). "
-            "Do NOT include any introduction, explanations, notes, or quotes. Output ONLY the translated text.\n\n"
-            f"Text to translate:\n{text}"
-        )
-        if active_key.startswith("AQ."):
-            import httpx
-            try:
-                url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
-                headers = {
-                    "Authorization": f"Bearer {active_key}",
-                    "Content-Type": "application/json"
-                }
-                payload = {
-                    "contents": [{"parts": [{"text": prompt}]}]
-                }
-                res = httpx.post(url, headers=headers, json=payload, timeout=20.0)
-                if res.status_code == 200:
-                    res_json = res.json()
-                    candidates = res_json.get("candidates", [])
-                    if candidates:
-                        text_parts = candidates[0].get("content", {}).get("parts", [])
-                        if text_parts:
-                            return text_parts[0].get("text", "").strip()
-                return ""
-            except Exception as e:
-                logger.error(f"Raw HTTP Gemini translation failed: {e}")
-                return ""
-        else:
-            try:
-                client = genai.Client(api_key=active_key)
-                response = client.models.generate_content(
-                    model='gemini-2.0-flash',
-                    contents=prompt
-                )
-                return response.text.strip()
-            except Exception as e:
-                logger.error(f"Gemini translation failed: {e}")
-                return 
+        try:
+            client = genai.Client(api_key=active_key)
+            prompt = (
+                "You are an expert English to Sinhala translator specializing in financial markets and trading terminology. "
+                "Translate the following English technical analysis or trading guidance into clear, natural, and accurate Sinhala. "
+                "Ensure that terms like Order Block, CHOCH, BOS, or Fair Value Gap are translated naturally or kept as recognizable terms in Sinhala script where appropriate (e.g. 'Order Block (ඕඩර් බ්ලොක්)'). "
+                "Do NOT include any introduction, explanations, notes, or quotes. Output ONLY the translated text.\n\n"
+                f"Text to translate:\n{text}"
+            )
+            response = client.models.generate_content(
+                model='gemini-2.0-flash',
+                contents=prompt
+            )
+            return response.text.strip()
+        except Exception as e:
+            logger.error(f"Gemini translation failed: {e}")
+            return ""
 
     @classmethod
     async def chat_response(
@@ -349,91 +298,48 @@ USER'S TRADING STRATEGY RULES:
 {analysis_context}
 """
 
-        if active_key.startswith("AQ."):
-            import httpx
-            try:
-                # Map the contents array for raw JSON payload
-                contents_payload = [
-                    {"role": "user", "parts": [{"text": system_prompt}]},
-                    {"role": "model", "parts": [{"text": "Understood. I am Project Falcon AI Brain. I will follow your guidelines and active strategy rules."}]}
-                ]
-                for msg in chat_history:
-                    role = "user" if msg.get("sender") == "user" else "model"
-                    contents_payload.append({"role": role, "parts": [{"text": msg.get("text", "")}]})
-                contents_payload.append({"role": "user", "parts": [{"text": message}]})
+        try:
+            client = genai.Client(api_key=active_key)
+            contents = [
+                types.Content(role="user", parts=[types.Part(text=system_prompt)]),
+                types.Content(role="model", parts=[types.Part(text="Understood. I am Project Falcon AI Brain. I will follow your guidelines and active strategy rules.")]),
+            ]
+            for msg in chat_history:
+                role = "user" if msg.get("sender") == "user" else "model"
+                contents.append(types.Content(role=role, parts=[types.Part(text=msg.get("text", ""))]))
                 
-                url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
-                headers = {
-                    "Authorization": f"Bearer {active_key}",
-                    "Content-Type": "application/json"
-                }
-                res = httpx.post(url, headers=headers, json={"contents": contents_payload}, timeout=30.0)
-                if res.status_code == 200:
-                    res_json = res.json()
-                    candidates = res_json.get("candidates", [])
-                    if candidates:
-                        text_parts = candidates[0].get("content", {}).get("parts", [])
-                        if text_parts:
-                            return text_parts[0].get("text", "").strip()
-                    return "No response text found in model output."
-                else:
-                    raise Exception(f"HTTP {res.status_code}: {res.text}")
-            except Exception as e:
-                logger.error(f"Raw HTTP Gemini chat failed: {e}")
-                err_msg = str(e)
-                if "401" in err_msg or "unauthenticated" in err_msg.lower():
-                    return (
-                        "⚠️ INVALID GEMINI API KEY:\n"
-                        "The configured Gemini API Key is invalid, unauthorized, or expired. Please click the Settings gear icon ⚙️ at the top right of the page and update your API Key with a valid one.\n\n"
-                        "---\n\n"
-                        "**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
-                        "⚠️ වලංගු නොවන GEMINI API KEY එකක්:\n"
-                        "පද්ධතියට ඇතුළත් කර ඇති Gemini API Key එක වැරදි හෝ කල් ඉකුත් වී ඇත. කරුණාකර පිටුවේ ඉහළ දකුණු කෙළවරේ ඇති Settings gear icon ⚙️ එක ක්ලික් කර නිවැරදි API Key එකක් ඇතුළත් කරන්න."
-                    )
-                return f"Error contacting AI Brain: {err_msg}"
-        else:
-            try:
-                client = genai.Client(api_key=active_key)
-                contents = [
-                    types.Content(role="user", parts=[types.Part(text=system_prompt)]),
-                    types.Content(role="model", parts=[types.Part(text="Understood. I am Project Falcon AI Brain. I will follow your guidelines and active strategy rules.")]),
-                ]
-                for msg in chat_history:
-                    role = "user" if msg.get("sender") == "user" else "model"
-                    contents.append(types.Content(role=role, parts=[types.Part(text=msg.get("text", ""))]))
-                    
-                contents.append(types.Content(role="user", parts=[types.Part(text=message)]))
-                
-                response = client.models.generate_content(
-                    model='gemini-2.0-flash',
-                    contents=contents
+            contents.append(types.Content(role="user", parts=[types.Part(text=message)]))
+            
+            response = client.models.generate_content(
+                model='gemini-2.0-flash',
+                contents=contents
+            )
+            return response.text.strip()
+        except Exception as e:
+            logger.error(f"Gemini API chat failed: {e}")
+            err_msg = str(e)
+            
+            if "401" in err_msg or "API_KEY_INVALID" in err_msg or "unauthenticated" in err_msg.lower() or "invalid API key" in err_msg.lower():
+                return (
+                    "⚠️ INVALID GEMINI API KEY:\n"
+                    "The configured Gemini API Key is invalid, unauthorized, or expired. Please click the Settings gear icon ⚙️ at the top right of the page and update your API Key with a valid one.\n\n"
+                    "---\n\n"
+                    "**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
+                    "⚠️ වලංගු නොවන GEMINI API KEY එකක්:\n"
+                    "පද්ධතියට ඇතුළත් කර ඇති Gemini API Key එක වැරදි හෝ කල් ඉකුත් වී ඇත. කරුණාකර පිටුවේ ඉහළ දකුණු කෙළවරේ ඇති Settings gear icon ⚙️ එක ක්ලික් කර නිවැරදි API Key එකක් ඇතුළත් කරන්න."
                 )
-                return response.text.strip()
-            except Exception as e:
-                logger.error(f"Gemini API chat failed: {e}")
-                err_msg = str(e)
-                
-                if "401" in err_msg or "API_KEY_INVALID" in err_msg or "unauthenticated" in err_msg.lower() or "invalid API key" in err_msg.lower():
-                    return (
-                        "⚠️ INVALID GEMINI API KEY:\n"
-                        "The configured Gemini API Key is invalid, unauthorized, or expired. Please click the Settings gear icon ⚙️ at the top right of the page and update your API Key with a valid one.\n\n"
-                        "---\n\n"
-                        "**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
-                        "⚠️ වලංගු නොවන GEMINI API KEY එකක්:\n"
-                        "පද්ධතියට ඇතුළත් කර ඇති Gemini API Key එක වැරදි හෝ කල් ඉකුත් වී ඇත. කරුණාකර පිටුවේ ඉහළ දකුණු කෙළවරේ ඇති Settings gear icon ⚙️ එක ක්ලික් කර නිවැරදි API Key එකක් ඇතුළත් කරන්න."
-                    )
-                elif "429" in err_msg or "resource_exhausted" in err_msg.lower() or "quota" in err_msg.lower() or "limit" in err_msg.lower():
-                    return (
-                        "⚠️ GEMINI API RATE LIMIT REACHED (429 RESOURCE EXHAUSTED):\n"
-                        "You have reached Gemini's free tier limit (usually 15-20 requests per minute). Please wait 1 to 2 minutes for the quota to reset, then try again.\n"
-                        "To avoid this limit, you can enable billing (Pay-As-You-Go) in your Google AI Studio account, which raises the limit significantly for free/cheap usage.\n\n"
-                        "---\n\n"
-                        "**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
-                        "⚠️ GEMINI API සීමාව ඉක්මවා ඇත (429 RATE LIMIT):\n"
-                        "Gemini API නොමිලේ ලබාදෙන සීමාව (විනාඩියකට උපරිම 15-20 වාරයක්) ඔබ විසින් ඉක්මවා ඇත. කරුණාකර විනාඩි 1ක් හෝ 2ක් රැඳී සිට නැවත උත්සාහ කරන්න.\n"
-                        "මෙම සීමාව මඟහරවා ගැනීමට, ඔබගේ Google AI Studio ගිණුමට billing ක්‍රමයක් එකතු කිරීමෙන් (Pay-As-You-Go) මෙම සීමාව විශාල ලෙස වැඩි කර ගත හැක."
-                    )
-                return f"Error contacting AI Brain: {err_msg}" 
+            elif "429" in err_msg or "resource_exhausted" in err_msg.lower() or "quota" in err_msg.lower() or "limit" in err_msg.lower():
+                return (
+                    "⚠️ GEMINI API RATE LIMIT REACHED (429 RESOURCE EXHAUSTED):\n"
+                    "You have reached Gemini's free tier limit (usually 15-20 requests per minute). Please wait 1 to 2 minutes for the quota to reset, then try again.\n"
+                    "To avoid this limit, you can enable billing (Pay-As-You-Go) in your Google AI Studio account, which raises the limit significantly for free/cheap usage.\n\n"
+                    "---\n\n"
+                    "**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
+                    "⚠️ GEMINI API සීමාව ඉක්මවා ඇත (429 RATE LIMIT):\n"
+                    "Gemini API නොමිලේ ලබාදෙන සීමාව (විනාඩියකට උපරිම 15-20 වාරයක්) ඔබ විසින් ඉක්මවා ඇත. කරුණාකර විනාඩි 1ක් හෝ 2ක් රැඳී සිට නැවත උත්සාහ කරන්න.\n"
+                    "මෙම සීමාව මඟහරවා ගැනීමට, ඔබගේ Google AI Studio ගිණුමට billing ක්‍රමයක් එකතු කිරීමෙන් (Pay-As-You-Go) මෙම සීමාව විශාල ලෙස වැඩි කර ගත හැක."
+                )
+            return f"Error contacting AI Brain: {err_msg}"
 
     @classmethod
     def _get_sb_steps(
