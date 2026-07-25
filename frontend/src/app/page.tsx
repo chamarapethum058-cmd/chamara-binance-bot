@@ -5256,6 +5256,14 @@ export default function Dashboard() {
                   Check API Limits & Usage ↗
                 </a>
 
+                {tempApiKey && tempApiKey.startsWith("AQ.") && tempApiKey.length < 100 && (
+                  <p className="text-[10px] text-amber-400 font-medium leading-normal mt-2 border border-amber-500/20 bg-amber-500/5 p-2 rounded-lg font-mono">
+                    ⚠️ WARNING: This key appears to be truncated (too short)! Make sure to copy the ENTIRE key using the official "Copy" button in Google AI Studio instead of manually highlighting screen text.
+                    <br />
+                    <span className="text-gray-400 font-normal">(සිංහල: මෙම Key එක අසම්පූර්ණයි (truncation). AI Studio හි ඇති "Copy" බොත්තම මඟින් සම්පූර්ණ Key එකම copy කරගන්න.)</span>
+                  </p>
+                )}
+
                 {/* API Key Status Feedback */}
                 <div 
                   className="border rounded-xl p-3 flex flex-col gap-1 text-[11px] font-mono mt-3"
