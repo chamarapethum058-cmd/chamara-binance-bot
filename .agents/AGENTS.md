@@ -147,3 +147,11 @@ The bot must strictly enforce the following high-impact news rules:
 > 2. **High Volume Node (HVN) Alignment Check:**
 >    - The recommended Limit Entry price must reside within a 0.5% tolerance threshold of a programmatically calculated High Volume Node (HVN) to verify support/resistance density.
 >    - Setups that do not align with a high-density volume zone should flag a warning on the checklist tree to alert the user of potential low-volume breakout risk.
+
+## 21. High-Velocity Execution & Dynamic Target Optimization Protocol (New Rule)
+> [!IMPORTANT]
+> **HIGH-VELOCITY EXECUTION & DYNAMIC TARGET OPTIMIZATION RULES:**
+> 1. **5-8 Minutes Expected Entry Fill:** The analysis engine recommends entry prices in close proximity to the current market price so that setups are typically filled/triggered within **5 to 8 minutes** of logging. No hard timeout invalidation should be applied to pending trades.
+> 2. **10-15 Minutes Expected Target Fill:** Take Profit targets are configured within a tight range to ensure they can typically be hit within **10 to 15 minutes** of running execution. No hard timeout closure or forced resolve should be applied to running trades.
+> 3. **Dynamic 1:2 to 1:4 Risk-to-Reward Target Allocation:** Instead of a fixed 1:4 or 1:3 target, the Take Profit target must reside strictly between **1:2.0 and 1:4.0** RR. The analysis engine must dynamically identify the nearest minor reversal swing extreme or FVG/OB boundary within this 1:2.0 to 1:4.0 RR range to use as the Take Profit target, maximizing target probability while meeting minimum RR requirements. If no local reversal extreme is identified in range, a default 1:3.0 RR target is applied.
+

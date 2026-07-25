@@ -522,7 +522,7 @@ USER'S TRADING STRATEGY RULES:
             
         sb_step_6_risk_mgmt_ok = (setup_triggered and not ct_locked and rr_ratio >= 2.0 and conf_score >= 70)
         if sb_step_6_risk_mgmt_ok:
-            sb_step_6_details = f"Risk management verified: SL at swept boundary, TP set at 1:4.00 RR. | SL සහ TP 1:4.00 RR අනුපාතයකට සකසා ඇත."
+            sb_step_6_details = f"Risk management verified: SL at swept boundary, TP set at 1:{rr_ratio:.2f} RR. | SL සහ TP 1:{rr_ratio:.2f} RR අනුපාතයකට සකසා ඇත."
         else:
             sb_step_6_details = f"Risk management locked: RR profile insufficient ({rr_ratio:.2f} < 1:2 RR or confidence < 70%). | රීති අවහිරය: RR අනුපාතය හෝ තහවුරු කිරීමේ ප්‍රතිශතය ප්‍රමාණවත් නොවේ."
 
@@ -1551,6 +1551,65 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
         return fallback_bias
 
     @classmethod
+    def _calculate_dynamic_tp(cls, symbol: str, timeframe: str, direction: str, entry_price: float, stop_loss: float) -> tuple:
+        """
+        Dynamically calculates the Take Profit level strictly between 1:2.0 and 1:4.0 RR
+        by scanning the last 50 candles for local reversal extremes (swing highs/lows) or FVG boundaries.
+        Falls back to a default 1:3.0 RR target if no candidate is found.
+        Returns a tuple of (target_price, rr_ratio).
+        """
+        risk = abs(entry_price - stop_loss)
+        if risk <= 0:
+            return entry_price, 0.0
+
+        min_rr = 2.0
+        max_rr = 4.0
+        
+        # Default fallback is 1:3.0 RR
+        fallback_rr = 3.0
+        if direction == "BULLISH":
+            fallback_target = entry_price + (risk * fallback_rr)
+        else:
+            fallback_target = entry_price - (risk * fallback_rr)
+            
+        from app.market import get_candles
+        sym = symbol.upper()
+        if sym.endswith(".P"):
+            sym = sym[:-2]
+        if not sym.endswith("USDT") and not sym.endswith("USD") and sym not in ["BTC", "ETH", "SOL", "XAUUSD"]:
+            sym = f"{sym}USDT"
+        elif sym in ["BTC", "ETH", "SOL"]:
+            sym = f"{sym}USDT"
+            
+        try:
+            candles = get_candles(sym, timeframe, limit=50)
+            if not candles:
+                return fallback_target, fallback_rr
+                
+            candidates = []
+            for c in candles:
+                if direction == "BULLISH":
+                    rr = (c["high"] - entry_price) / risk
+                    if min_rr <= rr <= max_rr:
+                        candidates.append((c["high"], rr))
+                else:
+                    rr = (entry_price - c["low"]) / risk
+                    if min_rr <= rr <= max_rr:
+                        candidates.append((c["low"], rr))
+                        
+            if candidates:
+                if direction == "BULLISH":
+                    candidates.sort(key=lambda x: x[0])
+                else:
+                    candidates.sort(key=lambda x: x[0], reverse=True)
+                best_target, best_rr = candidates[0]
+                return best_target, best_rr
+        except Exception as e:
+            logger.error(f"Error calculating dynamic TP: {e}")
+            
+        return fallback_target, fallback_rr
+
+    @classmethod
     def _get_mock_silver_bullet(cls, req: Dict[str, Any], upcoming_news_events: List[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Provides a structured mock analysis for Silver Bullet strategy if API key fails."""
         if upcoming_news_events is None:
@@ -1795,7 +1854,7 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                         dr_high=high_val,
                         current_price=current_price or 0.0
                     )
-                    target = entry_price + (abs(entry_price - stop_loss) * 4.0)
+                    target, rr_ratio = cls._calculate_dynamic_tp(symbol, timeframe, "BULLISH", entry_price, stop_loss)
                     bias = "BULLISH"
                 else:
                     entry_price, stop_loss = cls._find_deepest_pd_array_level(
@@ -1807,7 +1866,7 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                         dr_high=high_val,
                         current_price=current_price or 0.0
                     )
-                    target = entry_price - (abs(entry_price - stop_loss) * 4.0)
+                    target, rr_ratio = cls._calculate_dynamic_tp(symbol, timeframe, "BEARISH", entry_price, stop_loss)
                     bias = "BEARISH"
             else:
                 if setup_direction == "BULLISH":
@@ -1820,7 +1879,7 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                         dr_high=high_val,
                         current_price=current_price or 0.0
                     )
-                    target = entry_price + (abs(entry_price - stop_loss) * 4.0)
+                    target, rr_ratio = cls._calculate_dynamic_tp(symbol, timeframe, "BULLISH", entry_price, stop_loss)
                     bias = "BULLISH"
                 else:
                     entry_price, stop_loss = cls._find_deepest_pd_array_level(
@@ -1832,7 +1891,7 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                         dr_high=high_val,
                         current_price=current_price or 0.0
                     )
-                    target = entry_price - (abs(entry_price - stop_loss) * 4.0)
+                    target, rr_ratio = cls._calculate_dynamic_tp(symbol, timeframe, "BEARISH", entry_price, stop_loss)
                     bias = "BEARISH"
             
             # Calculate strategy confidence score based on confluences (out of 100%)
@@ -2246,14 +2305,15 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
             stop_loss = round(stop_loss, r_places)
             risk = round(abs(entry_price - stop_loss), r_places)
             if risk > 0:
+                current_rr = rr_ratio if (rr_ratio and rr_ratio != 4.0) else 3.0
                 if bias == "BULLISH":
-                    target = entry_price + (risk * 4.0)
-                    tp1_val = entry_price + (risk * 2.0)
-                    tp2_val = entry_price + (risk * 4.0)
+                    target = entry_price + (risk * current_rr)
+                    tp1_val = entry_price + (risk * (current_rr * 0.5))
+                    tp2_val = entry_price + (risk * current_rr)
                 else:
-                    target = entry_price - (risk * 4.0)
-                    tp1_val = entry_price - (risk * 2.0)
-                    tp2_val = entry_price - (risk * 4.0)
+                    target = entry_price - (risk * current_rr)
+                    tp1_val = entry_price - (risk * (current_rr * 0.5))
+                    tp2_val = entry_price - (risk * current_rr)
             else:
                 tp1_val = entry_price
                 tp2_val = entry_price
@@ -2262,7 +2322,7 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
             tp2_target = round(tp2_val, r_places)
             
             reward = abs(target - entry_price)
-            rr_ratio = reward / risk if risk > 0 else 4.0
+            rr_ratio = reward / risk if risk > 0 else 3.0
             
             action_type = "Buy Limit" if bias == "BULLISH" else "Sell Limit"
             
@@ -2345,9 +2405,9 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                 "stop_loss_level": stop_loss,
                 "target_reward_ratio": f"1:{rr_ratio:.2f}",
                 "tp1_target": tp1_target,
-                "tp1_rr": "1:2.00",
+                "tp1_rr": f"1:{(rr_ratio * 0.5):.2f}",
                 "tp2_target": tp2_target,
-                "tp2_rr": "1:4.00",
+                "tp2_rr": f"1:{rr_ratio:.2f}",
                 "reasoning": reasoning,
                 "invalidation": invalidation,
                 "risk_notes": risk_notes,
@@ -2802,9 +2862,10 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
         r_places = 4 if is_small else 2
         
         actual_risk = abs(entry_price - stop_loss)
-        tp1 = entry_price + (actual_risk * 2.0) if direction == "BULLISH" else entry_price - (actual_risk * 2.0)
-        tp2 = entry_price + (actual_risk * 4.0) if direction == "BULLISH" else entry_price - (actual_risk * 4.0)
-        tp3 = entry_price + (actual_risk * 6.0) if direction == "BULLISH" else entry_price - (actual_risk * 6.0)
+        target_val_smc, rr_ratio_smc = cls._calculate_dynamic_tp(symbol, timeframe, direction, entry_price, stop_loss)
+        tp1 = entry_price + (actual_risk * (rr_ratio_smc * 0.5)) if direction == "BULLISH" else entry_price - (actual_risk * (rr_ratio_smc * 0.5))
+        tp2 = target_val_smc
+        tp3 = entry_price + (actual_risk * (rr_ratio_smc * 1.5)) if direction == "BULLISH" else entry_price - (actual_risk * (rr_ratio_smc * 1.5))
 
         # 1. Double Mitigation Verification (Double-mitigation Test)
         double_mitigation_ok = False
@@ -2969,7 +3030,7 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                 f"මිල {stop_loss:.2f} මට්ටමෙන් ඔබ්බට ගියහොත් මෙම SMC setup එක සෘජුවම අවලංගು වේ."
             )
             risk_notes = (
-                f"SMC Scalp Risk strictly 0.5% - 1.0% maximum. Hold duration: 10m - 15m max. Stop Loss: {stop_loss:.2f}, Target: {tp2:.2f} (1:4.00 RR).\n\n"
+                f"SMC Scalp Risk strictly 0.5% - 1.0% maximum. Hold duration: 10m - 15m max. Stop Loss: {stop_loss:.2f}, Target: {tp2:.2f} (1:{rr_ratio_smc:.2f} RR).\n\n"
                 f"---\n\n"
                 f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
                 f"SMC Scalp trade එකක් බැවින් එක් trade එකකට උපරිම 0.5% - 1.0% ක් පමණක් අවදානමට ලක් කරන්න. උපරිම රඳවා ගැනීමේ කාලය: විනාඩි 10 - 15. Stop Loss: {stop_loss:.2f}, Target: {tp2:.2f}."
@@ -3016,7 +3077,7 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
             "tp1_target": tp1_val,
             "tp2_target": tp2_val,
             "tp3_target": tp3_val,
-            "target_reward_ratio": "1:4.00",
+            "target_reward_ratio": f"1:{rr_ratio_smc:.2f}",
             "equilibrium_price": equilibrium,
             "zone_type": "DISCOUNT" if is_discount else "PREMIUM",
             "daily_open_relation": "BELOW_OPEN" if price < daily_open else "ABOVE_OPEN",
