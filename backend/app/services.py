@@ -277,6 +277,47 @@ Format your output strictly as a JSON object with the following fields:
 OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formatting.
 """
 
+        # Check LLM Provider preference
+        from app.database import SessionLocal
+        from app.models import PreferenceModel
+        
+        db = SessionLocal()
+        try:
+            provider_pref = db.query(PreferenceModel).filter(PreferenceModel.key == "llm_provider").first()
+            provider = provider_pref.value if provider_pref else "GEMINI"
+            model_pref = db.query(PreferenceModel).filter(PreferenceModel.key == "ollama_model").first()
+            ollama_model = model_pref.value if model_pref else settings.OLLAMA_MODEL
+        except Exception:
+            provider = "GEMINI"
+            ollama_model = settings.OLLAMA_MODEL
+        finally:
+            db.close()
+            
+        if provider == "LOCAL":
+            try:
+                payload = {
+                    "model": ollama_model,
+                    "messages": [
+                        {"role": "system", "content": "You are the AI Brain of Project Falcon, a Personal AI Trading Assistant. Analyze the market structure and data using the provided strategy rules and return JSON only."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    "response_format": {"type": "json_object"}
+                }
+                async with httpx.AsyncClient() as client:
+                    res = await client.post(
+                        f"{settings.OLLAMA_BASE_URL}/v1/chat/completions",
+                        json=payload,
+                        timeout=90.0
+                    )
+                    res.raise_for_status()
+                    res_json = res.json()
+                    response_text = res_json["choices"][0]["message"]["content"]
+                    result = json.loads(response_text.strip())
+                    return result
+            except Exception as e:
+                logger.error(f"Local LLM (Ollama) analysis failed: {e}. Falling back to mock analysis.")
+                return cls._get_mock_analysis(symbol, timeframe, current_price)
+
         # Use passed key if available, otherwise check settings
         active_key = api_key or settings.GEMINI_API_KEY
         if not active_key:
@@ -345,6 +386,51 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
         """
         Translate English technical analysis text to Sinhala.
         """
+        # Check LLM Provider preference
+        from app.database import SessionLocal
+        from app.models import PreferenceModel
+        
+        db = SessionLocal()
+        try:
+            provider_pref = db.query(PreferenceModel).filter(PreferenceModel.key == "llm_provider").first()
+            provider = provider_pref.value if provider_pref else "GEMINI"
+            model_pref = db.query(PreferenceModel).filter(PreferenceModel.key == "ollama_model").first()
+            ollama_model = model_pref.value if model_pref else settings.OLLAMA_MODEL
+        except Exception:
+            provider = "GEMINI"
+            ollama_model = settings.OLLAMA_MODEL
+        finally:
+            db.close()
+
+        prompt = (
+            "You are an expert English to Sinhala translator specializing in financial markets and trading terminology. "
+            "Translate the following English technical analysis or trading guidance into clear, natural, and accurate Sinhala. "
+            "Ensure that terms like Order Block, CHOCH, BOS, or Fair Value Gap are translated naturally or kept as recognizable terms in Sinhala script where appropriate (e.g. 'Order Block (ඕඩර් බ්ලොක්)'). "
+            "Do NOT include any introduction, explanations, notes, or quotes. Output ONLY the translated text.\n\n"
+            f"Text to translate:\n{text}"
+        )
+
+        if provider == "LOCAL":
+            try:
+                payload = {
+                    "model": ollama_model,
+                    "messages": [
+                        {"role": "user", "content": prompt}
+                    ]
+                }
+                async with httpx.AsyncClient() as client:
+                    res = await client.post(
+                        f"{settings.OLLAMA_BASE_URL}/v1/chat/completions",
+                        json=payload,
+                        timeout=60.0
+                    )
+                    res.raise_for_status()
+                    res_json = res.json()
+                    return res_json["choices"][0]["message"]["content"].strip()
+            except Exception as e:
+                logger.error(f"Local LLM (Ollama) translation failed: {e}")
+                return ""
+
         active_key = api_key or settings.GEMINI_API_KEY
         if not active_key:
             logger.warning("GEMINI_API_KEY not configured. Cannot translate text.")
@@ -352,13 +438,6 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
             
         try:
             client = genai.Client(api_key=active_key)
-            prompt = (
-                "You are an expert English to Sinhala translator specializing in financial markets and trading terminology. "
-                "Translate the following English technical analysis or trading guidance into clear, natural, and accurate Sinhala. "
-                "Ensure that terms like Order Block, CHOCH, BOS, or Fair Value Gap are translated naturally or kept as recognizable terms in Sinhala script where appropriate (e.g. 'Order Block (ඕඩර් බ්ලොක්)'). "
-                "Do NOT include any introduction, explanations, notes, or quotes. Output ONLY the translated text.\n\n"
-                f"Text to translate:\n{text}"
-            )
             response = client.models.generate_content(
                 model='gemini-2.0-flash',
                 contents=prompt
@@ -381,17 +460,22 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
         Engage in chat conversation with Gemini about the trading strategy and current market context.
         Runs strictly on Gemini API.
         """
-        active_key = api_key or settings.GEMINI_API_KEY
-        if not active_key:
-            return (
-                "⚠️ GEMINI API KEY NOT CONFIGURED:\n"
-                "Please click the Settings gear icon ⚙️ at the top right of the page and enter a valid Gemini API Key to chat with the AI Trading Assistant.\n\n"
-                "---\n\n"
-                "**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
-                "⚠️ GEMINI API KEY එක සකසා නොමැත:\n"
-                "කරුණාකර පිටුවේ ඉහළ දකුණු කෙළවරේ ඇති Settings gear icon ⚙️ එක ක්ලික් කර AI සහයකයා සමඟ සම්බන්ධ වීමට වලංගු Gemini API Key එකක් ඇතුළත් කරන්න."
-            )
-            
+        # Check LLM Provider preference
+        from app.database import SessionLocal
+        from app.models import PreferenceModel
+        
+        db = SessionLocal()
+        try:
+            provider_pref = db.query(PreferenceModel).filter(PreferenceModel.key == "llm_provider").first()
+            provider = provider_pref.value if provider_pref else "GEMINI"
+            model_pref = db.query(PreferenceModel).filter(PreferenceModel.key == "ollama_model").first()
+            ollama_model = model_pref.value if model_pref else settings.OLLAMA_MODEL
+        except Exception:
+            provider = "GEMINI"
+            ollama_model = settings.OLLAMA_MODEL
+        finally:
+            db.close()
+
         # System prompt instructions
         system_prompt = f"""
 You are the AI Brain of Project Falcon, a Personal AI Trading Assistant.
@@ -413,6 +497,55 @@ USER'S TRADING STRATEGY RULES:
 {analysis_context}
 """
 
+        if provider == "LOCAL":
+            try:
+                messages = [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "assistant", "content": "Understood. I am Project Falcon AI Brain. I will follow your guidelines and active strategy rules."}
+                ]
+                for msg in chat_history:
+                    role = "user" if msg.get("sender") == "user" else "assistant"
+                    messages.append({"role": role, "content": msg.get("text", "")})
+                
+                messages.append({"role": "user", "content": message})
+                
+                payload = {
+                    "model": ollama_model,
+                    "messages": messages
+                }
+                async with httpx.AsyncClient() as client:
+                    res = await client.post(
+                        f"{settings.OLLAMA_BASE_URL}/v1/chat/completions",
+                        json=payload,
+                        timeout=90.0
+                    )
+                    res.raise_for_status()
+                    res_json = res.json()
+                    return res_json["choices"][0]["message"]["content"].strip()
+            except Exception as e:
+                logger.error(f"Local LLM (Ollama) chat failed: {e}")
+                return (
+                    f"⚠️ LOCAL OLLAMA CHAT FAILED:\n"
+                    f"Failed to connect to local Ollama server at http://localhost:11434.\n"
+                    f"Please verify Ollama is running and you have pulled the model '{ollama_model}' (run: 'ollama pull {ollama_model}').\n\n"
+                    f"---\n\n"
+                    f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
+                    f"⚠️ දේශීය OLLAMA සම්බන්ධතාවය අසාර්ථක විය:\n"
+                    f"Ollama සේවාව http://localhost:11434 හි ක්‍රියාත්මක නොවේ. "
+                    f"කරුණාකර Ollama ක්‍රියාත්මක බව සහ '{ollama_model}' model එක pull කර ඇති බව තහවුරු කරගන්න."
+                )
+
+        active_key = api_key or settings.GEMINI_API_KEY
+        if not active_key:
+            return (
+                "⚠️ GEMINI API KEY NOT CONFIGURED:\n"
+                "Please click the Settings gear icon ⚙️ at the top right of the page and enter a valid Gemini API Key to chat with the AI Trading Assistant.\n\n"
+                "---\n\n"
+                "**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
+                "⚠️ GEMINI API KEY එක සකසා නොමැත:\n"
+                "කරුණාකර පිටුවේ ඉහළ දකුණු කෙළවරේ ඇති Settings gear icon ⚙️ එක ක්ලික් කර AI සහයකයා සමඟ සම්බන්ධ වීමට වලංගු Gemini API Key එකක් ඇතුළත් කරන්න."
+            )
+            
         try:
             client = genai.Client(api_key=active_key)
             contents = [

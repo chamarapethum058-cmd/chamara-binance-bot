@@ -187,6 +187,22 @@ The engine must strictly monitor setups only during these three independent oper
         db.commit()
         print("Default Telegram Chat ID preference seeded from settings.")
         
+    # Seed default LLM provider if not set in DB
+    llm_prov_pref = db.query(PreferenceModel).filter(PreferenceModel.key == "llm_provider").first()
+    if not llm_prov_pref:
+        db_pref = PreferenceModel(key="llm_provider", value="GEMINI")
+        db.add(db_pref)
+        db.commit()
+        print("Default LLM Provider (GEMINI) preference seeded.")
+        
+    # Seed default Ollama model if not set in DB
+    ollama_m_pref = db.query(PreferenceModel).filter(PreferenceModel.key == "ollama_model").first()
+    if not ollama_m_pref:
+        db_pref = PreferenceModel(key="ollama_model", value=settings.OLLAMA_MODEL)
+        db.add(db_pref)
+        db.commit()
+        print("Default Ollama model preference seeded.")
+        
     db.close()
     
     # Start the background SMC watchlist tracker loop
@@ -275,6 +291,44 @@ _gemini_status_cache = {"status": "UNKNOWN", "details": "", "timestamp": 0.0}
 
 @app.get("/api/preferences/gemini-status")
 async def get_gemini_status(db: Session = Depends(get_db)):
+    provider_pref = db.query(PreferenceModel).filter(PreferenceModel.key == "llm_provider").first()
+    provider = provider_pref.value if provider_pref else "GEMINI"
+    
+    import time
+    global _gemini_status_cache
+    now = time.time()
+    
+    if provider == "LOCAL":
+        if _gemini_status_cache.get("provider") == "LOCAL" and (now - _gemini_status_cache.get("timestamp", 0.0)) < 10:
+            return _gemini_status_cache
+        try:
+            import httpx
+            url = f"{settings.OLLAMA_BASE_URL}/api/tags"
+            async with httpx.AsyncClient() as client:
+                res = await client.get(url, timeout=3.0)
+                if res.status_code == 200:
+                    _gemini_status_cache = {
+                        "status": "VALID",
+                        "details": "Local Ollama is active & connected. | දේශීය Ollama සේවාව සක්‍රිය සහ සම්බන්ධ වී ඇත.",
+                        "timestamp": now,
+                        "provider": "LOCAL"
+                    }
+                else:
+                    _gemini_status_cache = {
+                        "status": "ERROR",
+                        "details": f"Local Ollama returned status {res.status_code}. | දේශීය Ollama සේවාව {res.status_code} දෝෂයක් ලබා දෙයි.",
+                        "timestamp": now,
+                        "provider": "LOCAL"
+                    }
+        except Exception:
+            _gemini_status_cache = {
+                "status": "ERROR",
+                "details": "Ollama is not running on http://localhost:11434. Please start Ollama. | Ollama ක්‍රියාත්මක නොවේ, කරුණාකර එය ධාවනය කරන්න.",
+                "timestamp": now,
+                "provider": "LOCAL"
+            }
+        return _gemini_status_cache
+
     pref = db.query(PreferenceModel).filter(PreferenceModel.key == "gemini_api_key").first()
     api_key = pref.value if pref else None
     if not api_key:
@@ -283,10 +337,7 @@ async def get_gemini_status(db: Session = Depends(get_db)):
             "details": "Gemini API Key is missing. Enter it in Settings to enable AI features. | Gemini API Key එක ඇතුලත් කර නැත."
         }
     
-    import time
-    global _gemini_status_cache
-    now = time.time()
-    if _gemini_status_cache["status"] != "UNKNOWN" and (now - _gemini_status_cache["timestamp"]) < 120:
+    if _gemini_status_cache.get("provider") != "LOCAL" and _gemini_status_cache["status"] != "UNKNOWN" and (now - _gemini_status_cache["timestamp"]) < 120:
         cached_res = dict(_gemini_status_cache)
         if cached_res.get("status") == "VALID" and "rate-limited" in cached_res.get("details", "").lower():
             cached_res["status"] = "HIGH_DEMAND"
@@ -302,7 +353,8 @@ async def get_gemini_status(db: Session = Depends(get_db)):
         _gemini_status_cache = {
             "status": "VALID",
             "details": "Gemini API connection is active and valid. | Gemini සම්බන්ධතාවය සක්‍රිය සහ වලංගු වේ.",
-            "timestamp": now
+            "timestamp": now,
+            "provider": "GEMINI"
         }
     except Exception as e:
         err_str = str(e)
@@ -310,19 +362,22 @@ async def get_gemini_status(db: Session = Depends(get_db)):
             _gemini_status_cache = {
                 "status": "HIGH_DEMAND",
                 "details": "Gemini API Key is valid, but currently rate-limited (429 Resource Exhausted). | API Key එක වලංගු වේ, නමුත් සීමාව ඉක්මවා ඇත.",
-                "timestamp": now
+                "timestamp": now,
+                "provider": "GEMINI"
             }
         elif "401" in err_str or "API_KEY_INVALID" in err_str or "unauthenticated" in err_str.lower() or "invalid API key" in err_str.lower():
             _gemini_status_cache = {
                 "status": "INVALID",
                 "details": "Gemini API Key is invalid or expired. Please update it in Settings. | API Key එක වැරදි හෝ කල් ඉකුත් වී ඇත.",
-                "timestamp": now
+                "timestamp": now,
+                "provider": "GEMINI"
             }
         else:
             _gemini_status_cache = {
                 "status": "ERROR",
                 "details": f"API Error: {err_str} | API දෝෂයකි: {err_str}",
-                "timestamp": now
+                "timestamp": now,
+                "provider": "GEMINI"
             }
             
     return _gemini_status_cache
@@ -374,7 +429,7 @@ def set_preference(pref: PreferenceCreate, db: Session = Depends(get_db)):
     db.refresh(db_pref)
     
     # Invalidate cache if key was updated
-    if pref.key == "gemini_api_key":
+    if pref.key in ["gemini_api_key", "llm_provider", "ollama_model"]:
         global _gemini_status_cache
         _gemini_status_cache = {"status": "UNKNOWN", "details": "", "timestamp": 0.0}
         

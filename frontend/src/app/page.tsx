@@ -54,7 +54,11 @@ export default function Dashboard() {
   // Settings & preferences states
   const [geminiApiKey, setGeminiApiKey] = useState("");
   const [tempApiKey, setTempApiKey] = useState("");
-  const [geminiStatus, setGeminiStatus] = useState<{ status: string; details: string }>({ status: "UNKNOWN", details: "Checking key status..." });
+  const [llmProvider, setLlmProvider] = useState("GEMINI");
+  const [tempLlmProvider, setTempLlmProvider] = useState("GEMINI");
+  const [ollamaModel, setOllamaModel] = useState("qwen2.5-coder:7b");
+  const [tempOllamaModel, setTempOllamaModel] = useState("qwen2.5-coder:7b");
+  const [geminiStatus, setGeminiStatus] = useState<{ status: string; details: string; provider?: string }>({ status: "UNKNOWN", details: "Checking key status..." });
   const [showSettings, setShowSettings] = useState(false);
 
   // News states
@@ -1089,6 +1093,16 @@ export default function Dashboard() {
           setGeminiApiKey(apiKeyPref.value);
           setTempApiKey(apiKeyPref.value);
         }
+        const providerPref = data.find((p: any) => p.key === "llm_provider");
+        if (providerPref) {
+          setLlmProvider(providerPref.value);
+          setTempLlmProvider(providerPref.value);
+        }
+        const modelPref = data.find((p: any) => p.key === "ollama_model");
+        if (modelPref) {
+          setOllamaModel(modelPref.value);
+          setTempOllamaModel(modelPref.value);
+        }
       }
     } catch (e) {
       console.error("Error fetching preferences:", e);
@@ -1098,23 +1112,38 @@ export default function Dashboard() {
   const saveApiKey = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch(`${API_BASE}/preferences`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ key: "gemini_api_key", value: tempApiKey }),
-      });
-      if (res.ok) {
+      const [res1, res2, res3] = await Promise.all([
+        fetch(`${API_BASE}/preferences`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ key: "gemini_api_key", value: tempApiKey }),
+        }),
+        fetch(`${API_BASE}/preferences`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ key: "llm_provider", value: tempLlmProvider }),
+        }),
+        fetch(`${API_BASE}/preferences`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ key: "ollama_model", value: tempOllamaModel }),
+        })
+      ]);
+
+      if (res1.ok && res2.ok && res3.ok) {
         setGeminiApiKey(tempApiKey);
+        setLlmProvider(tempLlmProvider);
+        setOllamaModel(tempOllamaModel);
         setShowSettings(false);
-        alert("API Key saved successfully!");
+        alert("Configuration saved successfully! | සැකසුම් සාර්ථකව සුරකින ලදී!");
         checkHealth();
         fetchGeminiStatus();
       } else {
-        alert("Failed to save API key.");
+        alert("Failed to save configuration.");
       }
     } catch (e) {
-      console.error("Error saving API key:", e);
-      alert("Error saving API key.");
+      console.error("Error saving configurations:", e);
+      alert("Error saving configuration.");
     }
   };
 
@@ -1649,12 +1678,18 @@ export default function Dashboard() {
               }}
             >
               {
-                geminiStatus.status === "VALID" ? "GEMINI ACTIVE" :
-                geminiStatus.status === "INVALID" ? "GEMINI INVALID" :
-                geminiStatus.status === "HIGH_DEMAND" ? "GEMINI BUSY" :
-                geminiStatus.status === "MISSING" ? "NO GEMINI KEY" :
-                geminiStatus.status === "ERROR" ? "GEMINI ERROR" :
-                "CHECKING GEMINI"
+                geminiStatus.provider === "LOCAL" ? (
+                  geminiStatus.status === "VALID" ? "LOCAL ACTIVE" :
+                  geminiStatus.status === "ERROR" ? "LOCAL OFFLINE" :
+                  "CHECKING LOCAL"
+                ) : (
+                  geminiStatus.status === "VALID" ? "GEMINI ACTIVE" :
+                  geminiStatus.status === "INVALID" ? "GEMINI INVALID" :
+                  geminiStatus.status === "HIGH_DEMAND" ? "GEMINI BUSY" :
+                  geminiStatus.status === "MISSING" ? "NO GEMINI KEY" :
+                  geminiStatus.status === "ERROR" ? "GEMINI ERROR" :
+                  "CHECKING GEMINI"
+                )
               }
             </span>
           </div>
@@ -1668,6 +1703,8 @@ export default function Dashboard() {
           <button
             onClick={() => {
               setTempApiKey(geminiApiKey);
+              setTempLlmProvider(llmProvider);
+              setTempOllamaModel(ollamaModel);
               setShowSettings(true);
             }}
             id="btn-settings"
@@ -5235,33 +5272,65 @@ export default function Dashboard() {
             <p className="text-xs text-gray-500 font-mono mb-4">Set your preferences and API credentials</p>
             
             <form onSubmit={saveApiKey} className="flex flex-col gap-4">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs text-gray-400 font-semibold uppercase tracking-wider">Gemini API Key</label>
-                <input
-                  type="password"
-                  placeholder="AIzaSy... or AQ..."
-                  value={tempApiKey}
-                  onChange={(e) => setTempApiKey(e.target.value)}
-                  className="w-full bg-[#141626] border border-[#1E2235] rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#6366F1] font-mono"
-                />
-                <p className="text-[10px] text-gray-500 leading-normal mt-1">
-                  This key is stored securely in the database preferences and used by the AI Brain for technical analysis.
-                </p>
-                <a
-                  href="https://aistudio.google.com/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-[10px] text-indigo-400 hover:text-indigo-300 font-semibold mt-1.5 self-start flex items-center gap-1 font-mono transition-colors"
-                >
-                  Check API Limits & Usage ↗
-                </a>
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs text-gray-400 font-semibold uppercase tracking-wider">AI Model Provider</label>
+                  <select
+                    value={tempLlmProvider}
+                    onChange={(e) => setTempLlmProvider(e.target.value)}
+                    className="w-full bg-[#141626] border border-[#1E2235] rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#6366F1] font-mono cursor-pointer"
+                  >
+                    <option value="GEMINI">Gemini (Google AI Studio Cloud)</option>
+                    <option value="LOCAL">Local LLM (Ollama Offline)</option>
+                  </select>
+                </div>
 
-                {tempApiKey && tempApiKey.startsWith("AQ.") && tempApiKey.length < 100 && (
-                  <p className="text-[10px] text-amber-400 font-medium leading-normal mt-2 border border-amber-500/20 bg-amber-500/5 p-2 rounded-lg font-mono">
-                    ⚠️ WARNING: This key appears to be truncated (too short)! Make sure to copy the ENTIRE key using the official "Copy" button in Google AI Studio instead of manually highlighting screen text.
-                    <br />
-                    <span className="text-gray-400 font-normal">(සිංහල: මෙම Key එක අසම්පූර්ණයි (truncation). AI Studio හි ඇති "Copy" බොත්තම මඟින් සම්පූර්ණ Key එකම copy කරගන්න.)</span>
-                  </p>
+                {tempLlmProvider === "GEMINI" ? (
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs text-gray-400 font-semibold uppercase tracking-wider">Gemini API Key</label>
+                    <input
+                      type="password"
+                      placeholder="AIzaSy... or AQ..."
+                      value={tempApiKey}
+                      onChange={(e) => setTempApiKey(e.target.value)}
+                      className="w-full bg-[#141626] border border-[#1E2235] rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#6366F1] font-mono"
+                    />
+                    <p className="text-[10px] text-gray-500 leading-normal mt-1">
+                      This key is stored securely in the database preferences and used by the AI Brain for technical analysis.
+                    </p>
+                    <a
+                      href="https://aistudio.google.com/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[10px] text-indigo-400 hover:text-indigo-300 font-semibold mt-1.5 self-start flex items-center gap-1 font-mono transition-colors"
+                    >
+                      Check API Limits & Usage ↗
+                    </a>
+
+                    {tempApiKey && tempApiKey.startsWith("AQ.") && tempApiKey.length < 100 && (
+                      <p className="text-[10px] text-amber-400 font-medium leading-normal mt-2 border border-amber-500/20 bg-amber-500/5 p-2 rounded-lg font-mono">
+                        ⚠️ WARNING: This key appears to be truncated (too short)! Make sure to copy the ENTIRE key using the official "Copy" button in Google AI Studio instead of manually highlighting screen text.
+                        <br />
+                        <span className="text-gray-400 font-normal">(සිංහල: මෙම Key එක අසම්පූර්ණයි (truncation). AI Studio හි ඇති "Copy" බොත්තම මඟින් සම්පූර්ණ Key එකම copy කරගන්න.)</span>
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs text-gray-400 font-semibold uppercase tracking-wider">Ollama Model Name</label>
+                    <input
+                      type="text"
+                      placeholder="qwen2.5-coder:7b or llama3"
+                      value={tempOllamaModel}
+                      onChange={(e) => setTempOllamaModel(e.target.value)}
+                      className="w-full bg-[#141626] border border-[#1E2235] rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#6366F1] font-mono"
+                    />
+                    <p className="text-[10px] text-gray-500 leading-normal mt-1">
+                      Ensure Ollama is running locally on your computer at <code className="text-gray-300 font-semibold font-mono">http://localhost:11434</code>. Pull the model first by running:
+                      <br />
+                      <code className="text-[#8B5CF6] block mt-1 font-semibold font-mono">ollama pull {tempOllamaModel || 'qwen2.5-coder:7b'}</code>
+                    </p>
+                  </div>
                 )}
 
                 {/* API Key Status Feedback */}
@@ -5296,7 +5365,13 @@ export default function Dashboard() {
                       geminiStatus.status === "MISSING" ? "bg-gray-500" :
                       "bg-blue-500"
                     }`}></span>
-                    Connection Status: {geminiStatus.status === "HIGH_DEMAND" ? "RATE LIMITED (429)" : geminiStatus.status}
+                    Connection Status: {
+                      geminiStatus.provider === "LOCAL" ? (
+                        geminiStatus.status === "VALID" ? "OLLAMA CONNECTED" : "OLLAMA OFFLINE"
+                      ) : (
+                        geminiStatus.status === "HIGH_DEMAND" ? "RATE LIMITED (429)" : geminiStatus.status
+                      )
+                    }
                   </div>
                   <p className="text-[10px] text-gray-300 font-medium leading-normal mt-0.5">
                     {geminiStatus.details}
