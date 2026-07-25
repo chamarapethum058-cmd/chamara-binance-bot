@@ -12,9 +12,11 @@ from .schemas import (
     PreferenceCreate, PreferenceResponse,
     ChatRequest, TranslateRequest,
     SilverBulletRequest, SilverBulletResponse,
-    LoggedTradeCreate, LoggedTradeResponse
+    LoggedTradeCreate, LoggedTradeResponse,
+    TradeUpdateRequest
 )
 from .services import BinanceService, AIService, NewsService
+from .telegram_service import TelegramService
 from .config import settings
 from .tracker import start_tracking, stop_tracking, get_trackers_status
 
@@ -168,7 +170,28 @@ The engine must strictly monitor setups only during these three independent oper
         db.add(db_pref)
         db.commit()
         print("Default Gemini API Key preference seeded from settings (.env).")
+        
+    # Seed default Telegram Bot Token if not set in DB
+    tel_token_pref = db.query(PreferenceModel).filter(PreferenceModel.key == "telegram_bot_token").first()
+    if not tel_token_pref and settings.TELEGRAM_BOT_TOKEN:
+        db_pref = PreferenceModel(key="telegram_bot_token", value=settings.TELEGRAM_BOT_TOKEN)
+        db.add(db_pref)
+        db.commit()
+        print("Default Telegram Bot Token preference seeded from settings.")
+
+    # Seed default Telegram Chat ID if not set in DB
+    tel_chat_pref = db.query(PreferenceModel).filter(PreferenceModel.key == "telegram_chat_id").first()
+    if not tel_chat_pref and settings.TELEGRAM_CHAT_ID:
+        db_pref = PreferenceModel(key="telegram_chat_id", value=settings.TELEGRAM_CHAT_ID)
+        db.add(db_pref)
+        db.commit()
+        print("Default Telegram Chat ID preference seeded from settings.")
+        
     db.close()
+    
+    # Start the background SMC watchlist tracker loop
+    from .tracker import start_smc_tracker
+    start_smc_tracker()
 
 @app.get("/api/health")
 def health_check():
@@ -301,6 +324,37 @@ async def get_gemini_status(db: Session = Depends(get_db)):
             
     return _gemini_status_cache
 
+@app.post("/api/telegram/test")
+async def test_telegram_alert():
+    success = await TelegramService.send_message(
+        "🔔 <b>Project Falcon Connection Test</b>\n\n"
+        "Your Telegram alert notification setup is working perfectly! 🚀\n"
+        "ඔබගේ ටෙලිග්‍රෑම් දැනුම්දීම් සැකසුම සාර්ථකව ක්‍රියාත්මක වේ! 🎯"
+    )
+    if success:
+        return {"status": "success", "message": "Test notification sent successfully to Telegram."}
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Failed to send test notification. Please verify your Bot Token and Chat ID. | ටෙලිග්‍රෑම් පණිවිඩය යැවීමට නොහැකි විය. කරුණාකර settings පරීක්ෂා කරන්න."
+        )
+
+from pydantic import BaseModel
+
+class TelegramSendRequest(BaseModel):
+    message: str
+
+@app.post("/api/telegram/send")
+async def send_custom_telegram_message(req: TelegramSendRequest):
+    success = await TelegramService.send_message(req.message)
+    if success:
+        return {"status": "success", "message": "Message sent successfully to Telegram."}
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Failed to send message. Please check your Telegram configurations. | ටෙලිග්‍රෑම් පණිවිඩය යැවීමට නොහැකි විය."
+        )
+
 @app.post("/api/preferences", response_model=PreferenceResponse)
 def set_preference(pref: PreferenceCreate, db: Session = Depends(get_db)):
     db_pref = db.query(PreferenceModel).filter(PreferenceModel.key == pref.key).first()
@@ -318,6 +372,28 @@ def set_preference(pref: PreferenceCreate, db: Session = Depends(get_db)):
         _gemini_status_cache["timestamp"] = 0.0 # Force recheck
         
     return db_pref
+
+@app.get("/api/watchlist/smc")
+def get_smc_watchlist(db: Session = Depends(get_db)):
+    pref = db.query(PreferenceModel).filter(PreferenceModel.key == "smc_monitored_coins").first()
+    if pref and pref.value:
+        try:
+            return json.loads(pref.value)
+        except Exception:
+            return []
+    return []
+
+@app.post("/api/watchlist/smc")
+def update_smc_watchlist(watchlist: List[Dict[str, Any]], db: Session = Depends(get_db)):
+    pref = db.query(PreferenceModel).filter(PreferenceModel.key == "smc_monitored_coins").first()
+    json_val = json.dumps(watchlist)
+    if pref:
+        pref.value = json_val
+    else:
+        pref = PreferenceModel(key="smc_monitored_coins", value=json_val)
+        db.add(pref)
+    db.commit()
+    return {"status": "success", "message": "SMC Watchlist updated successfully."}
 
 # TRANSLATION ENDPOINTS
 @app.post("/api/translate")
@@ -833,6 +909,16 @@ async def fetch_current_price_for_symbol(symbol: str) -> float:
 
 @app.post("/api/trades/log", response_model=LoggedTradeResponse)
 def log_trade(trade: LoggedTradeCreate, db: Session = Depends(get_db)):
+    try:
+        AIService.validate_trade_stop_loss(
+            symbol=trade.symbol,
+            timeframe=trade.timeframe or "1m",
+            direction=trade.direction,
+            stop_loss=trade.stop_loss
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     db_trade = LoggedTradeModel(
         symbol=trade.symbol,
         direction=trade.direction,
@@ -888,6 +974,8 @@ async def get_trade_history(strategy_type: Optional[str] = None, db: Session = D
                         print(f"Error checking counter-MSS for pending trade: {mss_err}")
 
                 sym = trade.symbol.upper()
+                if sym.endswith(".P"):
+                    sym = sym[:-2]
                 binance_symbol = sym
                 if not binance_symbol.endswith("USDT") and len(binance_symbol) <= 5:
                     binance_symbol = f"{binance_symbol}USDT"
@@ -990,20 +1078,45 @@ def update_trade_status(trade_id: int, status_update: Dict[str, str], db: Sessio
         db.refresh(db_trade)
     return db_trade
 @app.post("/api/trades/{trade_id}/update", response_model=LoggedTradeResponse)
-def update_logged_trade(trade_id: int, updates: Dict[str, Any], db: Session = Depends(get_db)):
+def update_logged_trade(trade_id: int, req: TradeUpdateRequest, db: Session = Depends(get_db)):
     db_trade = db.query(LoggedTradeModel).filter(LoggedTradeModel.id == trade_id).first()
     if not db_trade:
         raise HTTPException(status_code=404, detail="Trade not found")
-    if "take_profit" in updates:
-        db_trade.take_profit = float(updates["take_profit"])
-    if "stop_loss" in updates:
-        db_trade.stop_loss = float(updates["stop_loss"])
-    if "entry_price" in updates:
-        db_trade.entry_price = float(updates["entry_price"])
-    if "confidence" in updates:
-        db_trade.confidence = int(updates["confidence"]) if updates["confidence"] is not None else None
-    if "status" in updates:
-        db_trade.status = updates["status"]
+    
+    has_price_change = False
+    
+    if req.stop_loss is not None:
+        if req.stop_loss != db_trade.stop_loss:
+            try:
+                AIService.validate_trade_stop_loss(
+                    symbol=db_trade.symbol,
+                    timeframe=db_trade.timeframe or "1m",
+                    direction=db_trade.direction,
+                    stop_loss=req.stop_loss
+                )
+            except ValueError as e:
+                raise HTTPException(status_code=400, detail=str(e))
+            db_trade.stop_loss = req.stop_loss
+            has_price_change = True
+
+    if req.take_profit is not None:
+        if req.take_profit != db_trade.take_profit:
+            db_trade.take_profit = req.take_profit
+            has_price_change = True
+            
+    if req.entry_price is not None:
+        if req.entry_price != db_trade.entry_price:
+            db_trade.entry_price = req.entry_price
+            has_price_change = True
+            
+    if req.confidence is not None:
+        db_trade.confidence = req.confidence
+        
+    if req.status is not None:
+        db_trade.status = req.status
+    elif has_price_change:
+        db_trade.status = "PENDING"
+        
     db.commit()
     db.refresh(db_trade)
     return db_trade

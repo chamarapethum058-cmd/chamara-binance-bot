@@ -178,6 +178,16 @@ class SilverBulletResponse(BaseModel):
     # SMC Dual Entry fields
     original_extreme_entry: Optional[float] = None
     fvg_boundary_entry: Optional[float] = None
+    rsi_value: Optional[float] = None
+    rsi_ok: Optional[bool] = None
+    frvp_ok: Optional[bool] = None
+
+class TradeUpdateRequest(BaseModel):
+    entry_price: Optional[float] = None
+    stop_loss: Optional[float] = None
+    take_profit: Optional[float] = None
+    confidence: Optional[int] = None
+    status: Optional[str] = None
 
 class LoggedTradeCreate(BaseModel):
     symbol: str

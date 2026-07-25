@@ -11,7 +11,7 @@
 ## 2. Antigravity Engine Master Specification Rules
 The following system instructions must be strictly followed when analyzing, validating, or executing trade setups:
 1. **ERL vs IRL tracking protocol**: Lock all analytical evaluations inside a strict External Range Liquidity (ERL) vs Internal Range Liquidity (IRL) tracking protocol.
-2. **Equilibrium Matrix Calculation**: Automate a 50% Equilibrium matrix calculation over the mapped dealing range. Invalidate Long signals in Premium and Short signals in Discount.
+2. **Equilibrium Matrix Calculation**: Bypassed for SMC setups. Do not restrict Long signals in Premium or Short signals in Discount.
 3. **Rigorous Verification Sequence**: Confirm HTF Daily Bias -> Map PDH/PDL and PWH/PWL magnets -> Validate a PDL/SSL Sweep strictly during London or New York AM Killzones (2AM-5AM / 7AM-10AM NY Time) -> Verify MSS/CISD shift on M15/M5 chart paired with unmitigated FVG/Order Block/Breaker/Mitigation/Rejection array before delivering an actionable entry.
 4. **UI checklist tree structure**: The system UI must display a clear structural tree detailing:
    - HTF Trend
@@ -42,7 +42,7 @@ The bot must track the following session hours mapped between New York Time and 
 
 ## 6. 80% Minimum Confirmation Rate Constraint
 The bot must strictly enforce the following confidence scoring boundaries:
-1. **Confidence Score Calculation:** Calculate a strategy confidence score out of 100% based on rule confluences (Trend alignment: 20%, Optimal matrix zone discount/premium: 20%, Daily Open alignment: 15%, Active Silver Bullet window: 15%, Wick Liquidity sweep: 15%, and LTF Shift/MSS with FVG: 15%).
+1. **Confidence Score Calculation:** Calculate a strategy confidence score out of 100% based on rule confluences (Trend alignment: 35%, Wick Liquidity sweep/mitigation: 20%, 1m Rejection Wick: 20%, and LTF Shift/MSS with FVG: 25%). Points 2 (Discount/Premium zone) and 3 (Daily Open relation) are completely excluded from evaluation and scoring.
 2. **80% Minimum Filter:** Only deliver trade setups that achieve a confidence score of 80% or higher.
 3. **Low-Confidence Entry Lockout:** If confidence is below 80%, the bot must suppress and lockout the setup, returning "No Entry (Confidence < 80%)" to prevent low-probability trades and shield the user from unnecessary stop losses. Display this confirmation percentage on the frontend page next to the Entry Price Area card.
 
@@ -62,7 +62,7 @@ The bot must strictly enforce the following high-impact news rules:
 ## 9. Triple-Verification Strategy Protocol (New Rule)
 > [!IMPORTANT]
 > **TRIPLE-VERIFICATION LOOP:** Before returning any actionable trade setup, the backend/AI engine must execute a strict triple-verification process.
-> It must sequentially check and match every parameter against the Falcon Rules (HTF Daily Bias, ERL/IRL zone, Daily Open vector relation, active Silver Bullet window, wick sweep, tight SL, close TP targets, news lockout, and confidence rating >= 70%) at least three separate times in its reasoning sequence.
+> It must sequentially check and match every parameter against the Falcon Rules (HTF Daily Bias, ERL/IRL zone, Daily Open vector relation, active Silver Bullet window, wick sweep, tight SL, close TP targets, news lockout, and confidence rating >= 80%) at least three separate times in its reasoning sequence.
 > If any check fails in any of the loops, the entry must be immediately suppressed and locked out.
 
 ## 10. High-Confluence Market-Price Confirmation Protocol (New Rule)
@@ -121,3 +121,29 @@ The bot must strictly enforce the following high-impact news rules:
 > 2. **Timeframe Isolation:** The invalidation check evaluates ONLY the trade's HTF trend filter (e.g., checking 15m trend for 1m scalp entries, and 1H trend for 15m entries) to allow normal 1m pullbacks without false invalidation. 3m charts are ignored.
 > 3. **Stop Loss Breach Lock:** The trade is immediately invalidated if the current price breaches the stop loss/manipulation extreme before execution.
 > 4. **Journal State Update:** The status in the trade history must transition automatically to `INVALIDATED` and be locked out of execution to prevent stop-loss hits from counter-momentum.
+
+## 18. RSI Momentum Confirmation Protocol (New Rule)
+> [!IMPORTANT]
+> **RSI MOMENTUM CONFIRMATION RULES:**
+> 1. **Live RSI Calculation:** The bot calculates a 14-period Relative Strength Index (RSI) using the closes of the last 50 candles on the active timeframe.
+> 2. **Momentum Alignment Check**:
+>    - **Buy setup (Uptrend):** Allowed ONLY when RSI is not overbought (RSI <= 65), verifying room for upward expansion.
+>    - **Sell setup (Downtrend):** Allowed ONLY when RSI is not oversold (RSI >= 35), verifying room for downward expansion.
+>    - **Strict Lockout:** If RSI is overbought during a buy pullback or oversold during a sell pullback, the setup is locked out (`No Entry`) to protect against momentum depletion.
+
+## 19. Swing Extreme Stop-Loss Protection Protocol (New Rule)
+> [!IMPORTANT]
+> **SWING EXTREME STOP-LOSS PROTECTION RULES:**
+> 1. **No Inner-Range Stop Losses:** The Stop Loss (SL) of any trade setup must strictly be placed outside the Swing Extreme boundaries to prevent manipulation wicks from prematurely triggering the SL before structural reversal.
+> 2. **Safety Buffer Calculation**:
+>    - **Buy setup (Long):** The SL must be calculated at `swing_low * 0.999` (a minimum of 0.1% safety buffer below the validated Swing Low extreme).
+>    - **Sell setup (Short):** The SL must be calculated at `swing_high * 1.001` (a minimum of 0.1% safety buffer above the validated Swing High extreme).
+> 3. **Manual Entry Logging Validation:** If the user manually edits the Stop Loss to be inside the swing extreme range during trade logging or edit operations (e.g. SL higher than swing_low for buys, or SL lower than swing_high for sells), the backend must reject the modification with a validation error to prevent arbitrary SL placement.
+
+## 20. Fixed Range Volume Profile (FRVP) Confluence Protocol (New Rule)
+> [!IMPORTANT]
+> **FRVP CONFLUENCE RULES:**
+> 1. **Programmatic Volume Profile Calculation:** The system calculates a 24-bin volume profile using the high, low, and volume of the last 50 candles on the active timeframe.
+> 2. **High Volume Node (HVN) Alignment Check:**
+>    - The recommended Limit Entry price must reside within a 0.5% tolerance threshold of a programmatically calculated High Volume Node (HVN) to verify support/resistance density.
+>    - Setups that do not align with a high-density volume zone should flag a warning on the checklist tree to alert the user of potential low-volume breakout risk.

@@ -37,3 +37,9 @@ Thumbs.db
 ehthumbs.db
 Desktop.ini
 .DS_Store
+
+# SQLite Temp Files & Scratch dirs
+*.db-shm
+*.db-wal
+**/scratch/
+.gemini/

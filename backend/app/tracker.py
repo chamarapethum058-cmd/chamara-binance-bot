@@ -1,8 +1,11 @@
 import asyncio
 import logging
+import json
 from typing import Dict, Any, List, Optional
 from app.market import get_candles
 from app.services import AIService
+from app.database import SessionLocal
+from app.models import PreferenceModel
 
 logger = logging.getLogger(__name__)
 
@@ -10,16 +13,21 @@ logger = logging.getLogger(__name__)
 # Keys: Symbol (e.g. "SOLUSDT")
 active_trackers: Dict[str, Dict[str, Any]] = {}
 tracker_task: Optional[asyncio.Task] = None
+smc_tracker_task: Optional[asyncio.Task] = None
+
+def standardize_symbol(symbol: str) -> str:
+    sym = symbol.upper().strip()
+    if sym.endswith(".P"):
+        sym = sym[:-2]
+    if not sym.endswith("USDT") and not sym.endswith("USD") and sym not in ["BTC", "ETH", "SOL", "XAUUSD"]:
+        sym = f"{sym}USDT"
+    elif sym in ["BTC", "ETH", "SOL"]:
+        sym = f"{sym}USDT"
+    return sym
 
 def get_current_price(symbol: str) -> Optional[float]:
     try:
-        # Standardize symbol representation (e.g. SOL -> SOLUSDT)
-        sym = symbol.upper()
-        if not sym.endswith("USDT") and not sym.endswith("USD") and sym not in ["BTC", "ETH", "SOL", "XAUUSD"]:
-            sym = f"{sym}USDT"
-        elif sym in ["BTC", "ETH", "SOL"]:
-            sym = f"{sym}USDT"
-            
+        sym = standardize_symbol(symbol)
         candles = get_candles(sym, "1m", limit=1)
         if candles:
             return candles[-1]["close"]
@@ -48,11 +56,7 @@ async def run_tracker_loop():
                 
                 # Fetch daily candles to extract asset-specific levels
                 try:
-                    sym = symbol.upper()
-                    if not sym.endswith("USDT") and not sym.endswith("USD") and sym not in ["BTC", "ETH", "SOL", "XAUUSD"]:
-                        sym = f"{sym}USDT"
-                    elif sym in ["BTC", "ETH", "SOL"]:
-                        sym = f"{sym}USDT"
+                    sym = standardize_symbol(symbol)
                     
                     daily_candles = get_candles(sym, "1d", limit=5)
                     if len(daily_candles) >= 2:
@@ -100,8 +104,25 @@ async def run_tracker_loop():
                     
                     if is_entry_active and not is_locked and steps_confirmed >= 10:
                         tracker["status"] = "ENTRY READY"
+                        if not tracker.get("notified"):
+                            from app.telegram_service import TelegramService
+                            direction_str = "Buy Limit" if "Buy" in entry_area else "Sell Limit"
+                            msg = (
+                                f"🔔 <b>FALCON ALERT: ENTRY CONFIRMED!</b>\n\n"
+                                f"🪙 <b>Symbol:</b> {symbol}\n"
+                                f"📈 <b>Strategy:</b> ICT Silver Bullet\n"
+                                f"🎯 <b>Setup:</b> {entry_area}\n"
+                                f"🔥 <b>Confidence:</b> {tracker.get('confidence', 0)}% ({steps_confirmed}/16 steps met)\n"
+                                f"📊 <b>Current Price:</b> ${tracker['current_price']:.4f}\n\n"
+                                f"📍 <i>Please check your trading terminal. Setup will invalid if price breaches Stop Loss.</i>\n\n"
+                                f"<b>සිංහල පරිවර්තනය (Sinhala):</b>\n"
+                                f"ට්‍රේඩ් එන්ට්‍රිය තහවුරු කර ඇත! {symbol} සඳහා {direction_str} ඕඩරය සූදානම්. කරුණාකර ඔබගේ ටර්මිනලය පරීක්ෂා කරන්න."
+                            )
+                            asyncio.create_task(TelegramService.send_message(msg))
+                            tracker["notified"] = True
                     else:
                         tracker["status"] = "RUNNING"
+                        tracker["notified"] = False
                 except Exception as ex:
                     logger.error(f"Error analyzing silver bullet in tracker loop for {symbol}: {ex}")
             
@@ -144,3 +165,108 @@ def get_trackers_status() -> List[Dict[str, Any]]:
             "last_result": tracker["last_result"]
         })
     return res
+
+async def run_smc_tracker_loop():
+    logger.info("SMC Background Tracker Loop Started.")
+    notified_symbols = {}
+    
+    while True:
+        try:
+            # Read monitored coins from DB preferences
+            db = SessionLocal()
+            try:
+                pref = db.query(PreferenceModel).filter(PreferenceModel.key == "smc_monitored_coins").first()
+                monitored_coins = json.loads(pref.value) if pref and pref.value else []
+            except Exception as pe:
+                logger.error(f"Error reading smc_monitored_coins preference: {pe}")
+                monitored_coins = []
+            finally:
+                db.close()
+                
+            # Clean up notified_symbols keys that are no longer in the active watchlist
+            active_keys = {f"{coin.get('symbol')}_{coin.get('timeframe')}" for coin in monitored_coins if coin.get("symbol")}
+            for key in list(notified_symbols.keys()):
+                if key not in active_keys:
+                    del notified_symbols[key]
+
+            if monitored_coins:
+                for coin in monitored_coins:
+                    symbol = coin.get("symbol")
+                    if not symbol:
+                        continue
+                        
+                    # Fetch latest price
+                    price = get_current_price(symbol)
+                    if price is None:
+                        continue
+                        
+                    # Fetch daily open, pdh, pdl to pass into payload
+                    try:
+                        sym = standardize_symbol(symbol)
+                            
+                        daily_candles = get_candles(sym, "1d", limit=2)
+                        daily_open = daily_candles[-1]["open"] if daily_candles else price
+                        pdh = daily_candles[-2]["high"] if len(daily_candles) >= 2 else price * 1.01
+                        pdl = daily_candles[-2]["low"] if len(daily_candles) >= 2 else price * 0.99
+                    except Exception as dex:
+                        logger.error(f"Error fetching daily levels for {symbol} in SMC tracker: {dex}")
+                        daily_open = price
+                        pdh = price * 1.01
+                        pdl = price * 0.99
+                        
+                    # Calculate confluences programmatically using local logic (Rule 11)
+                    payload = {
+                        "symbol": symbol,
+                        "timeframe": coin.get("timeframe", "1m"),
+                        "current_price": price,
+                        "pdh": pdh,
+                        "pdl": pdl,
+                        "daily_open": daily_open
+                    }
+                    
+                    try:
+                        result = await AIService.calculate_programmatic_smc(payload)
+                        confidence = result.get("confidence", 0)
+                        is_valid = result.get("is_valid", False)
+                        entry_price = result.get("entry_price_area") or ""
+                        stop_loss = result.get("stop_loss_level")
+                        take_profit = result.get("tp2_target")
+                        
+                        # Determine if we should notify
+                        key = f"{symbol}_{coin.get('timeframe')}"
+                        if is_valid and confidence >= 80:
+                            if not notified_symbols.get(key):
+                                from app.telegram_service import TelegramService
+                                direction_str = "Buy Limit" if "Buy" in entry_price else "Sell Limit"
+                                msg = (
+                                    f"🔔 <b>SMC ALERT: ENTRY CONFIRMED!</b>\n\n"
+                                    f"🪙 <b>Symbol:</b> {symbol} ({coin.get('timeframe')})\n"
+                                    f"📈 <b>Strategy:</b> SMC Method\n"
+                                    f"🎯 <b>Setup:</b> {entry_price}\n"
+                                    f"🔥 <b>Confidence:</b> {confidence}% (Confirmed)\n"
+                                    f"🛡️ <b>Stop Loss:</b> ${stop_loss}\n"
+                                    f"💰 <b>Take Profit:</b> ${take_profit}\n"
+                                    f"📊 <b>Current Price:</b> ${price:.4f}\n\n"
+                                    f"📍 <i>Please check your trading terminal. Setup will invalid if price breaches Stop Loss.</i>\n\n"
+                                    f"<b>සිංහල පරිවර්තනය (Sinhala):</b>\n"
+                                    f"SMC එන්ට්‍රිය තහවුරු කර ඇත! {symbol} සඳහා {direction_str} ඕඩරය සූදානම්. කරුණාකර ඔබගේ ටර්මිනලය පරීක්ෂා කරන්න."
+                                )
+                                asyncio.create_task(TelegramService.send_message(msg))
+                                notified_symbols[key] = True
+                        else:
+                            # Do not reset notification state to False immediately
+                            # This prevents duplicate notification spam when price oscillates
+                            pass
+                            
+                    except Exception as ae:
+                        logger.error(f"Error calculating programmatic SMC in tracker for {symbol}: {ae}")
+                        
+        except Exception as e:
+            logger.error(f"Error in SMC tracker loop: {e}")
+            
+        await asyncio.sleep(10)
+
+def start_smc_tracker():
+    global smc_tracker_task
+    if smc_tracker_task is None or smc_tracker_task.done():
+        smc_tracker_task = asyncio.create_task(run_smc_tracker_loop())

@@ -29,6 +29,8 @@ interface ChatMessage {
   timestamp: Date;
 }
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api";
+
 export default function Dashboard() {
   const [symbols] = useState(["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT"]);
   const [timeframes] = useState(["1m", "5m", "15m", "30m", "1h", "4h", "1d"]);
@@ -65,7 +67,7 @@ export default function Dashboard() {
 
   const fetchTradeHistory = async () => {
     try {
-      const res = await fetch("http://127.0.0.1:8000/api/trades/history");
+      const res = await fetch(`${API_BASE}/trades/history`);
       if (res.ok) {
         const data = await res.json();
         setTradeHistory(data);
@@ -133,7 +135,7 @@ export default function Dashboard() {
 
     setLogLoading(true);
     try {
-      const res = await fetch("http://127.0.0.1:8000/api/trades/log", {
+      const res = await fetch(`${API_BASE}/trades/log`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -162,22 +164,24 @@ export default function Dashboard() {
   };
 
   const handleDeleteTrade = async (tradeId: number) => {
-    if (!confirm("Are you sure you want to delete this trade from history?")) return;
+    // Optimistic update: instantly remove from UI
+    setTradeHistory(prev => prev.filter(t => t.id !== tradeId));
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/trades/${tradeId}`, {
+      const res = await fetch(`${API_BASE}/trades/${tradeId}`, {
         method: "DELETE"
       });
-      if (res.ok) {
+      if (!res.ok) {
         fetchTradeHistory();
       }
     } catch (err) {
       console.error("Error deleting trade:", err);
+      fetchTradeHistory();
     }
   };
 
   const handleUpdateTradeStatus = async (tradeId: number, newStatus: string) => {
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/trades/${tradeId}/status`, {
+      const res = await fetch(`${API_BASE}/trades/${tradeId}/status`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus })
@@ -201,7 +205,7 @@ export default function Dashboard() {
     }
     
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/trades/${trade.id}/update`, {
+      const res = await fetch(`${API_BASE}/trades/${trade.id}/update`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ [field]: newValue })
@@ -210,7 +214,8 @@ export default function Dashboard() {
         alert(`${fieldName} updated successfully! 🎯`);
         fetchTradeHistory();
       } else {
-        alert(`Failed to update ${fieldName}.`);
+        const errData = await res.json();
+        alert(`Failed to update ${fieldName}: ${errData.detail || "Unknown error"}`);
       }
     } catch (err) {
       console.error(err);
@@ -410,26 +415,60 @@ export default function Dashboard() {
   const [smcResult, setSmcResult] = useState<any | null>(null);
   const [monitoredCoins, setMonitoredCoins] = useState<any[]>([]);
   const [livePrices, setLivePrices] = useState<Record<string, number>>({});
+  const isInitialMount = useRef(true);
 
-  // Load monitoredCoins from localStorage on client-side mount
+  // Sync watchlist to backend SQLite preferences
+  const syncWatchlistToBackend = async (coins: any[]) => {
+    try {
+      await fetch(`${API_BASE}/watchlist/smc`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(coins)
+      });
+    } catch (err) {
+      console.error("Error syncing watchlist to backend:", err);
+    }
+  };
+
+  // Load monitoredCoins from backend or localStorage on client-side mount
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("smc_monitored_coins");
-      if (saved) {
-        try {
-          setMonitoredCoins(JSON.parse(saved));
-        } catch (e) {
-          console.error("Failed to parse saved monitored coins:", e);
+    const loadWatchlist = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/watchlist/smc`);
+        if (res.ok) {
+          const data = await res.json();
+          setMonitoredCoins(data);
+          return;
+        }
+      } catch (err) {
+        console.error("Failed to fetch watchlist from backend:", err);
+      }
+      
+      // Fallback to localStorage
+      if (typeof window !== "undefined") {
+        const saved = localStorage.getItem("smc_monitored_coins");
+        if (saved) {
+          try {
+            setMonitoredCoins(JSON.parse(saved));
+          } catch (e) {
+            console.error("Failed to parse saved monitored coins:", e);
+          }
         }
       }
-    }
+    };
+    loadWatchlist();
   }, []);
 
-  // Save monitoredCoins to localStorage when they change
+  // Save monitoredCoins to localStorage and backend when they change
   useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
     if (typeof window !== "undefined") {
       localStorage.setItem("smc_monitored_coins", JSON.stringify(monitoredCoins));
     }
+    syncWatchlistToBackend(monitoredCoins);
   }, [monitoredCoins]);
 
   // 5-Second Local API Watchlist Polling Loop
@@ -445,16 +484,51 @@ export default function Dashboard() {
           try {
             const sym = getTradingViewSymbol(coin.symbol);
             const cleanSym = sym.includes(":") ? sym.split(":")[1] : sym;
-            const res = await fetch(`http://127.0.0.1:8000/api/market/price?symbol=${encodeURIComponent(cleanSym)}`);
-            if (res.ok) {
-              const data = await res.json();
-              return {
-                ...coin,
-                currentPrice: data.current_price || coin.currentPrice,
-                pdh: data.pdh || coin.pdh,
-                pdl: data.pdl || coin.pdl,
-                open: data.open || coin.open
-              };
+            
+            // 1. Fetch live market price & daily levels
+            const resPrice = await fetch(`http://127.0.0.1:8000/api/market/price?symbol=${encodeURIComponent(cleanSym)}`);
+            if (resPrice.ok) {
+              const priceData = await resPrice.json();
+              const currentPrice = priceData.current_price || coin.currentPrice;
+              const pdh = priceData.pdh || coin.pdh;
+              const pdl = priceData.pdl || coin.pdl;
+              const open = priceData.open || coin.open;
+              const htfTrend = priceData.daily_bias || coin.htfTrend;
+
+              // 2. Fetch full programmatic SMC analysis from backend
+              const resSMC = await fetch(`http://127.0.0.1:8000/api/smc/analyze`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  symbol: cleanSym,
+                  timeframe: coin.timeframe,
+                  current_price: currentPrice,
+                  pdh: pdh,
+                  pdl: pdl,
+                  daily_open: open,
+                  htf_trend: htfTrend
+                })
+              });
+
+              if (resSMC.ok) {
+                const smcData = await resSMC.json();
+                return {
+                  ...coin,
+                  currentPrice: currentPrice,
+                  pdh: pdh,
+                  pdl: pdl,
+                  open: open,
+                  htfTrend: smcData.daily_bias || htfTrend,
+                  confidence: smcData.confidence,
+                  is_valid: smcData.is_valid,
+                  entryPrice: smcData.entry_price_area,
+                  stopLoss: smcData.stop_loss_level,
+                  takeProfit: smcData.liquidity_target,
+                  liquidityPoolsSwept: smcData.sb_step_2_liquidity_sweep_ok,
+                  swingValidated: smcData.sb_step_3_displacement_mss_ok,
+                  ltfChoch: smcData.sb_step_9_ltf_choch_ok
+                };
+              }
             }
           } catch (e) {
             console.error("Error refreshing monitored coin:", coin.symbol, e);
@@ -464,15 +538,11 @@ export default function Dashboard() {
       );
 
       setMonitoredCoins(prevCoins => {
-        // Only keep and update coins that are still in the list
         return prevCoins.map(prevCoin => {
           const match = updated.find(u => u.symbol === prevCoin.symbol);
           return match ? {
             ...prevCoin,
-            currentPrice: match.currentPrice,
-            pdh: match.pdh,
-            pdl: match.pdl,
-            open: match.open
+            ...match
           } : prevCoin;
         });
       });
@@ -521,38 +591,52 @@ export default function Dashboard() {
 
   // Watchlist Local Strategy Recalculators
   const calculateCoinConfidence = (coin: any) => {
-    const isDiscount = coin.currentPrice < (coin.pdh + coin.pdl) / 2;
-    const isBelowOpen = coin.currentPrice < coin.open;
     const isBullish = coin.htfTrend === "BULLISH";
     const isBearish = coin.htfTrend === "BEARISH";
 
     let conf = 0;
-    if (isBullish && isDiscount) conf += 15;
-    if (isBearish && !isDiscount) conf += 15;
-    if (isBullish && isBelowOpen) conf += 15;
-    if (isBearish && !isBelowOpen) conf += 15;
-    if (coin.liquidityPoolsSwept) conf += 10;
-    if (coin.inducementSwept) conf += 15;
-    if (coin.swingValidated) conf += 10;
-    if (coin.bosConfirmed) conf += 10;
-    if (coin.orderBlockMitigated || coin.fvgMitigated) conf += 10;
-    if (coin.ltfChoch) conf += 10;
+    if (isBullish || isBearish) conf += 35;
+    if (coin.liquidityPoolsSwept) conf += 20;
+    if (coin.swingValidated) conf += 20;
+    if (coin.ltfChoch) conf += 25;
 
     return {
       confidence: conf,
-      is_valid: conf >= 70,
-      zone_ok: (isBullish && isDiscount) || (isBearish && !isDiscount),
-      open_ok: (isBullish && isBelowOpen) || (isBearish && !isBelowOpen),
-      is_discount: isDiscount,
-      is_below_open: isBelowOpen
+      is_valid: conf >= 80,
+      zone_ok: true,
+      open_ok: true,
+      is_discount: false,
+      is_below_open: false
     };
   };
 
   const getCoinParameters = (coin: any) => {
+    if (coin.confidence !== undefined && coin.entryPrice !== undefined) {
+      let entry = coin.currentPrice;
+      if (coin.entryPrice && typeof coin.entryPrice === "string") {
+        const matches = coin.entryPrice.match(/\d+(?:\.\d+)?/);
+        if (matches) entry = Number(matches[0]);
+      } else if (typeof coin.entryPrice === "number") {
+        entry = coin.entryPrice;
+      }
+
+      return {
+        confidence: coin.confidence,
+        is_valid: coin.is_valid,
+        zone_ok: true,
+        open_ok: true,
+        is_discount: false,
+        is_below_open: false,
+        entry_price: entry,
+        stop_loss: coin.stopLoss,
+        take_profit: coin.takeProfit
+      };
+    }
+
     const confData = calculateCoinConfidence(coin);
     const risk = coin.currentPrice * 0.0015;
     const isBullish = coin.htfTrend === "BULLISH";
-    const entryPrice = isBullish ? coin.currentPrice - (risk * 0.5) : coin.currentPrice + (risk * 0.5);
+    const entryPrice = isBullish ? coin.currentPrice - (risk * 0.3) : coin.currentPrice + (risk * 0.3);
     const stopLoss = isBullish ? entryPrice - risk : entryPrice + risk;
     const tp2 = isBullish ? entryPrice + (risk * 4.0) : entryPrice - (risk * 4.0);
 
@@ -615,21 +699,15 @@ export default function Dashboard() {
       const isBearish = activeHtfTrend === "BEARISH";
 
       let conf = 0;
-      if (isBullish && isDiscount) conf += 15;
-      if (isBearish && !isDiscount) conf += 15;
-      if (isBullish && isBelowOpen) conf += 15;
-      if (isBearish && !isBelowOpen) conf += 15;
-      if (smcLiquidityPoolsSwept) conf += 10;
-      if (smcInducementSwept) conf += 15;
-      if (smcSwingValidated) conf += 10;
-      if (smcBosConfirmed) conf += 10;
-      if (smcOrderBlockMitigated || smcFvgMitigated) conf += 10;
-      if (smcLtfChoch) conf += 10;
+      if (isBullish || isBearish) conf += 35;
+      if (smcLiquidityPoolsSwept) conf += 20;
+      if (smcSwingValidated) conf += 20;
+      if (smcLtfChoch) conf += 25;
 
-      const isSetupValid = conf >= 70;
+      const isSetupValid = conf >= 80;
       const direction = isBullish ? "BULLISH" : "BEARISH";
       const risk = fetchedPrice * 0.0015;
-      const entryPrice = isBullish ? fetchedPrice - (risk * 0.5) : fetchedPrice + (risk * 0.5);
+      const entryPrice = isBullish ? fetchedPrice - (risk * 0.3) : fetchedPrice + (risk * 0.3);
       const stopLoss = isBullish ? entryPrice - risk : entryPrice + risk;
       const tp1 = isBullish ? entryPrice + (risk * 2.0) : entryPrice - (risk * 2.0);
       const tp2 = isBullish ? entryPrice + (risk * 4.0) : entryPrice - (risk * 4.0);
@@ -641,7 +719,7 @@ export default function Dashboard() {
         is_valid: isSetupValid,
         confidence: conf,
         daily_bias: direction,
-        entry_price_area: isSetupValid ? `${action} at ${formatPrice(entryPrice)}` : "No Entry (Confidence < 70%)",
+        entry_price_area: isSetupValid ? `${action} at ${formatPrice(entryPrice)}` : "No Entry (Confidence < 80%)",
         stop_loss_level: isSetupValid ? formatPrice(stopLoss) : null,
         liquidity_target: isSetupValid ? formatPrice(tp2) : null,
         tp1_target: isSetupValid ? formatPrice(tp1) : null,
@@ -784,7 +862,7 @@ export default function Dashboard() {
 
     setLogLoading(true);
     try {
-      const res = await fetch("http://127.0.0.1:8000/api/trades/log", {
+      const res = await fetch(`${API_BASE}/trades/log`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -840,8 +918,6 @@ export default function Dashboard() {
     if (direction === "BEARISH") return entryPriceNum - (risk * 4.0);
     return null;
   })();
-
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 
   const fetchLivePrices = async () => {
     if (!sbSymbol.trim()) return;
@@ -2322,9 +2398,9 @@ export default function Dashboard() {
                             <div className="flex justify-between items-center text-[10px] border-t border-[#1E2235]/40 pt-1.5 mt-1 font-mono">
                               <span className="text-gray-400">Confidence:</span>
                               <span className={`font-bold ${
-                                (tracker.confidence || 0) >= 70 ? "text-emerald-400 font-extrabold" : "text-gray-400"
+                                (tracker.confidence || 0) >= 80 ? "text-emerald-400 font-extrabold" : "text-gray-400"
                               }`}>
-                                {tracker.confidence || 0}% {(tracker.confidence || 0) >= 70 ? "🔥 (READY)" : ""}
+                                {tracker.confidence || 0}% {(tracker.confidence || 0) >= 80 ? "🔥 (READY)" : ""}
                               </span>
                             </div>
                           </div>
@@ -2532,7 +2608,7 @@ export default function Dashboard() {
                           <div className={`bg-[#141626]/40 border rounded-xl p-4 flex flex-col gap-2.5 transition-all md:col-span-2 ${
                             sbResult.news_lockout_active 
                               ? "border-rose-500/50 shadow-md shadow-rose-500/5"
-                              : sbResult.confidence && sbResult.confidence >= 70 
+                              : sbResult.confidence && sbResult.confidence >= 80 
                                 ? "border-indigo-500/50 shadow-md shadow-indigo-500/5" 
                                 : "border-[#1E2235]/60"
                           }`}>
@@ -2551,9 +2627,9 @@ export default function Dashboard() {
                                   </span>
                                 ) : sbResult.confidence !== undefined && sbResult.confidence !== null && (
                                   <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded font-mono flex items-center gap-1 ${
-                                    sbResult.confidence >= 70 ? "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20" : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                                    sbResult.confidence >= 80 ? "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20" : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
                                   }`}>
-                                    <span className={`w-1.5 h-1.5 rounded-full ${sbResult.confidence >= 70 ? "bg-indigo-400 animate-pulse" : "bg-rose-400"}`} />
+                                    <span className={`w-1.5 h-1.5 rounded-full ${sbResult.confidence >= 80 ? "bg-indigo-400 animate-pulse" : "bg-rose-400"}`} />
                                     {sbResult.confidence}% CONFIRMED
                                   </span>
                                 )}
@@ -3153,9 +3229,16 @@ export default function Dashboard() {
                                sbResult.sb_step_7_london_asian_sweep_ok && 
                                sbResult.sb_step_8_htf_pd_mitigation_ok && 
                                sbResult.sb_step_9_ltf_choch_ok && 
-                               sbResult.sb_step_10_fvg_limit_ok && sbResult.sb_step_11_equilibrium_ok && sbResult.sb_step_12_po3_align_ok && (
+                               sbResult.sb_step_10_fvg_limit_ok && 
+                               sbResult.sb_step_11_equilibrium_ok && 
+                               sbResult.sb_step_12_po3_align_ok && 
+                               sbResult.sb_step_13_htf_mapped_ok && 
+                               sbResult.sb_step_14_ltf_tap_ok && 
+                               sbResult.sb_step_15_dual_entry_ok && 
+                               sbResult.sb_step_16_htf_align_ok && 
+                               sbResult.frvp_ok && (
                                  <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[9px] font-bold px-1.5 py-0.5 rounded font-mono animate-pulse flex items-center gap-1">
-                                    <span>✓</span> 12/12 CONFLUENCES VERIFIED
+                                    <span>✓</span> 17/17 CONFLUENCES VERIFIED
                                  </span>
                               )}
                               <span className="text-[10px] text-gray-400 font-mono">1m Execution Timeframe</span>
@@ -3590,6 +3673,37 @@ export default function Dashboard() {
                                   </p>
                                   <span className="text-[10px] text-indigo-300/80 font-sans">
                                     {sbResult.sb_step_16_details ? (sbResult.sb_step_16_details.split("|")[1]?.trim() || "HTF (1H) ප්‍රවණතා දිශානති පෙළගැස්ම.") : "HTF (1H) ප්‍රවණතා දිශානති පෙළගැස්ම."}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Step 17: Fixed Range Volume Profile (FRVP) Confluence */}
+                              <div className="bg-[#07080E]/40 border border-[#1E2235]/40 rounded-xl p-3.5 flex items-start gap-3.5 hover:border-indigo-500/20 transition-all">
+                                <div className={`w-6 h-6 rounded-full shrink-0 flex items-center justify-center font-bold text-xs font-mono border ${
+                                  sbResult.frvp_ok 
+                                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" 
+                                    : "bg-[#1E2235]/30 text-gray-500 border-[#1E2235]"
+                                }`}>
+                                  {sbResult.frvp_ok ? "✓" : "17"}
+                                </div>
+                                <div className="flex flex-col gap-1 w-full">
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider font-mono">Step 17: FRVP Volume Profile Confluence</span>
+                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded font-mono ${
+                                      sbResult.frvp_ok ? "bg-emerald-500/10 text-emerald-400" : "bg-[#1E2235]/30 text-gray-400"
+                                    }`}>
+                                      {sbResult.frvp_ok ? "ALIGNED" : "WARNING"}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-white leading-relaxed mt-0.5">
+                                    {sbResult.frvp_ok 
+                                      ? "Entry price is aligned with a High Volume Node (HVN) area." 
+                                      : "Entry price is NOT aligned with any High Volume Node (HVN) area (Potential Breakout Risk)."}
+                                  </p>
+                                  <span className="text-[10px] text-indigo-300/80 font-sans">
+                                    {sbResult.frvp_ok 
+                                      ? "ඇතුල්වීමේ මිල High Volume Node (HVN) කලාපය සමඟ සමපාත වේ." 
+                                      : "ඇතුල්වීමේ මිල High Volume Node (HVN) කලාපය සමඟ සමපාත නොවේ (අවලංගු වීමේ අවදානමක් ඇත)."}
                                   </span>
                                 </div>
                               </div>
@@ -4117,55 +4231,27 @@ export default function Dashboard() {
 
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px] font-mono mt-2">
                             <div className="flex items-center justify-between p-2 rounded bg-black/20 border border-[#1E2235]/40">
-                              <span className="text-gray-400">1. Trend Alignment</span>
-                              <span className={smcResult.daily_bias !== "NEUTRAL" && smcResult.confidence > 0 ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
-                                {smcResult.daily_bias !== "NEUTRAL" && smcResult.confidence > 0 ? "+20% (Met)" : "0% (Failed)"}
+                              <span className="text-gray-400">1. HTF Trend Alignment</span>
+                              <span className={smcResult.daily_bias !== "NEUTRAL" ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
+                                {smcResult.daily_bias !== "NEUTRAL" ? "+35% (Met)" : "0% (Failed)"}
                               </span>
                             </div>
                             <div className="flex items-center justify-between p-2 rounded bg-black/20 border border-[#1E2235]/40">
-                              <span className="text-gray-400">2. Discount/Premium Zone</span>
-                              <span className={
-                                (smcResult.daily_bias === "BULLISH" && smcResult.zone_type === "DISCOUNT") || 
-                                (smcResult.daily_bias === "BEARISH" && smcResult.zone_type === "PREMIUM")
-                                  ? "text-emerald-400 font-bold" 
-                                  : "text-rose-400 font-bold"
-                              }>
-                                {(smcResult.daily_bias === "BULLISH" && smcResult.zone_type === "DISCOUNT") || 
-                                 (smcResult.daily_bias === "BEARISH" && smcResult.zone_type === "PREMIUM")
-                                  ? "+20% (Met)" 
-                                  : "0% (Failed)"}
-                              </span>
-                            </div>
-                            <div className="flex items-center justify-between p-2 rounded bg-black/20 border border-[#1E2235]/40">
-                              <span className="text-gray-400">3. Daily Open Relation</span>
-                              <span className={
-                                (smcResult.daily_bias === "BULLISH" && smcResult.daily_open_relation === "BELOW_OPEN") || 
-                                (smcResult.daily_bias === "BEARISH" && smcResult.daily_open_relation === "ABOVE_OPEN")
-                                  ? "text-emerald-400 font-bold" 
-                                  : "text-rose-400 font-bold"
-                              }>
-                                {(smcResult.daily_bias === "BULLISH" && smcResult.daily_open_relation === "BELOW_OPEN") || 
-                                 (smcResult.daily_bias === "BEARISH" && smcResult.daily_open_relation === "ABOVE_OPEN")
-                                  ? "+15% (Met)" 
-                                  : "0% (Failed)"}
-                              </span>
-                            </div>
-                            <div className="flex items-center justify-between p-2 rounded bg-black/20 border border-[#1E2235]/40">
-                              <span className="text-gray-400">4. Liquidity Pools Swept</span>
+                              <span className="text-gray-400">2. Wick Liquidity Sweep/Mitigation</span>
                               <span className={smcLiquidityPoolsSwept ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
-                                {smcLiquidityPoolsSwept ? "+15% (Met)" : "0% (Failed)"}
+                                {smcLiquidityPoolsSwept ? "+20% (Met)" : "0% (Failed)"}
                               </span>
                             </div>
                             <div className="flex items-center justify-between p-2 rounded bg-black/20 border border-[#1E2235]/40">
-                              <span className="text-gray-400">5. 1m Rejection Wick</span>
+                              <span className="text-gray-400">3. LTF 1m Rejection Wick</span>
                               <span className={smcSwingValidated ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
-                                {smcSwingValidated ? "+15% (Met)" : "0% (Failed)"}
+                                {smcSwingValidated ? "+20% (Met)" : "0% (Failed)"}
                               </span>
                             </div>
-                            <div className="flex items-center justify-between p-2 rounded bg-black/20 border border-[#1E2235]/40">
-                              <span className="text-gray-400">6. LTF MSS Shift with FVG</span>
-                              <span className={smcLtfChoch ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
-                                {smcLtfChoch ? "+15% (Met)" : "0% (Failed)"}
+                            <div className="flex items-center justify-between p-2 rounded bg-black/20 border border-[#1E2235]/40 col-span-1 md:col-span-2">
+                              <span className="text-gray-400">5. FRVP Volume Profile Node</span>
+                              <span className={smcResult?.frvp_ok ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
+                                {smcResult?.frvp_ok ? "Aligned (Met)" : "Mismatch (Pending)"}
                               </span>
                             </div>
                           </div>
@@ -4177,9 +4263,9 @@ export default function Dashboard() {
                             <div className="bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl p-3.5 text-xs font-mono flex items-center gap-2">
                               <span>⚠️</span>
                               <span>
-                                <strong>SMC Setup Locked:</strong> Confirmation rate is {smcResult.confidence}% (less than the mandatory 70% threshold). Entry parameters are suppressed from active logging.
+                                <strong>SMC Setup Locked:</strong> Confirmation rate is {smcResult.confidence}% (less than the mandatory 80% threshold). Entry parameters are suppressed from active logging.
                                 <br />
-                                <span className="text-[10px] text-rose-300/80">සිංහල පරිවර්තනය: උපාය මාර්ගික අනුකූලතාවය {smcResult.confidence}% ක් වන බැවින් (අවම 70% ට වඩා අඩු) ඇතුල්වීම් අවහිර කර ඇත.</span>
+                                <span className="text-[10px] text-rose-300/80">සිංහල පරිවර්තනය: උපාය මාර්ගික අනුකූලතාවය {smcResult.confidence}% ක් වන බැවින් (අවම 80% ට වඩා අඩු) ඇතුල්වීම් අවහිර කර ඇත.</span>
                               </span>
                             </div>
 
@@ -4226,9 +4312,9 @@ export default function Dashboard() {
                           <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl p-3.5 text-xs font-mono flex items-center gap-2 animate-pulse">
                             <span>✅</span>
                             <span>
-                              <strong>SMC Setup Active:</strong> 70% minimum confirmation reached ({smcResult.confidence}%). Limit order is ready!
+                              <strong>SMC Setup Active:</strong> 80% minimum confirmation reached ({smcResult.confidence}%). Limit order is ready!
                               <br />
-                              <span className="text-[10px] text-emerald-300/80">සිංහල පරිවර්තනය: අවම 70% සීමාව පසු කර ඇති බැවින් (තහවුරු කිරීම: {smcResult.confidence}%) ඇතුල්වීම වලංගු වේ!</span>
+                              <span className="text-[10px] text-emerald-300/80">සිංහල පරිවර්තනය: අවම 80% සීමාව පසු කර ඇති බැවින් (තහවුරු කිරීම: {smcResult.confidence}%) ඇතුල්වීම වලංගු වේ!</span>
                             </span>
                           </div>
                         )}
@@ -4435,7 +4521,7 @@ export default function Dashboard() {
                                   onClick={async () => {
                                     setLogLoading(true);
                                     try {
-                                      const res = await fetch("http://127.0.0.1:8000/api/trades/log", {
+                                      const res = await fetch(`${API_BASE}/trades/log`, {
                                         method: "POST",
                                         headers: { "Content-Type": "application/json" },
                                         body: JSON.stringify({
@@ -4452,7 +4538,7 @@ export default function Dashboard() {
                                       if (res.ok) {
                                         alert(`🎯 SMC trade for ${coin.symbol.toUpperCase()} executed/logged successfully!`);
                                         setMonitoredCoins(monitoredCoins.filter(c => c.id !== coin.id));
-                                        const resHist = await fetch("http://127.0.0.1:8000/api/trades/history");
+                                        const resHist = await fetch(`${API_BASE}/trades/history`);
                                         if (resHist.ok) {
                                           const histData = await resHist.json();
                                           setTradeHistory(histData);

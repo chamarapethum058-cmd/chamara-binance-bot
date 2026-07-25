@@ -66,6 +66,121 @@ class AIService:
     _last_news_fetch = None
 
     @classmethod
+    def _calculate_rsi(cls, prices: List[float], period: int = 14) -> float:
+        if len(prices) < period + 1:
+            return 50.0
+        gains = []
+        losses = []
+        for i in range(1, len(prices)):
+            diff = prices[i] - prices[i-1]
+            if diff > 0:
+                gains.append(diff)
+                losses.append(0.0)
+            else:
+                gains.append(0.0)
+                losses.append(abs(diff))
+        avg_gain = sum(gains[:period]) / period
+        avg_loss = sum(losses[:period]) / period
+        for i in range(period, len(gains)):
+            avg_gain = (avg_gain * (period - 1) + gains[i]) / period
+            avg_loss = (avg_loss * (period - 1) + losses[i]) / period
+        if avg_loss == 0:
+            return 100.0
+        rs = avg_gain / avg_loss
+        return 100.0 - (100.0 / (1.0 + rs))
+
+    @classmethod
+    def validate_trade_stop_loss(cls, symbol: str, timeframe: str, direction: str, stop_loss: float):
+        from app.market import get_candles
+        sym = symbol.upper()
+        if sym.endswith(".P"):
+            sym = sym[:-2]
+        if not sym.endswith("USDT") and not sym.endswith("USD") and sym not in ["BTC", "ETH", "SOL", "XAUUSD"]:
+            sym = f"{sym}USDT"
+        elif sym in ["BTC", "ETH", "SOL"]:
+            sym = f"{sym}USDT"
+            
+        candles = get_candles(sym, timeframe or "1m", limit=50)
+        if candles:
+            swing_low = min(c["low"] for c in candles)
+            swing_high = max(c["high"] for c in candles)
+        else:
+            return
+            
+        if direction.upper() in ["BULLISH", "LONG", "BUY"]:
+            if stop_loss > swing_low:
+                raise ValueError(
+                    f"Stop Loss ({stop_loss:.4f}) cannot be inside the Swing Low extreme ({swing_low:.4f}). "
+                    f"Minimum required SL with buffer: {swing_low * 0.999:.4f} (සිංහල: Stop Loss අගය Swing Low එකට වඩා ඉහළින් තැබිය නොහැක)."
+                )
+        elif direction.upper() in ["BEARISH", "SHORT", "SELL"]:
+            if stop_loss < swing_high:
+                raise ValueError(
+                    f"Stop Loss ({stop_loss:.4f}) cannot be inside the Swing High extreme ({swing_high:.4f}). "
+                    f"Minimum required SL with buffer: {swing_high * 1.001:.4f} (සිංහල: Stop Loss අගය Swing High එකට වඩා පහළින් තැබිය නොහැක)."
+                )
+
+    @classmethod
+    def _calculate_volume_profile(cls, candles: List[Dict[str, Any]], bins_count: int = 24) -> Dict[str, Any]:
+        if not candles:
+            return {"poc": 0.0, "hvns": [], "lvns": [], "bin_size": 0.0}
+        
+        lows = [c["low"] for c in candles]
+        highs = [c["high"] for c in candles]
+        min_price = min(lows)
+        max_price = max(highs)
+        price_range = max_price - min_price
+        
+        if price_range == 0:
+            return {"poc": min_price, "hvns": [min_price], "lvns": [], "bin_size": 0.0}
+            
+        bin_size = price_range / bins_count
+        bins = [min_price + i * bin_size for i in range(bins_count + 1)]
+        bin_volumes = [0.0] * bins_count
+        
+        for c in candles:
+            c_low = c["low"]
+            c_high = c["high"]
+            c_vol = c.get("volume", 0.0) or c.get("vol", 0.0) or 1.0
+            
+            overlapped_bins = []
+            for i in range(bins_count):
+                bin_start = bins[i]
+                bin_end = bins[i+1]
+                if max(c_low, bin_start) <= min(c_high, bin_end):
+                    overlapped_bins.append(i)
+                    
+            if overlapped_bins:
+                vol_share = c_vol / len(overlapped_bins)
+                for idx in overlapped_bins:
+                    bin_volumes[idx] += vol_share
+                    
+        max_vol = max(bin_volumes) if bin_volumes else 0
+        poc_idx = bin_volumes.index(max_vol) if max_vol > 0 else 0
+        poc_price = bins[poc_idx] + (bin_size / 2.0)
+        
+        avg_vol = sum(bin_volumes) / bins_count if bins_count > 0 else 0
+        
+        hvns = []
+        lvns = []
+        for i in range(bins_count):
+            bin_center = bins[i] + (bin_size / 2.0)
+            if bin_volumes[i] >= avg_vol * 1.1:
+                hvns.append(bin_center)
+            elif bin_volumes[i] < avg_vol * 0.9:
+                lvns.append(bin_center)
+                
+        if poc_price not in hvns:
+            hvns.append(poc_price)
+                
+        return {
+            "poc": poc_price,
+            "hvns": hvns,
+            "lvns": lvns,
+            "bin_size": bin_size
+        }
+
+    @classmethod
     async def _fetch_economic_calendar(cls) -> List[Dict[str, Any]]:
         import time
         now = time.time()
@@ -2582,6 +2697,38 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
 
         is_valid_trend = False
         direction = "NEUTRAL"
+
+        # USD High-Impact News Calendar Lockout check (Rule 7)
+        from datetime import datetime, timezone, timedelta
+        now_utc = datetime.now(timezone.utc)
+        news_lockout_active = False
+        active_news_event = None
+        upcoming_news_events = []
+        try:
+            events = await cls._fetch_economic_calendar()
+            for event in events:
+                if event.get("impact") == "High" and event.get("country") == "USD":
+                    try:
+                        event_dt = datetime.fromisoformat(event["date"])
+                        event_utc = event_dt.astimezone(timezone.utc)
+                        diff_sec = (event_utc - now_utc).total_seconds()
+                        if abs(diff_sec) <= 3600:
+                            news_lockout_active = True
+                            active_news_event = event.get("title")
+                        if -14400 <= diff_sec <= 43200:
+                            slst_dt_ev = event_utc.astimezone(timezone(timedelta(hours=5, minutes=30)))
+                            upcoming_news_events.append({
+                                "title": event.get("title"),
+                                "country": event.get("country"),
+                                "impact": event.get("impact"),
+                                "time_slst": slst_dt_ev.strftime("%I:%M %p"),
+                                "time_utc": event_utc.isoformat(),
+                                "seconds_remaining": int(diff_sec)
+                            })
+                    except Exception:
+                        pass
+        except Exception:
+            pass
         
         if trend_1h == "BULLISH" and trend_15m == "BULLISH" and trend_1m == "BULLISH":
             direction = "BULLISH"
@@ -2632,6 +2779,24 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
 
         original_entry_price = entry_price
         entry_price = buffered_entry_price
+
+        # FRVP Volume Profile Confluence check
+        frvp_ok = False
+        poc_price = 0.0
+        hvn_list = []
+        if is_valid_trend and candles:
+            try:
+                profile = cls._calculate_volume_profile(candles)
+                poc_price = profile.get("poc", 0.0)
+                hvn_list = profile.get("hvns", [])
+                
+                # Check if entry_price is within 0.5% of any HVN
+                for hvn in hvn_list:
+                    if abs(entry_price - hvn) / hvn <= 0.005:
+                        frvp_ok = True
+                        break
+            except Exception as e_frvp:
+                logger.error(f"Error calculating volume profile: {e_frvp}")
 
         is_small = price < 2.0
         r_places = 4 if is_small else 2
@@ -2700,34 +2865,35 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
             else:
                 detected_po3_phase = "ACCUMULATION"
 
+        # Calculate 14-period RSI from candle close history
+        rsi_val = 50.0
+        if candles:
+            closes = [c["close"] for c in candles]
+            rsi_val = cls._calculate_rsi(closes)
+
+        # RSI Momentum Confirmation check
+        rsi_ok = True
+        if direction == "BULLISH":
+            rsi_ok = rsi_val <= 65
+        elif direction == "BEARISH":
+            rsi_ok = rsi_val >= 35
+
         # Calculate dynamic confidence score (confluence out of 100%)
         conf_score = 0
         if is_valid_trend:
-            if direction == "BULLISH":
-                conf_score += 20  # Trend alignment
-                if is_discount:
-                    conf_score += 20  # Zone discount
-                if price < daily_open:
-                    conf_score += 15  # Below open
-            else:
-                conf_score += 20  # Trend alignment
-                if not is_discount:
-                    conf_score += 20  # Zone premium
-                if price > daily_open:
-                    conf_score += 15  # Above open
-
+            conf_score += 35  # Trend alignment
             if double_mitigation_ok:
-                conf_score += 15  # Double mitigation confirmation
+                conf_score += 20  # Double mitigation confirmation
             if rejection_wick_ok:
-                conf_score += 15  # 1m rejection wick
-            conf_score += 15  # 1m MSS shift with displacement
+                conf_score += 20  # 1m rejection wick
+            conf_score += 25  # 1m MSS shift with displacement
             
             if conf_score > 100:
                 conf_score = 100
         else:
             conf_score = 0
 
-        is_valid = conf_score >= 80
+        is_valid = (conf_score >= 80) and rsi_ok and frvp_ok and not news_lockout_active
         action = "Buy Limit" if direction == "BULLISH" else "Sell Limit"
 
         if is_valid_trend:
@@ -2741,7 +2907,9 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                     f"5. 1m Rejection Wick Confirmation: Rejection wick present on 1m chart ({'YES - CONFIRMED' if rejection_wick_ok else 'NO - PENDING'}).\n"
                     f"6. 1m MSS Shift with Displacement: Bullish/Bearish structure shift confirmed on 1m chart (YES).\n"
                     f"7. FVG / OB Pullback Limit Order Set: Entry placed strictly as a Limit Order ({action} at {entry_price:.2f}) (CONFIRMED).\n"
-                    f"8. Scalping Hold Limit: Setup designed to complete within 10-15 Minutes holding time (CONFIRMED).\n\n"
+                    f"8. RSI Momentum Confirmation: RSI is at {rsi_val:.2f} (CONFIRMED).\n"
+                    f"9. Fixed Range Volume Profile (FRVP) Confluence: Entry price is aligned with a High Volume Node (HVN) (CONFIRMED). (POC: {poc_price:.2f})\n"
+                    f"10. Scalping Hold Limit: Setup designed to complete within 10-15 Minutes holding time (CONFIRMED).\n\n"
                     f"---\n\n"
                     f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
                     f"📍 පළමු පියවර (STEP 1): Market Structure Mapping - දිශාව: {direction}, කලාපය: {'DISCOUNT' if is_discount else 'PREMIUM'}.\n"
@@ -2752,23 +2920,53 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                     f"5. 1m Rejection Wick: මිනිත්තු 1 ප්‍රස්ථාරයේ Rejection Wick එකක් සනාථ වීම: {'ඔව් (තහවුරු විය)' if rejection_wick_ok else 'නැත (බලාපොරොත්තු වේ)'}.\n"
                     f"6. 1m MSS Shift: 1m MSS (Market Structure Shift) සහ displacement එකක් සනාථ වීම: ඔව්.\n"
                     f"7. FVG/OB Limit Order: පවතින Market Price එකෙන් සෘජුවම Entry නොදී, FVG / OB Pullback මට්ටමේ {action} එකක් පමණක් පිහිටුවීම ({entry_price:.2f} හිදී): තහවුරු විය (CONFIRMED).\n"
-                    f"8. Hold Limit: විනාඩි 10-15 Scalping Hold සීමාව සහ තද Stop Loss මට්ටම ({stop_loss:.2f}): තහවුරු විය (CONFIRMED)."
+                    f"8. RSI Momentum Confirmation: RSI අගය {rsi_val:.2f} ලෙස තහවුරු විය: (CONFIRMED).\n"
+                    f"9. FRVP Confluence: ඇතුල්වීමේ මිල High Volume Node (HVN) කලාපය සමඟ සමපාත වේ: (CONFIRMED). (POC: {poc_price:.2f})\n"
+                    f"10. Hold Limit: විනාඩි 10-15 Scalping Hold සීමාව සහ තද Stop Loss මට්ටම ({stop_loss:.2f}): තහවුරු විය (CONFIRMED)."
                 )
             else:
-                reasoning = (
-                    f"📍 SETUP LOCKED OUT (Low Confidence: {conf_score}% < 80%):\n"
-                    f"SMC Strategy confluences were insufficient to reach the mandatory 80% confirmation threshold. Entry parameters suppressed to protect risk capital.\n\n"
-                    f"---\n\n"
-                    f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
-                    f"📍 ඇතුල්වීම් අවහිර කර ඇත (අඩු තහවුරු කිරීමේ ප්‍රතිශතය: {conf_score}% < 80%):\n"
-                    f"SMC උපාය මාර්ගික අනුකූලතා ප්‍රමාණය අනිවාර්ය 80% සීමාවට වඩා අඩු බැවින් අවදානම අවම කිරීම සඳහා මෙම setup එක අවලංගු කර ඇත."
-                )
+                if conf_score < 80:
+                    reasoning = (
+                        f"📍 SETUP LOCKED OUT (Low Confidence: {conf_score}% < 80%):\n"
+                        f"SMC Strategy confluences were insufficient to reach the mandatory 80% confirmation threshold. Entry parameters suppressed to protect risk capital.\n\n"
+                        f"---\n\n"
+                        f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
+                        f"📍 ඇතුල්වීම් අවහිර කර ඇත (අඩු තහවුරු කිරීමේ ප්‍රතිශතය: {conf_score}% < 80%):\n"
+                        f"SMC උපාය මාර්ගික අනුකූලතා ප්‍රමාණය අනිවාර්ය 80% සීමාවට වඩා අඩු බැවින් අවදානම අවම කිරීම සඳහා මෙම setup එක අවලංගු කර ඇත."
+                    )
+                elif not rsi_ok:
+                    reasoning = (
+                        f"📍 SETUP LOCKED OUT (RSI Momentum Lockout - RSI: {rsi_val:.2f}):\n"
+                        f"RSI momentum did not confirm the setup (RSI: {rsi_val:.2f}). For BULLISH setups, RSI must be <= 65. For BEARISH setups, RSI must be >= 35 to verify expansion room. Entry parameters suppressed.\n\n"
+                        f"---\n\n"
+                        f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
+                        f"📍 ඇතුල්වීම් අවහිර කර ඇත (RSI Momentum Lockout - RSI: {rsi_val:.2f}):\n"
+                        f"RSI ගම්‍යතාවය (momentum) මෙම setup එක තහවුරු නොකරයි (RSI: {rsi_val:.2f}). BUY setup සඳහා RSI <= 65 විය යුතු අතර SELL setup සඳහා RSI >= 35 විය යුතුය. ඇතුල්වීම් අවහිර කර ඇත."
+                    )
+                elif news_lockout_active:
+                    reasoning = (
+                        f"📍 SETUP LOCKED OUT (High-Impact News Lockout - Event: {active_news_event}):\n"
+                        f"High-impact USD economic news is scheduled within +/- 60 minutes of the current time. Setup has been locked out to prevent trading during extreme news volatility.\n\n"
+                        f"---\n\n"
+                        f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
+                        f"📍 ඇතුල්වීම් අවහිර කර ඇත (USD High-Impact News Lockout - Event: {active_news_event}):\n"
+                        f"ප්‍රධාන USD ආර්ථික පුවත් තව විනාඩි 60ක් ඇතුළත හෝ පසුගිය විනාඩි 60 තුළ ප්‍රකාශයට පත් වී ඇති බැවින් අවදානම අවම කිරීම සඳහා මෙම setup එක අවලංගු කර ඇත."
+                    )
+                else:
+                    reasoning = (
+                        f"📍 SETUP LOCKED OUT (FRVP Volume Profile Mismatch - POC: {poc_price:.2f}):\n"
+                        f"Fixed Range Volume Profile (FRVP) did not confirm the entry price. The entry price ({entry_price:.2f}) must be aligned with a High Volume Node (HVN) area within 0.5% tolerance to prevent breakout risk.\n\n"
+                        f"---\n\n"
+                        f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
+                        f"📍 ඇතුල්වීම් අවහිර කර ඇත (FRVP Volume Profile Mismatch - POC: {poc_price:.2f}):\n"
+                        f"Fixed Range Volume Profile (FRVP) මඟින් ඇතුල්වීමේ මිල තහවුරු නොකරයි. අවදානම අවම කිරීම සඳහා ඇතුල්වීමේ මිල ({entry_price:.2f}) High Volume Node (HVN) කලාපය සමඟ 0.5% ක පරාසයක සමපාත විය යුතුය."
+                    )
             
             invalidation = (
                 f"Setup is invalidated if price breaches the manipulation extreme at {stop_loss:.2f} before limit execution.\n\n"
                 f"---\n\n"
                 f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
-                f"මිල {stop_loss:.2f} මට්ටමෙන් ඔබ්බට ගියහොත් මෙම SMC setup එක සෘජුවම අවලංගු වේ."
+                f"මිල {stop_loss:.2f} මට්ටමෙන් ඔබ්බට ගියහොත් මෙම SMC setup එක සෘජුවම අවලංගು වේ."
             )
             risk_notes = (
                 f"SMC Scalp Risk strictly 0.5% - 1.0% maximum. Hold duration: 10m - 15m max. Stop Loss: {stop_loss:.2f}, Target: {tp2:.2f} (1:4.00 RR).\n\n"
@@ -2833,7 +3031,11 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
             "double_mitigation_ok": double_mitigation_ok,
             "rejection_wick_ok": rejection_wick_ok,
             "original_extreme_entry": round(original_entry_price, 2) if is_valid_trend else None,
-            "fvg_boundary_entry": round(fvg_boundary_entry, 2) if is_valid_trend else None
+            "fvg_boundary_entry": round(fvg_boundary_entry, 2) if is_valid_trend else None,
+            "rsi_value": round(rsi_val, 2),
+            "rsi_ok": rsi_ok,
+            "frvp_ok": frvp_ok,
+            "news_lockout_active": news_lockout_active
         }
 
 
