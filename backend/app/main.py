@@ -360,11 +360,15 @@ async def send_custom_telegram_message(req: TelegramSendRequest):
 
 @app.post("/api/preferences", response_model=PreferenceResponse)
 def set_preference(pref: PreferenceCreate, db: Session = Depends(get_db)):
+    val_to_save = pref.value
+    if pref.key == "gemini_api_key" and val_to_save:
+        val_to_save = val_to_save.strip().replace('"', '').replace("'", "")
+        
     db_pref = db.query(PreferenceModel).filter(PreferenceModel.key == pref.key).first()
     if db_pref:
-        db_pref.value = pref.value
+        db_pref.value = val_to_save
     else:
-        db_pref = PreferenceModel(key=pref.key, value=pref.value)
+        db_pref = PreferenceModel(key=pref.key, value=val_to_save)
         db.add(db_pref)
     db.commit()
     db.refresh(db_pref)
@@ -372,7 +376,7 @@ def set_preference(pref: PreferenceCreate, db: Session = Depends(get_db)):
     # Invalidate cache if key was updated
     if pref.key == "gemini_api_key":
         global _gemini_status_cache
-        _gemini_status_cache["timestamp"] = 0.0 # Force recheck
+        _gemini_status_cache = {"status": "UNKNOWN", "details": "", "timestamp": 0.0}
         
     return db_pref
 
