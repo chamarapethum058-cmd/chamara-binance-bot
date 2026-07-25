@@ -5288,7 +5288,7 @@ export default function Dashboard() {
                       geminiStatus.status === "MISSING" ? "bg-gray-500" :
                       "bg-blue-500"
                     }`}></span>
-                    Connection Status: {geminiStatus.status}
+                    Connection Status: {geminiStatus.status === "HIGH_DEMAND" ? "RATE LIMITED (429)" : geminiStatus.status}
                   </div>
                   <p className="text-[10px] text-gray-300 font-medium leading-normal mt-0.5">
                     {geminiStatus.details}

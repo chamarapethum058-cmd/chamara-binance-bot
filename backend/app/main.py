@@ -287,7 +287,10 @@ async def get_gemini_status(db: Session = Depends(get_db)):
     global _gemini_status_cache
     now = time.time()
     if _gemini_status_cache["status"] != "UNKNOWN" and (now - _gemini_status_cache["timestamp"]) < 120:
-        return _gemini_status_cache
+        cached_res = dict(_gemini_status_cache)
+        if cached_res.get("status") == "VALID" and "rate-limited" in cached_res.get("details", "").lower():
+            cached_res["status"] = "HIGH_DEMAND"
+        return cached_res
         
     try:
         from google import genai
@@ -305,7 +308,7 @@ async def get_gemini_status(db: Session = Depends(get_db)):
         err_str = str(e)
         if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "quota" in err_str.lower():
             _gemini_status_cache = {
-                "status": "VALID",
+                "status": "HIGH_DEMAND",
                 "details": "Gemini API Key is valid, but currently rate-limited (429 Resource Exhausted). | API Key එක වලංගු වේ, නමුත් සීමාව ඉක්මවා ඇත.",
                 "timestamp": now
             }
