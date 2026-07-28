@@ -338,10 +338,7 @@ async def get_gemini_status(db: Session = Depends(get_db)):
         }
     
     if _gemini_status_cache.get("provider") != "LOCAL" and _gemini_status_cache["status"] != "UNKNOWN" and (now - _gemini_status_cache["timestamp"]) < 120:
-        cached_res = dict(_gemini_status_cache)
-        if cached_res.get("status") == "HIGH_DEMAND":
-            cached_res["status"] = "VALID"
-        return cached_res
+        return dict(_gemini_status_cache)
         
     try:
         from google import genai
@@ -360,8 +357,8 @@ async def get_gemini_status(db: Session = Depends(get_db)):
         err_str = str(e)
         if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "quota" in err_str.lower():
             _gemini_status_cache = {
-                "status": "VALID",
-                "details": "Gemini API connection is active and valid (Rate Limit Bypassed). | Gemini සම්බන්ධතාවය සක්‍රිය සහ වලංගු වේ.",
+                "status": "INVALID",
+                "details": "Gemini API Key has exceeded its quota (429 Rate Limited). Please try a new key or set up billing. | API Key එකෙහි සීමාව ඉක්මවා ඇත (429 Rate Limited).",
                 "timestamp": now,
                 "provider": "GEMINI"
             }
