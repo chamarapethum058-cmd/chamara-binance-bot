@@ -3281,8 +3281,7 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                     reasoning = (
                         f"📍 SETUP LOCKED OUT (High-Impact News Lockout - Event: {active_news_event}):\n"
                         f"High-impact USD economic news is scheduled within +/- 60 minutes of the current time. Setup has been locked out to prevent trading during extreme news volatility.\n\n"
-                        f"---
-\n"
+                        f"---\n\n"
                         f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
                         f"📍 ඇතුල්වීම් අවහිර කර ඇත (USD High-Impact News Lockout - Event: {active_news_event}):\n"
                         f"ප්‍රධාන USD ආර්ථික පුවත් තව විනාඩි 60ක් ඇතුළත හෝ පසුගිය විනාඩි 60 තුළ ප්‍රකාශයට පත් වී ඇති බැවින් අවදානම අවම කිරීම සඳහා මෙම setup එක අවලංගු කර ඇත."
@@ -3291,9 +3290,7 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                     reasoning = (
                         f"📍 SETUP LOCKED OUT (RSI Momentum or FRVP Mismatch):\n"
                         f"RSI or FRVP confluences did not verify the setup. Entry parameters suppressed.\n\n"
-                        f"---
-
-"
+                        f"---\n\n"
                         f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
                         f"📍 ඇතුල්වීම් අවහිර කර ඇත (RSI හෝ FRVP නොගැලපීම):\n"
                         f"RSI හෝ FRVP අගයන් මෙම setup එක සනාථ නොකරන බැවින් ඇතුල්වීම් අවහිර කර ඇත."
@@ -3301,17 +3298,13 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
             
             invalidation = (
                 f"Setup is invalidated if price breaches the manipulation extreme at {stop_loss:.2f} before limit execution.\n\n"
-                f"---
-
-"
+                f"---\n\n"
                 f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
                 f"මිල {stop_loss:.2f} මට්ටමෙන් ඔබ්බට ගියහොත් මෙම SMC setup එක සෘජුවම අවලංගු වේ."
             )
             risk_notes = (
                 f"SMC Scalp Risk strictly 0.5% - 1.0% maximum. Hold duration: 10m - 15m max. Stop Loss: {stop_loss:.2f}, Target: {tp2:.2f} (1:{rr_ratio_smc:.2f} RR).\n\n"
-                f"---
-
-"
+                f"---\n\n"
                 f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
                 f"SMC Scalp trade එකක් බැවින් එක් trade එකකට උපරිම 0.5% - 1.0% ක් පමණක් අවදානමට ලක් කරන්න. උපරිම රඳවා ගැනීමේ කාලය: විනාඩි 10 - 15. Stop Loss: {stop_loss:.2f}, Target: {tp2:.2f}."
             )
@@ -3323,9 +3316,7 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                 f"2. 15-Minute Trend: {trend_15m}\n"
                 f"3. 1-Minute Trend: {trend_1m}\n"
                 f"Strict triple-timeframe trend alignment (all BULLISH or all BEARISH) is required to execute a sniper entry. Setup has been suppressed to avoid trading against major institutional flow.\n\n"
-                f"---
-
-"
+                f"---\n\n"
                 f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
                 f"📍 ඇතුල්වීම් අවහිර කර ඇත (Trend නොගැලපීම):\n"
                 f"1. 1-Hour Trend: {trend_1h}\n"
@@ -3467,4 +3458,3 @@ class NewsService:
                         "description": "The SEC has outlined its regulatory priorities for the upcoming fiscal year."
                     }
                 ]
-
