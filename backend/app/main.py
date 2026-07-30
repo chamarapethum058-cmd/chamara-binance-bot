@@ -34,9 +34,54 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+def auto_start_ollama():
+    import socket
+    import subprocess
+    import shutil
+    import os
+
+    # Check if port 11434 is already open
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.settimeout(1.0)
+    try:
+        s.connect(("127.0.0.1", 11434))
+        s.close()
+        return  # Already running
+    except Exception:
+        pass
+
+    # Find the ollama executable path
+    ollama_path = shutil.which("ollama")
+    if not ollama_path:
+        user_profile = os.getenv("USERPROFILE", "")
+        possible_path = os.path.join(user_profile, "AppData", "Local", "Programs", "Ollama", "ollama.exe")
+        if os.path.exists(possible_path):
+            ollama_path = possible_path
+
+    if ollama_path:
+        try:
+            # Spawn a background detached process so it doesn't block the backend
+            if os.name == 'nt':
+                DETACHED_PROCESS = 0x00000008
+                subprocess.Popen(
+                    [ollama_path, "serve"],
+                    creationflags=DETACHED_PROCESS,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL
+                )
+            else:
+                subprocess.Popen(
+                    [ollama_path, "serve"],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL
+                )
+        except Exception:
+            pass
+
 # Initialize default strategy if empty
 @app.on_event("startup")
 def startup_populate():
+    auto_start_ollama()
     db = SessionLocal()
     
     # Check if SMC exists, if not seed it
