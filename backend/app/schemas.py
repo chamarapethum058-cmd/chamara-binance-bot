@@ -95,6 +95,11 @@ class SilverBulletRequest(BaseModel):
     has_fresh_fvg: Optional[bool] = None
     high_impact_news: Optional[bool] = None
     
+    # 9-confluence strategy parameters
+    m1_liquidity_sweep: Optional[bool] = None
+    displacement_choch: Optional[bool] = None
+    fvg_ob_confluence: Optional[bool] = None
+    
     # Advanced 9:00 AM Candle Range parameters
     candle_9am_high: Optional[float] = None
     candle_9am_low: Optional[float] = None
@@ -181,6 +186,15 @@ class SilverBulletResponse(BaseModel):
     rsi_value: Optional[float] = None
     rsi_ok: Optional[bool] = None
     frvp_ok: Optional[bool] = None
+    
+    # 9-confluence strategy parameters
+    m1_liquidity_sweep: Optional[bool] = None
+    displacement_choch: Optional[bool] = None
+    fvg_ob_confluence: Optional[bool] = None
+    
+    # Fibonacci Golden/OTE Zone parameters
+    fib_retracement: Optional[float] = None
+    fib_zone_ok: Optional[bool] = None
 
 class TradeUpdateRequest(BaseModel):
     entry_price: Optional[float] = None

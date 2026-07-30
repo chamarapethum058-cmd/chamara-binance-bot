@@ -206,8 +206,9 @@ The engine must strictly monitor setups only during these three independent oper
     db.close()
     
     # Start the background SMC watchlist tracker loop
-    from .tracker import start_smc_tracker
+    from .tracker import start_smc_tracker, start_tcs_tracker
     start_smc_tracker()
+    start_tcs_tracker()
 
 @app.get("/api/health")
 def health_check():
@@ -454,6 +455,28 @@ def update_smc_watchlist(watchlist: List[Dict[str, Any]], db: Session = Depends(
     db.commit()
     return {"status": "success", "message": "SMC Watchlist updated successfully."}
 
+@app.get("/api/watchlist/tcs")
+def get_tcs_watchlist(db: Session = Depends(get_db)):
+    pref = db.query(PreferenceModel).filter(PreferenceModel.key == "tcs_monitored_coins").first()
+    if pref and pref.value:
+        try:
+            return json.loads(pref.value)
+        except Exception:
+            return []
+    return []
+
+@app.post("/api/watchlist/tcs")
+def update_tcs_watchlist(watchlist: List[Dict[str, Any]], db: Session = Depends(get_db)):
+    pref = db.query(PreferenceModel).filter(PreferenceModel.key == "tcs_monitored_coins").first()
+    json_val = json.dumps(watchlist)
+    if pref:
+        pref.value = json_val
+    else:
+        pref = PreferenceModel(key="tcs_monitored_coins", value=json_val)
+        db.add(pref)
+    db.commit()
+    return {"status": "success", "message": "TCS Watchlist updated successfully."}
+
 # TRANSLATION ENDPOINTS
 @app.post("/api/translate")
 async def translate_text_endpoint(req: TranslateRequest, db: Session = Depends(get_db)):
@@ -656,6 +679,90 @@ async def silverbullet_analyze(req: SilverBulletRequest, db: Session = Depends(g
 @app.post("/api/smc/analyze", response_model=SilverBulletResponse)
 async def smc_analyze(req: SilverBulletRequest, db: Session = Depends(get_db)):
     result = await AIService.calculate_programmatic_smc(req.dict())
+    
+    # Sanitize float fields
+    for field in ["liquidity_target", "stop_loss_level", "equilibrium_price"]:
+        val = result.get(field)
+        if val is not None:
+            if isinstance(val, str):
+                val_clean = val.strip().lower()
+                if val_clean in ["none", "n/a", "null", ""]:
+                    result[field] = None
+                else:
+                    try:
+                        result[field] = float(val)
+                    except ValueError:
+                        result[field] = None
+            else:
+                try:
+                    result[field] = float(val)
+                except (ValueError, TypeError):
+                    result[field] = None
+
+    return SilverBulletResponse(
+        is_valid=result.get("is_valid", False),
+        status_message=result.get("status_message") or "Success",
+        market_structure_status=result.get("market_structure_status"),
+        daily_bias=result.get("daily_bias"),
+        liquidity_target=result.get("liquidity_target"),
+        entry_price_area=result.get("entry_price_area"),
+        stop_loss_level=result.get("stop_loss_level"),
+        target_reward_ratio=result.get("target_reward_ratio"),
+        reasoning=result.get("reasoning"),
+        invalidation=result.get("invalidation"),
+        risk_notes=result.get("risk_notes"),
+        
+        equilibrium_price=result.get("equilibrium_price"),
+        zone_type=result.get("zone_type"),
+        daily_open_relation=result.get("daily_open_relation"),
+        killzone_valid=result.get("killzone_valid"),
+        counter_trend_locked=result.get("counter_trend_locked"),
+        
+        erl_irl_state=result.get("erl_irl_state"),
+        swept_liquidity_pool=result.get("swept_liquidity_pool"),
+        mitigated_pd_array_type=result.get("mitigated_pd_array_type"),
+        is_advanced_setup=result.get("is_advanced_setup"),
+        advanced_setup_status=result.get("advanced_setup_status"),
+        
+        sb_step_1_time_window_ok=result.get("sb_step_1_time_window_ok"),
+        sb_step_1_details=result.get("sb_step_1_details"),
+        sb_step_2_liquidity_sweep_ok=result.get("sb_step_2_liquidity_sweep_ok"),
+        sb_step_2_details=result.get("sb_step_2_details"),
+        sb_step_3_displacement_mss_ok=result.get("sb_step_3_displacement_mss_ok"),
+        sb_step_3_details=result.get("sb_step_3_details"),
+        sb_step_4_fvg_bpr_ok=result.get("sb_step_4_fvg_bpr_ok"),
+        sb_step_4_details=result.get("sb_step_4_details"),
+        sb_step_5_entry_exec_ok=result.get("sb_step_5_entry_exec_ok"),
+        sb_step_5_details=result.get("sb_step_5_details"),
+        sb_step_6_risk_mgmt_ok=result.get("sb_step_6_risk_mgmt_ok"),
+        sb_step_6_details=result.get("sb_step_6_details"),
+        sb_step_7_london_asian_sweep_ok=result.get("sb_step_7_london_asian_sweep_ok"),
+        sb_step_7_details=result.get("sb_step_7_details"),
+        sb_step_8_htf_pd_mitigation_ok=result.get("sb_step_8_htf_pd_mitigation_ok"),
+        sb_step_8_details=result.get("sb_step_8_details"),
+        sb_step_9_ltf_choch_ok=result.get("sb_step_9_ltf_choch_ok"),
+        sb_step_9_details=result.get("sb_step_9_details"),
+        sb_step_10_fvg_limit_ok=result.get("sb_step_10_fvg_limit_ok"),
+        sb_step_10_details=result.get("sb_step_10_details"),
+        
+        confidence=result.get("confidence", 0),
+        news_lockout_active=result.get("news_lockout_active", False),
+        active_news_event=result.get("active_news_event"),
+        upcoming_news_events=result.get("upcoming_news_events"),
+        original_extreme_entry=result.get("original_extreme_entry"),
+        fvg_boundary_entry=result.get("fvg_boundary_entry"),
+        po3_phase=result.get("po3_phase"),
+        m1_liquidity_sweep=result.get("m1_liquidity_sweep"),
+        displacement_choch=result.get("displacement_choch"),
+        fvg_ob_confluence=result.get("fvg_ob_confluence"),
+        fib_retracement=result.get("fib_retracement"),
+        fib_zone_ok=result.get("fib_zone_ok")
+    )
+
+
+@app.post("/api/tcs/analyze", response_model=SilverBulletResponse)
+async def tcs_analyze(req: SilverBulletRequest, db: Session = Depends(get_db)):
+    result = await AIService.calculate_programmatic_tcs(req.dict())
     
     # Sanitize float fields
     for field in ["liquidity_target", "stop_loss_level", "equilibrium_price"]:

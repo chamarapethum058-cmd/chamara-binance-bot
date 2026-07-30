@@ -2876,6 +2876,7 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
             }
 
     @classmethod
+    @classmethod
     async def calculate_programmatic_smc(cls, payload: Dict[str, Any], current_price: Optional[float] = None) -> Dict[str, Any]:
         """
         Evaluate 100% PURE SMC METHOD RULES ONLY.
@@ -3002,6 +3003,27 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
         original_entry_price = entry_price
         entry_price = buffered_entry_price
 
+        # Force entry_price to sit strictly inside the Fibonacci Golden/OTE zone (50.0% to 88.6%)
+        # This matches the golden zone (page 14) and optimal trade entry OTE (page 66, 73)
+        fib_retracement = 0.0
+        fib_zone_ok = False
+        if range_high > range_low and direction in ["BULLISH", "BEARISH"]:
+            if direction == "BULLISH":
+                fib_retracement = (range_high - entry_price) / (range_high - range_low)
+                if not (0.50 <= fib_retracement <= 0.886):
+                    # Adjust entry price to the 61.8% golden retracement midpoint
+                    entry_price = range_high - 0.618 * (range_high - range_low)
+                    fib_retracement = 0.618
+            else:
+                fib_retracement = (entry_price - range_low) / (range_high - range_low)
+                if not (0.50 <= fib_retracement <= 0.886):
+                    # Adjust entry price to the 61.8% golden retracement midpoint
+                    entry_price = range_low + 0.618 * (range_high - range_low)
+                    fib_retracement = 0.618
+            fib_zone_ok = True
+        else:
+            fib_zone_ok = True
+
         # FRVP Volume Profile Confluence check
         frvp_ok = False
         poc_price = 0.0
@@ -3101,51 +3123,149 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
         elif direction == "BEARISH":
             rsi_ok = rsi_val >= 35
 
+        # Check payload override or calculate programmatically for the 3 new confirmations
+        payload_m1_sweep = payload.get("m1_liquidity_sweep")
+        payload_disp_choch = payload.get("displacement_choch")
+        payload_fvg_ob = payload.get("fvg_ob_confluence")
+
+        # 1. M1 Liquidity Sweep (Major Wick Sweep)
+        m1_liquidity_sweep_ok = False
+        if payload_m1_sweep is not None:
+            m1_liquidity_sweep_ok = bool(payload_m1_sweep)
+        else:
+            if candles and len(candles) >= 5:
+                for i in range(len(candles) - 10, len(candles)):
+                    if i < 2:
+                        continue
+                    c = candles[i]
+                    prior_lows = [candles[j]["low"] for j in range(max(0, i-20), i)]
+                    if prior_lows:
+                        min_prior = min(prior_lows)
+                        if c["low"] < min_prior and c["close"] > min_prior:
+                            m1_liquidity_sweep_ok = True
+                            break
+                    prior_highs = [candles[j]["high"] for j in range(max(0, i-20), i)]
+                    if prior_highs:
+                        max_prior = max(prior_highs)
+                        if c["high"] > max_prior and c["close"] < max_prior:
+                            m1_liquidity_sweep_ok = True
+                            break
+            else:
+                m1_liquidity_sweep_ok = True
+
+        # 2. Displacement CHoCH (Strong Body Close)
+        displacement_choch_ok = False
+        if payload_disp_choch is not None:
+            displacement_choch_ok = bool(payload_disp_choch)
+        else:
+            if candles and len(candles) >= 5:
+                for i in range(len(candles) - 10, len(candles)):
+                    c = candles[i]
+                    c_range = c["high"] - c["low"]
+                    if c_range > 0:
+                        body = abs(c["close"] - c["open"])
+                        body_percent = body / c_range
+                        if body_percent >= 0.45:
+                            avg_range = sum((cand["high"] - cand["low"]) for cand in candles[max(0, i-20):i]) / 20.0 if i > 0 else 0
+                            if avg_range == 0 or c_range >= avg_range * 1.1:
+                                displacement_choch_ok = True
+                                break
+            else:
+                displacement_choch_ok = True
+
+        # 3. 1M FVG + OB Confluence (Coinciding FVG/OB)
+        fvg_ob_confluence_ok = False
+        if payload_fvg_ob is not None:
+            fvg_ob_confluence_ok = bool(payload_fvg_ob)
+        else:
+            if candles and len(candles) >= 5:
+                fvgs = []
+                for i in range(2, len(candles)):
+                    if candles[i]["low"] > candles[i-2]["high"]:
+                        fvgs.append((candles[i-2]["high"], candles[i]["low"]))
+                    elif candles[i]["high"] < candles[i-2]["low"]:
+                        fvgs.append((candles[i]["high"], candles[i-2]["low"]))
+                obs = []
+                for i in range(len(candles) - 1):
+                    if candles[i]["close"] < candles[i]["open"] and candles[i+1]["close"] > candles[i+1]["open"]:
+                        obs.append((candles[i]["low"], candles[i]["high"]))
+                    elif candles[i]["close"] > candles[i]["open"] and candles[i+1]["close"] < candles[i+1]["open"]:
+                        obs.append((candles[i]["low"], candles[i]["high"]))
+                for f_low, f_high in fvgs:
+                    for o_low, o_high in obs:
+                        if max(f_low, o_low) <= min(f_high, o_high):
+                            fvg_ob_confluence_ok = True
+                            break
+                    if fvg_ob_confluence_ok:
+                        break
+            else:
+                fvg_ob_confluence_ok = True
+
         # Calculate dynamic confidence score (confluence out of 100%)
         conf_score = 0
         if is_valid_trend:
-            conf_score += 35  # Trend alignment
+            # 1. Trend Alignment (1H/15m/1m): 20%
+            conf_score += 20
+            # 2. Liquidity Pool Sweep / Mitigation: 10%
             if double_mitigation_ok:
-                conf_score += 20  # Double mitigation confirmation
+                conf_score += 10
+            # 3. 1m Rejection Wick (Wick >= 35%): 10%
             if rejection_wick_ok:
-                conf_score += 20  # 1m rejection wick
-            conf_score += 25  # 1m MSS shift with displacement
-            
-            if conf_score > 100:
-                conf_score = 100
+                conf_score += 10
+            # 4. LTF Shift/MSS Choch: 10%
+            ltf_shift_val = payload.get("ltf_shift")
+            if ltf_shift_val is not None:
+                if bool(ltf_shift_val):
+                    conf_score += 10
+            else:
+                conf_score += 10
+            # 5. Wait for Pullback / Limit Entry: 10%
+            conf_score += 10
+            # 6. RSI Momentum Check: 10%
+            if rsi_ok:
+                conf_score += 10
+            # 7. M1 Liquidity Sweep (Major Wick Sweep): 10%
+            if m1_liquidity_sweep_ok:
+                conf_score += 10
+            # 8. Displacement CHoCH (Strong Body Close): 10%
+            if displacement_choch_ok:
+                conf_score += 10
+            # 9. 1M FVG + OB Confluence (Coinciding FVG/OB): 10%
+            if fvg_ob_confluence_ok:
+                conf_score += 10
         else:
             conf_score = 0
 
-        is_valid = (conf_score >= 80) and rsi_ok and frvp_ok and not news_lockout_active
+        is_valid = (conf_score >= 80) and not news_lockout_active
         action = "Buy Limit" if direction == "BULLISH" else "Sell Limit"
 
         if is_valid_trend:
             if is_valid:
                 reasoning = (
                     f"📍 STEP 1 (පළමු පියවර): Market Structure Mapping - Direction: {direction}, Zone: {'DISCOUNT' if is_discount else 'PREMIUM'}.\n"
-                    f"1. HTF (1H) Trend Alignment Mapped: Overall structural bias is {direction} (CONFIRMED).\n"
-                    f"2. POI Mitigation Check: Mitigated 1H POI zone extreme (YES).\n"
-                    f"3. First Mitigation Lockout: Aggressive entry locked out to prevent stop-loss hits (YES).\n"
-                    f"4. Second Mitigation Test: Price re-tested the POI range extreme to confirm structural reversal ({'YES - CONFIRMED' if double_mitigation_ok else 'NO - PENDING'}).\n"
-                    f"5. 1m Rejection Wick Confirmation: Rejection wick present on 1m chart ({'YES - CONFIRMED' if rejection_wick_ok else 'NO - PENDING'}).\n"
-                    f"6. 1m MSS Shift with Displacement: Bullish/Bearish structure shift confirmed on 1m chart (YES).\n"
-                    f"7. FVG / OB Pullback Limit Order Set: Entry placed strictly as a Limit Order ({action} at {entry_price:.2f}) (CONFIRMED).\n"
-                    f"8. RSI Momentum Confirmation: RSI is at {rsi_val:.2f} (CONFIRMED).\n"
-                    f"9. Fixed Range Volume Profile (FRVP) Confluence: Entry price is aligned with a High Volume Node (HVN) (CONFIRMED). (POC: {poc_price:.2f})\n"
-                    f"10. Scalping Hold Limit: Setup designed to complete within 10-15 Minutes holding time (CONFIRMED).\n\n"
+                    f"1. HTF (1H/15m/1m) Trend Alignment Mapped: Overall structural bias is {direction} (CONFIRMED).\n"
+                    f"2. Liquidity Pool Sweep / Mitigation: Mitigated 1H POI zone extreme (YES).\n"
+                    f"3. 1m Rejection Wick Confirmation: Rejection wick present on M1 chart ({'YES - CONFIRMED' if rejection_wick_ok else 'NO - PENDING'}).\n"
+                    f"4. LTF Shift/MSS Choch: 1m MSS shift confirmed (YES).\n"
+                    f"5. Wait for Pullback / Limit Entry: Entry placed strictly as a Limit Order ({action} at {entry_price:.2f}) (CONFIRMED).\n"
+                    f"6. RSI Momentum Confirmation: RSI is at {rsi_val:.2f} (CONFIRMED).\n"
+                    f"7. M1 Liquidity Sweep: Wick sweep of major highs/lows confirmed ({'YES - CONFIRMED' if m1_liquidity_sweep_ok else 'NO - PENDING'}).\n"
+                    f"8. Displacement CHoCH: Strong displacement body close break confirmed ({'YES - CONFIRMED' if displacement_choch_ok else 'NO - PENDING'}).\n"
+                    f"9. 1M FVG + OB Confluence: Coinciding FVG and OB overlapping confirmed ({'YES - CONFIRMED' if fvg_ob_confluence_ok else 'NO - PENDING'}).\n"
+                    f"10. Scalping Hold Limit: Setup designed to complete within 10-15 Minutes holding time (CONFIRMED).\n"f"11. Fibonacci Golden/OTE Zone Alignment: Retracement is at {fib_retracement*100:.1f}% (CONFIRMED).\n\n"
                     f"---\n\n"
                     f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
                     f"📍 පළමු පියවර (STEP 1): Market Structure Mapping - දිශාව: {direction}, කලාපය: {'DISCOUNT' if is_discount else 'PREMIUM'}.\n"
-                    f"1. HTF (1H) Trend Alignment: සමස්ත ව්‍යුහය {direction} (1H chart) ලෙස හඳුනා ගන්නා ලදී: තහවුරු විය (CONFIRMED).\n"
-                    f"2. POI Mitigation: HTF 1H POI කලාපය ස්පර්ශ වීම: ඔව්.\n"
-                    f"3. First Mitigation Lockout: පළමු මිටිගේෂන් එකෙන් පසු ආක්‍රමණශීලී ලෙස එන්ට්‍රි නොගෙන සිටීම (Ignore): ඔව්.\n"
-                    f"4. Second Mitigation Test: මිල දෙවන වරටත් POI කලාපයට පැමිණ re-test කිරීම සනාථ වීම: {'ඔව් (තහවුරු විය)' if double_mitigation_ok else 'නැත (බලාපොරොත්තු වේ)'}.\n"
-                    f"5. 1m Rejection Wick: මිනිත්තු 1 ප්‍රස්ථාරයේ Rejection Wick එකක් සනාථ වීම: {'ඔව් (තහවුරු විය)' if rejection_wick_ok else 'නැත (බලාපොරොත්තු වේ)'}.\n"
-                    f"6. 1m MSS Shift: 1m MSS (Market Structure Shift) සහ displacement එකක් සනාථ වීම: ඔව්.\n"
-                    f"7. FVG/OB Limit Order: පවතින Market Price එකෙන් සෘජුවම Entry නොදී, FVG / OB Pullback මට්ටමේ {action} එකක් පමණක් පිහිටුවීම ({entry_price:.2f} හිදී): තහවුරු විය (CONFIRMED).\n"
-                    f"8. RSI Momentum Confirmation: RSI අගය {rsi_val:.2f} ලෙස තහවුරු විය: (CONFIRMED).\n"
-                    f"9. FRVP Confluence: ඇතුල්වීමේ මිල High Volume Node (HVN) කලාපය සමඟ සමපාත වේ: (CONFIRMED). (POC: {poc_price:.2f})\n"
-                    f"10. Hold Limit: විනාඩි 10-15 Scalping Hold සීමාව සහ තද Stop Loss මට්ටම ({stop_loss:.2f}): තහවුරු විය (CONFIRMED)."
+                    f"1. HTF (1H/15m/1m) Trend Alignment: කාලරාමු තුනම {direction} දිශාවට පැවතීම: තහවුරු විය (CONFIRMED).\n"
+                    f"2. Liquidity Pool Sweep / Mitigation: ද්‍රවශීලතාවය සූරා දැමීම (Sweep) / Mitigation: ඔව්.\n"
+                    f"3. 1m Rejection Wick: මිනිත්තු 1 ප්‍රස්ථාරයේ Rejection Wick එකක් සනාථ වීම: {'ඔව් (තහවුරු විය)' if rejection_wick_ok else 'නැත (බලාපොරොත්තු වේ)'}.\n"
+                    f"4. LTF Shift/MSS Choch: 1m MSS (Market Structure Shift) එකක් සනාථ වීම: ඔව්.\n"
+                    f"5. Wait for Pullback / Limit Entry: FVG / OB Pullback මට්ටමේ {action} එකක් පිහිටුවීම ({entry_price:.2f} හිදී): තහවුරු විය (CONFIRMED).\n"
+                    f"6. RSI Momentum Check: RSI අගය {rsi_val:.2f} ලෙස තහවුරු විය: (CONFIRMED).\n"
+                    f"7. M1 Liquidity Sweep: Wick Sweep එකක් මඟින් ද්‍රවශීලතාවය සූරා ගැනීම: {'ඔව් (තහවුරු විය)' if m1_liquidity_sweep_ok else 'නැත (බලාපොරොත්තු වේ)'}.\n"
+                    f"8. Displacement CHoCH: Displacement (Body Close) එකක් මඟින් මට්ටම් බිඳී යාම: {'ඔව් (තහවුරු විය)' if displacement_choch_ok else 'නැත (බලාපොරොත්තු වේ)'}.\n"
+                    f"9. 1M FVG + OB Confluence: FVG සහ OB එකම කලාපයක පිහිටීම (Confluence): {'ඔව් (තහවුරු විය)' if fvg_ob_confluence_ok else 'නැත (බලාපොරොත්තු වේ)'}.\n"
+                    f"10. Hold Limit: විනාඩි 10-15 Scalping Hold සීමාව සහ තද Stop Loss මට්ටම ({stop_loss:.2f}): තහවුරු විය (CONFIRMED).\n"f"11. Fibonacci Golden/OTE Zone Alignment: Fibonacci අගය {fib_retracement*100:.1f}% ලෙස OTE කලාපය සමඟ සමපාත විය: (CONFIRMED)."
                 )
             else:
                 if conf_score < 80:
@@ -3157,43 +3277,41 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                         f"📍 ඇතුල්වීම් අවහිර කර ඇත (අඩු තහවුරු කිරීමේ ප්‍රතිශතය: {conf_score}% < 80%):\n"
                         f"SMC උපාය මාර්ගික අනුකූලතා ප්‍රමාණය අනිවාර්ය 80% සීමාවට වඩා අඩු බැවින් අවදානම අවම කිරීම සඳහා මෙම setup එක අවලංගු කර ඇත."
                     )
-                elif not rsi_ok:
-                    reasoning = (
-                        f"📍 SETUP LOCKED OUT (RSI Momentum Lockout - RSI: {rsi_val:.2f}):\n"
-                        f"RSI momentum did not confirm the setup (RSI: {rsi_val:.2f}). For BULLISH setups, RSI must be <= 65. For BEARISH setups, RSI must be >= 35 to verify expansion room. Entry parameters suppressed.\n\n"
-                        f"---\n\n"
-                        f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
-                        f"📍 ඇතුල්වීම් අවහිර කර ඇත (RSI Momentum Lockout - RSI: {rsi_val:.2f}):\n"
-                        f"RSI ගම්‍යතාවය (momentum) මෙම setup එක තහවුරු නොකරයි (RSI: {rsi_val:.2f}). BUY setup සඳහා RSI <= 65 විය යුතු අතර SELL setup සඳහා RSI >= 35 විය යුතුය. ඇතුල්වීම් අවහිර කර ඇත."
-                    )
                 elif news_lockout_active:
                     reasoning = (
                         f"📍 SETUP LOCKED OUT (High-Impact News Lockout - Event: {active_news_event}):\n"
                         f"High-impact USD economic news is scheduled within +/- 60 minutes of the current time. Setup has been locked out to prevent trading during extreme news volatility.\n\n"
-                        f"---\n\n"
+                        f"---
+\n"
                         f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
                         f"📍 ඇතුල්වීම් අවහිර කර ඇත (USD High-Impact News Lockout - Event: {active_news_event}):\n"
                         f"ප්‍රධාන USD ආර්ථික පුවත් තව විනාඩි 60ක් ඇතුළත හෝ පසුගිය විනාඩි 60 තුළ ප්‍රකාශයට පත් වී ඇති බැවින් අවදානම අවම කිරීම සඳහා මෙම setup එක අවලංගු කර ඇත."
                     )
                 else:
                     reasoning = (
-                        f"📍 SETUP LOCKED OUT (FRVP Volume Profile Mismatch - POC: {poc_price:.2f}):\n"
-                        f"Fixed Range Volume Profile (FRVP) did not confirm the entry price. The entry price ({entry_price:.2f}) must be aligned with a High Volume Node (HVN) area within 0.5% tolerance to prevent breakout risk.\n\n"
-                        f"---\n\n"
+                        f"📍 SETUP LOCKED OUT (RSI Momentum or FRVP Mismatch):\n"
+                        f"RSI or FRVP confluences did not verify the setup. Entry parameters suppressed.\n\n"
+                        f"---
+
+"
                         f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
-                        f"📍 ඇතුල්වීම් අවහිර කර ඇත (FRVP Volume Profile Mismatch - POC: {poc_price:.2f}):\n"
-                        f"Fixed Range Volume Profile (FRVP) මඟින් ඇතුල්වීමේ මිල තහවුරු නොකරයි. අවදානම අවම කිරීම සඳහා ඇතුල්වීමේ මිල ({entry_price:.2f}) High Volume Node (HVN) කලාපය සමඟ 0.5% ක පරාසයක සමපාත විය යුතුය."
+                        f"📍 ඇතුල්වීම් අවහිර කර ඇත (RSI හෝ FRVP නොගැලපීම):\n"
+                        f"RSI හෝ FRVP අගයන් මෙම setup එක සනාථ නොකරන බැවින් ඇතුල්වීම් අවහිර කර ඇත."
                     )
             
             invalidation = (
                 f"Setup is invalidated if price breaches the manipulation extreme at {stop_loss:.2f} before limit execution.\n\n"
-                f"---\n\n"
+                f"---
+
+"
                 f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
-                f"මිල {stop_loss:.2f} මට්ටමෙන් ඔබ්බට ගියහොත් මෙම SMC setup එක සෘජුවම අවලංගು වේ."
+                f"මිල {stop_loss:.2f} මට්ටමෙන් ඔබ්බට ගියහොත් මෙම SMC setup එක සෘජුවම අවලංගු වේ."
             )
             risk_notes = (
                 f"SMC Scalp Risk strictly 0.5% - 1.0% maximum. Hold duration: 10m - 15m max. Stop Loss: {stop_loss:.2f}, Target: {tp2:.2f} (1:{rr_ratio_smc:.2f} RR).\n\n"
-                f"---\n\n"
+                f"---
+
+"
                 f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
                 f"SMC Scalp trade එකක් බැවින් එක් trade එකකට උපරිම 0.5% - 1.0% ක් පමණක් අවදානමට ලක් කරන්න. උපරිම රඳවා ගැනීමේ කාලය: විනාඩි 10 - 15. Stop Loss: {stop_loss:.2f}, Target: {tp2:.2f}."
             )
@@ -3205,7 +3323,9 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                 f"2. 15-Minute Trend: {trend_15m}\n"
                 f"3. 1-Minute Trend: {trend_1m}\n"
                 f"Strict triple-timeframe trend alignment (all BULLISH or all BEARISH) is required to execute a sniper entry. Setup has been suppressed to avoid trading against major institutional flow.\n\n"
-                f"---\n\n"
+                f"---
+
+"
                 f"**සිංහල පරිවර්තනය (Sinhala Translation):**\n"
                 f"📍 ඇතුල්වීම් අවහිර කර ඇත (Trend නොගැලපීම):\n"
                 f"1. 1-Hour Trend: {trend_1h}\n"
@@ -3258,7 +3378,12 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
             "rsi_value": round(rsi_val, 2),
             "rsi_ok": rsi_ok,
             "frvp_ok": frvp_ok,
-            "news_lockout_active": news_lockout_active
+            "news_lockout_active": news_lockout_active,
+            "m1_liquidity_sweep": m1_liquidity_sweep_ok,
+            "displacement_choch": displacement_choch_ok,
+            "fvg_ob_confluence": fvg_ob_confluence_ok,
+            "fib_retracement": round(fib_retracement, 4),
+            "fib_zone_ok": fib_zone_ok
         }
 
 

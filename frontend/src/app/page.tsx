@@ -64,7 +64,7 @@ export default function Dashboard() {
   // News states
   const [news, setNews] = useState<any[]>([]);
   const [newsLoading, setNewsLoading] = useState(false);
-  const [activeView, setActiveView] = useState<"dashboard" | "news" | "silverbullet" | "smc">("dashboard");
+  const [activeView, setActiveView] = useState<"dashboard" | "news" | "silverbullet" | "smc" | "tcs">("dashboard");
   const [trackers, setTrackers] = useState<any[]>([]);
   const [tradeHistory, setTradeHistory] = useState<any[]>([]);
   const [logLoading, setLogLoading] = useState(false);
@@ -409,6 +409,9 @@ export default function Dashboard() {
   const [smcFvgMitigated, setSmcFvgMitigated] = useState(true);
   const [smcLtfChoch, setSmcLtfChoch] = useState(true);
   const [smcPo3Phase, setSmcPo3Phase] = useState("DISTRIBUTION");
+  const [smcM1LiquiditySweep, setSmcM1LiquiditySweep] = useState(true);
+  const [smcDisplacementChoch, setSmcDisplacementChoch] = useState(true);
+  const [smcFvgObConfluence, setSmcFvgObConfluence] = useState(true);
   const [smcPdh, setSmcPdh] = useState<number | "">(65000);
   const [smcPdl, setSmcPdl] = useState<number | "">(64000);
   const [smcOpen, setSmcOpen] = useState<number | "">(64200);
@@ -418,6 +421,38 @@ export default function Dashboard() {
   const [smcTrend1h, setSmcTrend1h] = useState<string>("");
   const [smcResult, setSmcResult] = useState<any | null>(null);
   const [monitoredCoins, setMonitoredCoins] = useState<any[]>([]);
+
+  // TCS states
+  const [tcsSymbol, setTcsSymbol] = useState("BTCUSDT");
+  const [tcsStrategyModel, setTcsStrategyModel] = useState("trend_following");
+  const [tcsTimeframe, setTcsTimeframe] = useState("1m");
+  const [tcsHtfTrend, setTcsHtfTrend] = useState("BULLISH");
+  const [tcsSmaAligned, setTcsSmaAligned] = useState(true);
+  const [tcsRsiAligned, setTcsRsiAligned] = useState(true);
+  const [tcsFrvpAligned, setTcsFrvpAligned] = useState(true);
+  const [tcsPdh, setTcsPdh] = useState<number | "">(65000);
+  const [tcsPdl, setTcsPdl] = useState<number | "">(64000);
+  const [tcsOpen, setTcsOpen] = useState<number | "">(64200);
+  const [tcsCurrentPrice, setTcsCurrentPrice] = useState<number | "">(64100);
+  const [tcsTrend1m, setTcsTrend1m] = useState<string>("");
+  const [tcsTrend15m, setTcsTrend15m] = useState<string>("");
+  const [tcsTrend1h, setTcsTrend1h] = useState<string>("");
+  const [tcsResult, setTcsResult] = useState<any | null>(null);
+  const [tcsLoading, setTcsLoading] = useState(false);
+  const [tcsMonitoredCoins, setTcsMonitoredCoins] = useState<any[]>([]);
+
+  // Manual TCS rules checklist states (strictly the 6 confirmations)
+  const [tcsRule1, setTcsRule1] = useState(false);
+  const [tcsRule2, setTcsRule2] = useState(false);
+  const [tcsRule3, setTcsRule3] = useState(false);
+  const [tcsRule4, setTcsRule4] = useState(false);
+  const [tcsRule5, setTcsRule5] = useState(false);
+  const [tcsRule6, setTcsRule6] = useState(false);
+
+  // Manual TCS entry parameter state inputs
+  const [tcsManualEntry, setTcsManualEntry] = useState<string>("");
+  const [tcsManualSl, setTcsManualSl] = useState<string>("");
+  const [tcsManualTp, setTcsManualTp] = useState<string>("");
   const [livePrices, setLivePrices] = useState<Record<string, number>>({});
   const isInitialMount = useRef(true);
 
@@ -474,6 +509,56 @@ export default function Dashboard() {
     }
     syncWatchlistToBackend(monitoredCoins);
   }, [monitoredCoins]);
+
+  // Sync TCS watchlist to backend SQLite preferences
+  const syncTcsWatchlistToBackend = async (coins: any[]) => {
+    try {
+      await fetch(`${API_BASE}/watchlist/tcs`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(coins)
+      });
+    } catch (err) {
+      console.error("Error syncing TCS watchlist to backend:", err);
+    }
+  };
+
+  // Load tcsMonitoredCoins from backend or localStorage on client-side mount
+  useEffect(() => {
+    const loadTcsWatchlist = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/watchlist/tcs`);
+        if (res.ok) {
+          const data = await res.json();
+          setTcsMonitoredCoins(data);
+          return;
+        }
+      } catch (err) {
+        console.error("Failed to fetch TCS watchlist from backend:", err);
+      }
+
+      // Fallback to localStorage
+      if (typeof window !== "undefined") {
+        const saved = localStorage.getItem("tcs_monitored_coins");
+        if (saved) {
+          try {
+            setTcsMonitoredCoins(JSON.parse(saved));
+          } catch (e) {
+            console.error("Failed to parse saved TCS monitored coins:", e);
+          }
+        }
+      }
+    };
+    loadTcsWatchlist();
+  }, []);
+
+  // Save tcsMonitoredCoins to localStorage and backend when they change
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("tcs_monitored_coins", JSON.stringify(tcsMonitoredCoins));
+    }
+    syncTcsWatchlistToBackend(tcsMonitoredCoins);
+  }, [tcsMonitoredCoins]);
 
   // 5-Second Local API Watchlist Polling Loop
   useEffect(() => {
@@ -555,6 +640,85 @@ export default function Dashboard() {
     return () => clearInterval(intervalId);
   }, [monitoredCoins]);
 
+  // 5-Second Local API TCS Watchlist Polling Loop
+  useEffect(() => {
+    if (tcsMonitoredCoins.length === 0) return;
+
+    const intervalId = setInterval(async () => {
+      const currentCoins = [...tcsMonitoredCoins];
+      if (currentCoins.length === 0) return;
+
+      const updated = await Promise.all(
+        currentCoins.map(async (coin) => {
+          try {
+            const sym = getTradingViewSymbol(coin.symbol);
+            const cleanSym = sym.includes(":") ? sym.split(":")[1] : sym;
+
+            // 1. Fetch live market price & daily levels
+            const resPrice = await fetch(`http://127.0.0.1:8000/api/market/price?symbol=${encodeURIComponent(cleanSym)}`);
+            if (resPrice.ok) {
+              const priceData = await resPrice.json();
+              const currentPrice = priceData.current_price || coin.currentPrice;
+              const pdh = priceData.pdh || coin.pdh;
+              const pdl = priceData.pdl || coin.pdl;
+              const open = priceData.open || coin.open;
+              const htfTrend = priceData.daily_bias || coin.htfTrend;
+
+              // 2. Fetch full programmatic TCS analysis from backend
+              const resTCS = await fetch(`http://127.0.0.1:8000/api/tcs/analyze`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  symbol: cleanSym,
+                  timeframe: coin.timeframe,
+                  current_price: currentPrice,
+                  pdh: pdh,
+                  pdl: pdl,
+                  daily_open: open,
+                  htf_trend: htfTrend
+                })
+              });
+
+              if (resTCS.ok) {
+                const tcsData = await resTCS.json();
+                return {
+                  ...coin,
+                  currentPrice: currentPrice,
+                  pdh: pdh,
+                  pdl: pdl,
+                  open: open,
+                  htfTrend: tcsData.daily_bias || htfTrend,
+                  confidence: tcsData.confidence || coin.confidence, // Preserve calculated confidence rating
+                  is_valid: tcsData.is_valid,
+                  entryPrice: coin.entryPrice,
+                  stopLoss: coin.stopLoss,
+                  takeProfit: coin.takeProfit,
+                  smaAligned: coin.smaAligned,
+                  rsiAligned: coin.rsiAligned
+                };
+              }
+            }
+          } catch (e) {
+            console.error("Error refreshing TCS monitored coin:", coin.symbol, e);
+          }
+          return coin;
+        })
+      );
+
+      setTcsMonitoredCoins(prevCoins => {
+        return prevCoins.map(prevCoin => {
+          const match = updated.find(u => u.symbol === prevCoin.symbol);
+          return match ? {
+            ...prevCoin,
+            ...match
+          } : prevCoin;
+        });
+      });
+    }, 5000);
+
+    return () => clearInterval(intervalId);
+  }, [tcsMonitoredCoins]);
+
   // 5-Second Journal Trades Price Polling Loop
   useEffect(() => {
     if (tradeHistory.length === 0) return;
@@ -599,10 +763,16 @@ export default function Dashboard() {
     const isBearish = coin.htfTrend === "BEARISH";
 
     let conf = 0;
-    if (isBullish || isBearish) conf += 35;
-    if (coin.liquidityPoolsSwept) conf += 20;
-    if (coin.swingValidated) conf += 20;
-    if (coin.ltfChoch) conf += 25;
+    if (isBullish || isBearish) conf += 20;
+    if (coin.liquidityPoolsSwept) conf += 10;
+    if (coin.inducementSwept) conf += 10;
+    if (coin.swingValidated) conf += 10;
+    if (coin.ltfChoch) conf += 10;
+    conf += 10; // Wait for Pullback / Limit Entry
+    if (coin.bosConfirmed) conf += 10; // RSI Momentum Check
+    if (coin.m1_liquidity_sweep) conf += 10;
+    if (coin.displacement_choch) conf += 10;
+    if (coin.fvg_ob_confluence) conf += 10;
 
     return {
       confidence: conf,
@@ -697,104 +867,80 @@ export default function Dashboard() {
         if (data.trend_1h) setSmcTrend1h(data.trend_1h);
       }
 
-      const isDiscount = fetchedPrice < (fetchedPdh + fetchedPdl) / 2;
-      const isBelowOpen = fetchedPrice < fetchedOpen;
-      const isBullish = activeHtfTrend === "BULLISH";
-      const isBearish = activeHtfTrend === "BEARISH";
-
-      let conf = 0;
-      if (isBullish || isBearish) conf += 35;
-      if (smcLiquidityPoolsSwept) conf += 20;
-      if (smcSwingValidated) conf += 20;
-      if (smcLtfChoch) conf += 25;
-
-      const isSetupValid = conf >= 80;
-      const direction = isBullish ? "BULLISH" : "BEARISH";
-      const risk = fetchedPrice * 0.0015;
-      const entryPrice = isBullish ? fetchedPrice - (risk * 0.3) : fetchedPrice + (risk * 0.3);
-      const stopLoss = isBullish ? entryPrice - risk : entryPrice + risk;
-      const tp1 = isBullish ? entryPrice + (risk * 2.0) : entryPrice - (risk * 2.0);
-      const tp2 = isBullish ? entryPrice + (risk * 4.0) : entryPrice - (risk * 4.0);
-      const tp3 = isBullish ? entryPrice + (risk * 6.0) : entryPrice - (risk * 6.0);
-
-      const action = isBullish ? "Buy Limit" : "Sell Limit";
-
-       const smcAnalysisData = {
-        is_valid: isSetupValid,
-        confidence: conf,
-        daily_bias: direction,
-        entry_price_area: isSetupValid ? `${action} at ${formatPrice(entryPrice)}` : "No Entry (Confidence < 80%)",
-        stop_loss_level: isSetupValid ? formatPrice(stopLoss) : null,
-        liquidity_target: isSetupValid ? formatPrice(tp2) : null,
-        tp1_target: isSetupValid ? formatPrice(tp1) : null,
-        tp2_target: isSetupValid ? formatPrice(tp2) : null,
-        tp3_target: isSetupValid ? formatPrice(tp3) : null,
-        target_reward_ratio: "1:4.00",
-        equilibrium_price: (fetchedPdh + fetchedPdl) / 2,
-        zone_type: isDiscount ? "DISCOUNT" : "PREMIUM",
-        daily_open_relation: isBelowOpen ? "BELOW_OPEN" : "ABOVE_OPEN",
-        swept_liquidity_pool: smcInducementSwept ? "IDM_PULLBACK_SWEEP" : "NONE",
-        mitigated_pd_array_type: smcOrderBlockMitigated ? "ORDER_BLOCK" : (smcFvgMitigated ? "FVG" : "NONE"),
-        po3_phase: smcPo3Phase,
-        reasoning: `1. Liquidity Pool Identification: Equal Highs/Lows / Trendline liquidity swept (${smcLiquidityPoolsSwept ? "YES" : "NO"}).\n` +
-          `2. Inducement (IDM) Sweep: First minor pullback level swept to trap retail liquidity (${smcInducementSwept ? "YES" : "NO"}).\n` +
-          `3. Swing High/Low Validation: Major swing extreme validated following IDM sweep (${smcSwingValidated ? "YES" : "NO"}).\n` +
-          `4. BOS Body Close: Structure break confirmed strictly via candle body close (${smcBosConfirmed ? "YES" : "NO"}).\n` +
-          `5. Unmitigated POI Selection: Fresh Order Block / FVG tapped in ${isDiscount ? "DISCOUNT" : "PREMIUM"} zone (${smcOrderBlockMitigated || smcFvgMitigated ? "YES" : "NO"}).\n` +
-          `6. LTF CHOCH & Entry Confirmation: 1m/3m/5m CHOCH verified with limit entry at 50% FVG/OB midpoint.\n\n` +
-          `---\n\n` +
-          `**සිංහල පරිවර්තනය (Sinhala Translation):**\n` +
-          `1. නීතිය 1 (Liquidity Pools): Equal Highs/Lows / Trendline ද්‍රවශීලතාවය සූරා දැමීම (Sweep): ${smcLiquidityPoolsSwept ? "ඔව්" : "නැත"}.\n` +
-          `2. නීතිය 2 (Inducement Sweep): පළමු Minor Pullback (IDM) මට්ටම Sweep වීම: ${smcInducementSwept ? "ඔව්" : "නැත"}.\n` +
-          `3. නීතිය 3 (Swing Validation): IDM sweep වීමෙන් පසු ප්‍රධාන Swing High/Low එක තහවුරු වීම: ${smcSwingValidated ? "ඔව්" : "නැත"}.\n` +
-          `4. නීතිය 4 (BOS Body Close): Candle Body එකකින් BOS සනාථ වීම: ${smcBosConfirmed ? "ඔව්" : "නැත"}.\n` +
-          `5. නීතිය 5 (Unmitigated POI): ${isDiscount ? "DISCOUNT" : "PREMIUM"} කලාපයේ Fresh Order Block / FVG කලාපයට මිල පැමිණීම: ${smcOrderBlockMitigated || smcFvgMitigated ? "ඔව්" : "නැත"}.\n` +
-          `6. නීතිය 6 (LTF Entry Confirmation): 1m/3m/5m CHOCH සනාථ වී FVG / Order Block 50% මට්ටමේ Limit Order එක පිහිටුවීම.`,
-        invalidation: `Setup is invalidated if price breaches the manipulation extreme at ${formatPrice(stopLoss)} before limit execution.\n\n` +
-          `---\n\n` +
-          `**සිංහල පරිවර්තනය (Sinhala Translation):**\n` +
-          `මිල ${formatPrice(stopLoss)} මට්ටමෙන් ඔබ්බට ගියහොත් මෙම SMC setup එක සෘජුවම අවලංගු වේ.`,
-        risk_notes: `SMC Scalp Risk strictly 0.5% - 1.0% maximum. Hold duration: 10m - 15m max. Stop Loss: ${formatPrice(stopLoss)}, Target: ${formatPrice(tp2)} (1:4.00 RR).\n\n` +
-          `---\n\n` +
-          `**සිංහල පරිවර්තනය (Sinhala Translation):**\n` +
-          `SMC Scalp trade එකක් බැවින් එක් trade එකකට උපරිම 0.5% - 1.0% ක් පමණක් අවදානමට ලක් කරන්න. උපරිම රඳවා ගැනීමේ කාලය: විනාඩි 10 - 15. Stop Loss: ${formatPrice(stopLoss)}, Target: ${formatPrice(tp2)}.`
+      // Fetch SMC analysis from the backend API endpoint
+      const payload = {
+        symbol: searchSymbol,
+        timeframe: smcTimeframe,
+        current_price: fetchedPrice || null,
+        pdh: fetchedPdh || null,
+        pdl: fetchedPdl || null,
+        daily_open: fetchedOpen || null,
+        
+        // Map UI checkboxes to payload confluences
+        asian_sweep: smcLiquidityPoolsSwept,
+        demand_mitigation: smcSwingValidated,
+        ltf_shift: smcLtfChoch,
+        m1_liquidity_sweep: smcM1LiquiditySweep,
+        displacement_choch: smcDisplacementChoch,
+        fvg_ob_confluence: smcFvgObConfluence,
+        
+        po3_phase: smcPo3Phase
       };
 
-      // Add to monitoredCoins watchlist ONLY if explicitly requested
-      if (addToWatchlist) {
-        setMonitoredCoins(prevCoins => {
-          const coinSymbol = smcSymbol.toUpperCase().trim();
-          const existingIdx = prevCoins.findIndex((c: any) => c.symbol === coinSymbol);
-          const newMonitoredCoin = {
-            id: existingIdx >= 0 ? prevCoins[existingIdx].id : Date.now().toString(),
-            symbol: coinSymbol,
-            timeframe: smcTimeframe,
-            htfTrend: activeHtfTrend,
-            currentPrice: fetchedPrice,
-            open: fetchedOpen,
-            pdh: fetchedPdh,
-            pdl: fetchedPdl,
-            liquidityPoolsSwept: smcLiquidityPoolsSwept,
-            inducementSwept: smcInducementSwept,
-            swingValidated: smcSwingValidated,
-            bosConfirmed: smcBosConfirmed,
-            orderBlockMitigated: smcOrderBlockMitigated,
-            fvgMitigated: smcFvgMitigated,
-            ltfChoch: smcLtfChoch,
-            po3Phase: smcPo3Phase
-          };
+      const resSMC = await fetch(`${API_BASE}/smc/analyze`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
 
-          if (existingIdx >= 0) {
-            const copy = [...prevCoins];
-            copy[existingIdx] = newMonitoredCoin;
-            return copy;
-          } else {
-            return [...prevCoins, newMonitoredCoin];
-          }
-        });
+      if (resSMC.ok) {
+        const smcData = await resSMC.json();
+        setSmcResult(smcData);
+
+        // Add to monitoredCoins watchlist ONLY if explicitly requested
+        if (addToWatchlist) {
+          setMonitoredCoins(prevCoins => {
+            const coinSymbol = searchSymbol.toUpperCase().trim();
+            const existingIdx = prevCoins.findIndex((c: any) => c.symbol === coinSymbol);
+            const newMonitoredCoin = {
+              id: existingIdx >= 0 ? prevCoins[existingIdx].id : Date.now().toString(),
+              symbol: coinSymbol,
+              timeframe: smcTimeframe,
+              htfTrend: smcData.daily_bias || activeHtfTrend,
+              currentPrice: fetchedPrice,
+              open: fetchedOpen,
+              pdh: fetchedPdh,
+              pdl: fetchedPdl,
+              liquidityPoolsSwept: smcLiquidityPoolsSwept,
+              inducementSwept: smcInducementSwept,
+              swingValidated: smcSwingValidated,
+              bosConfirmed: smcBosConfirmed,
+              orderBlockMitigated: smcOrderBlockMitigated,
+              fvgMitigated: smcFvgMitigated,
+              ltfChoch: smcLtfChoch,
+              m1_liquidity_sweep: smcM1LiquiditySweep,
+              displacement_choch: smcDisplacementChoch,
+              fvg_ob_confluence: smcFvgObConfluence,
+              po3Phase: smcPo3Phase,
+              confidence: smcData.confidence,
+              is_valid: smcData.is_valid,
+              entryPrice: smcData.entry_price_area,
+              stopLoss: smcData.stop_loss_level,
+              takeProfit: smcData.liquidity_target
+            };
+
+            if (existingIdx >= 0) {
+              const copy = [...prevCoins];
+              copy[existingIdx] = newMonitoredCoin;
+              return copy;
+            } else {
+              return [...prevCoins, newMonitoredCoin];
+            }
+          });
+        }
+      } else {
+        alert("Failed to analyze SMC setup.");
       }
-
-      setSmcResult(smcAnalysisData);
     } catch (err) {
       console.error("Error running SMC analysis:", err);
     } finally {
@@ -821,6 +967,285 @@ export default function Dashboard() {
       handleRunSmcAnalysis(false);
     }
   }, [smcTimeframe]);
+
+  const handleRunTcsAnalysis = async (addToWatchlist: boolean = false) => {
+    setTcsLoading(true);
+    try {
+      let searchSymbol = tcsSymbol.toUpperCase().trim();
+      if (searchSymbol) {
+        const isForexOrCommodity = ["GOLD", "XAUUSD", "XAU/USD", "EURUSD", "EUR/USD", "GBPUSD", "GBP/USD", "USDJPY"].includes(searchSymbol);
+        if (!isForexOrCommodity) {
+          if (!searchSymbol.endsWith(".P")) {
+            if (searchSymbol.endsWith("USDT")) {
+              searchSymbol = searchSymbol + ".P";
+            } else {
+              searchSymbol = searchSymbol + "USDT.P";
+            }
+          }
+        }
+      }
+      setTcsSymbol(searchSymbol);
+
+      const resPrice = await fetch(`${API_BASE}/market/price?symbol=${encodeURIComponent(searchSymbol)}`);
+      if (!resPrice.ok) {
+        setTcsResult(null);
+        setTcsCurrentPrice("");
+        setTcsPdh("");
+        setTcsPdl("");
+        setTcsOpen("");
+        setTcsTrend1m("");
+        setTcsTrend15m("");
+        setTcsTrend1h("");
+        return;
+      }
+
+      const data = await resPrice.json();
+      const fetchedPrice = data.current_price || 0;
+      const fetchedPdh = data.pdh || 0;
+      const fetchedPdl = data.pdl || 0;
+      const fetchedOpen = data.open || 0;
+
+      if (fetchedPrice === 0) {
+        setTcsResult(null);
+        setTcsCurrentPrice("");
+        setTcsPdh("");
+        setTcsPdl("");
+        setTcsOpen("");
+        setTcsTrend1m("");
+        setTcsTrend15m("");
+        setTcsTrend1h("");
+        return;
+      }
+
+      setTcsCurrentPrice(fetchedPrice);
+      setTcsPdh(fetchedPdh);
+      setTcsPdl(fetchedPdl);
+      setTcsOpen(fetchedOpen);
+
+      let activeHtfTrend = tcsHtfTrend;
+      if (data.daily_bias) {
+        setTcsHtfTrend(data.daily_bias);
+        activeHtfTrend = data.daily_bias;
+      }
+      if (data.trend_1m) setTcsTrend1m(data.trend_1m);
+      if (data.trend_15m) setTcsTrend15m(data.trend_15m);
+      if (data.trend_1h) setTcsTrend1h(data.trend_1h);
+
+      // Call backend TCS analyze
+      const resTcs = await fetch(`${API_BASE}/tcs/analyze`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          symbol: searchSymbol,
+          timeframe: tcsTimeframe,
+          current_price: fetchedPrice,
+          pdh: fetchedPdh,
+          pdl: fetchedPdl,
+          daily_open: fetchedOpen,
+          htf_trend: activeHtfTrend
+        })
+      });
+
+      if (resTcs.ok) {
+        const tcsData = await resTcs.json();
+        setTcsResult(tcsData);
+
+        // Populate manual fields with default reference values
+        setTcsManualEntry(String(fetchedPrice));
+        setTcsManualSl(String(tcsData.stop_loss_level || (activeHtfTrend === "BULLISH" ? fetchedPrice * 0.99 : fetchedPrice * 1.01)));
+        setTcsManualTp(String(tcsData.tp2_target || (activeHtfTrend === "BULLISH" ? fetchedPrice * 1.03 : fetchedPrice * 0.97)));
+
+        // Sync rules states automatically from backend scan results
+        setTcsRule1(tcsData.sb_step_1_time_window_ok || false);
+        setTcsRule2(tcsData.sb_step_2_liquidity_sweep_ok || false);
+        setTcsRule3(tcsData.sb_step_3_displacement_mss_ok || false);
+        setTcsRule4(tcsData.sb_step_4_fvg_bpr_ok || false);
+        setTcsRule5(tcsData.sb_step_5_entry_exec_ok || false);
+        setTcsRule6(tcsData.sb_step_6_risk_mgmt_ok || false);
+
+        if (addToWatchlist) {
+          setTcsMonitoredCoins(prevCoins => {
+            const coinSymbol = searchSymbol;
+            const existingIdx = prevCoins.findIndex((c: any) => c.symbol === coinSymbol);
+            const newMonitoredCoin = {
+              id: existingIdx >= 0 ? prevCoins[existingIdx].id : Date.now().toString(),
+              symbol: coinSymbol,
+              timeframe: tcsTimeframe,
+              htfTrend: activeHtfTrend,
+              currentPrice: fetchedPrice,
+              open: fetchedOpen,
+              pdh: fetchedPdh,
+              pdl: fetchedPdl,
+              confidence: tcsData.confidence || 0,
+              is_valid: true,
+              entryPrice: String(fetchedPrice),
+              stopLoss: String(tcsData.stop_loss_level || (activeHtfTrend === "BULLISH" ? fetchedPrice * 0.99 : fetchedPrice * 1.01)),
+              takeProfit: String(tcsData.tp2_target || (activeHtfTrend === "BULLISH" ? fetchedPrice * 1.03 : fetchedPrice * 0.97)),
+              smaAligned: tcsData.first_mitigation_ok || false,
+              rsiAligned: tcsData.double_mitigation_ok || false
+            };
+
+            if (existingIdx >= 0) {
+              const copy = [...prevCoins];
+              copy[existingIdx] = newMonitoredCoin;
+              return copy;
+            } else {
+              return [...prevCoins, newMonitoredCoin];
+            }
+          });
+        }
+      }
+    } catch (err) {
+      console.error("Error running TCS analysis:", err);
+    } finally {
+      setTcsLoading(false);
+    }
+  };
+
+  const handleResetTcsSearch = () => {
+    setTcsSymbol("");
+    setTcsCurrentPrice("");
+    setTcsPdh("");
+    setTcsPdl("");
+    setTcsOpen("");
+    setTcsTrend1m("");
+    setTcsTrend15m("");
+    setTcsTrend1h("");
+    setTcsResult(null);
+    setTcsHtfTrend("BULLISH");
+    setTcsManualEntry("");
+    setTcsManualSl("");
+    setTcsManualTp("");
+    setTcsRule1(false);
+    setTcsRule2(false);
+    setTcsRule3(false);
+    setTcsRule4(false);
+    setTcsRule5(false);
+    setTcsRule6(false);
+  };
+
+  const handleResetTcsManualFields = () => {
+    if (tcsResult) {
+      setTcsManualEntry(String(tcsCurrentPrice || ""));
+      setTcsManualSl(String(tcsResult.stop_loss_level || ""));
+      setTcsManualTp(String(tcsResult.tp2_target || ""));
+    } else {
+      setTcsManualEntry("");
+      setTcsManualSl("");
+      setTcsManualTp("");
+    }
+  };
+
+  const handleAddToTcsWatchlist = () => {
+    if (!tcsSymbol) return;
+    let computedConf = 0;
+    if (tcsRule1) computedConf += 20;
+    if (tcsRule2) computedConf += 20;
+    if (tcsRule3) computedConf += 20;
+    if (tcsRule6) computedConf += 20;
+    if (tcsRule4) computedConf += 10;
+    if (tcsRule5) computedConf += 10;
+
+    setTcsMonitoredCoins(prevCoins => {
+      const coinSymbol = tcsSymbol.toUpperCase().trim();
+      const existingIdx = prevCoins.findIndex((c: any) => c.symbol === coinSymbol);
+      const newMonitoredCoin = {
+        id: existingIdx >= 0 ? prevCoins[existingIdx].id : Date.now().toString(),
+        symbol: coinSymbol,
+        timeframe: tcsTimeframe,
+        htfTrend: tcsHtfTrend,
+        currentPrice: parseFloat(String(tcsCurrentPrice || 0)),
+        open: parseFloat(String(tcsOpen || 0)),
+        pdh: parseFloat(String(tcsPdh || 0)),
+        pdl: parseFloat(String(tcsPdl || 0)),
+        confidence: computedConf,
+        is_valid: true,
+        entryPrice: tcsManualEntry,
+        stopLoss: tcsManualSl,
+        takeProfit: tcsManualTp,
+        smaAligned: tcsRule2,
+        rsiAligned: tcsRule3
+      };
+
+      if (existingIdx >= 0) {
+        const copy = [...prevCoins];
+        copy[existingIdx] = newMonitoredCoin;
+        return copy;
+      } else {
+        return [...prevCoins, newMonitoredCoin];
+      }
+    });
+    alert(`${tcsSymbol} added/updated in the TCS active watchlist! 📡`);
+  };
+
+  const handleLogTcsTrade = async () => {
+    if (!tcsSymbol) return;
+
+    const direction = tcsHtfTrend;
+    const entry = parseFloat(tcsManualEntry || String(tcsCurrentPrice || 0));
+    let sl = parseFloat(tcsManualSl || "0");
+    if (isNaN(sl) || sl === 0) {
+      sl = direction === "BULLISH" ? entry * 0.99 : entry * 1.01;
+    }
+    let target = parseFloat(tcsManualTp || "0");
+    if (isNaN(target) || target === 0) {
+      target = direction === "BULLISH" ? entry * 1.03 : entry * 0.97;
+    }
+
+    const confirmedEntryStr = prompt(`Confirm/Edit Entry Price for ${tcsSymbol}:`, entry.toFixed(4));
+    if (confirmedEntryStr === null) return;
+    const confirmedEntry = parseFloat(confirmedEntryStr);
+
+    const confirmedSlStr = prompt(`Confirm/Edit Stop-Loss (SL) Price for ${tcsSymbol}:`, sl.toFixed(4));
+    if (confirmedSlStr === null) return;
+    const confirmedSl = parseFloat(confirmedSlStr);
+
+    const confirmedTargetStr = prompt(`Confirm/Edit Take-Profit (TP) Price for ${tcsSymbol}:`, target.toFixed(4));
+    if (confirmedTargetStr === null) return;
+    const confirmedTarget = parseFloat(confirmedTargetStr);
+
+    let computedConf = 0;
+    if (tcsRule1) computedConf += 20;
+    if (tcsRule2) computedConf += 20;
+    if (tcsRule3) computedConf += 20;
+    if (tcsRule6) computedConf += 20;
+    if (tcsRule4) computedConf += 10;
+    if (tcsRule5) computedConf += 10;
+
+    setLogLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/trades/log`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          symbol: tcsSymbol,
+          direction: direction,
+          entry_price: confirmedEntry,
+          stop_loss: confirmedSl,
+          take_profit: confirmedTarget,
+          confidence: computedConf,
+          timeframe: tcsTimeframe
+        })
+      });
+      if (res.ok) {
+        alert("TCS Trade logged to history successfully! 📈");
+        fetchTradeHistory();
+      } else {
+        const errData = await res.json();
+        alert(`Failed to log trade: ${errData.detail || "Unknown error"}`);
+      }
+    } catch (err) {
+      console.error("Error logging TCS trade:", err);
+    } finally {
+      setLogLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (tcsSymbol && tcsSymbol.length >= 3) {
+      handleRunTcsAnalysis(false);
+    }
+  }, [tcsTimeframe]);
 
   const handleLogSmcTrade = async () => {
     if (!smcResult) return;
@@ -1639,6 +2064,20 @@ export default function Dashboard() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
             </svg>
             SMC Method
+          </button>
+          <button
+            onClick={() => setActiveView("tcs")}
+            id="btn-tcs-model"
+            className={`px-4 py-2 rounded-lg text-xs font-semibold tracking-wider uppercase transition-all flex items-center gap-1.5 ${
+              activeView === "tcs"
+                ? "bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-md shadow-violet-500/20"
+                : "text-gray-400 hover:text-gray-200"
+            }`}
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+            </svg>
+            TCS Model
           </button>
         </div>
 
@@ -4003,186 +4442,137 @@ export default function Dashboard() {
                     </div>
 
                     <div className="flex flex-col gap-2.5 bg-[#141626]/40 p-4 rounded-xl border border-[#1E2235]">
-                      <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider font-mono flex items-center justify-between">
-                        <span>{smcStrategyModel === "double_mitigation" ? "SMC Double Mitigation Reversal Rules" : "SMC 1m Sniper Entry Rules"}</span>
-                        <span className="text-[9px] text-gray-400 font-normal">YouTube Tutorial Sync</span>
+                      <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider font-mono flex justify-between items-center">
+                        <span>SMC 9-Confluence Strategy Rules (80% Power)</span>
+                        <span className="text-[9px] text-gray-400 font-normal">Falcon System V3</span>
                       </span>
 
-                      {smcStrategyModel === "double_mitigation" ? (
-                        <>
-                          {/* Rule 1 */}
-                          <label className="flex items-center gap-3 cursor-pointer select-none py-1">
-                            <input
-                              type="checkbox"
-                              checked={true}
-                              readOnly
-                              className="w-4 h-4 rounded text-emerald-600 bg-[#141626] border-[#1E2235] focus:ring-emerald-500 opacity-60"
-                            />
-                            <div className="flex flex-col">
-                              <span className="text-xs font-semibold text-white">Rule 1: HTF Trend Alignment & POI Mitigation</span>
-                              <span className="text-[9px] text-emerald-400/80 font-mono">සිංහල පරිවර්තනය: HTF Trend එක සහ 1H/15m POI කලාපය සනාථ වීම</span>
-                            </div>
-                          </label>
+                      {/* Rule 1: HTF Trend Alignment */}
+                      <label className="flex items-center gap-3 cursor-pointer select-none py-1">
+                        <input
+                          type="checkbox"
+                          checked={true}
+                          readOnly
+                          className="w-4 h-4 rounded text-emerald-600 bg-[#141626] border-[#1E2235] focus:ring-emerald-500 opacity-60"
+                        />
+                        <div className="flex flex-col">
+                          <span className="text-xs font-semibold text-white">Rule 1: HTF Trend Alignment (1H/15m/1m) (20%)</span>
+                          <span className="text-[9px] text-emerald-400/80 font-mono">සිංහල පරිවර්තනය: කාලරාමු 3ම එකම දිශාවට පැවතීම (තහවුරු විය)</span>
+                        </div>
+                      </label>
 
-                          {/* Rule 2 */}
-                          <label className="flex items-center gap-3 cursor-pointer select-none py-1 border-t border-[#1E2235]/40 mt-1 pt-2">
-                            <input
-                              type="checkbox"
-                              checked={true}
-                              readOnly
-                              className="w-4 h-4 rounded text-emerald-600 bg-[#141626] border-[#1E2235] focus:ring-emerald-500 opacity-60"
-                            />
-                            <div className="flex flex-col">
-                              <span className="text-xs font-semibold text-white">Rule 2: First Mitigation Lockout (Ignore Entry)</span>
-                              <span className="text-[9px] text-emerald-400/80 font-mono">සිංහල පරිවර්තනය: පළමු මිටිගේෂන් එකෙන් පසු ආක්‍රමණශීලී ලෙස එන්ට්‍රි නොගෙන සිටීම (Ignore)</span>
-                            </div>
-                          </label>
+                      {/* Rule 2: POI Double Mitigation */}
+                      <label className="flex items-center gap-3 cursor-pointer select-none py-1 border-t border-[#1E2235]/40 mt-1 pt-2">
+                        <input
+                          type="checkbox"
+                          checked={smcLiquidityPoolsSwept}
+                          onChange={(e) => setSmcLiquidityPoolsSwept(e.target.checked)}
+                          className="w-4 h-4 rounded text-emerald-600 bg-[#141626] border-[#1E2235] focus:ring-emerald-500"
+                        />
+                        <div className="flex flex-col">
+                          <span className="text-xs font-semibold text-white">Rule 2: Liquidity Pool Sweep / POI Mitigation (10%)</span>
+                          <span className="text-[9px] text-emerald-400/80 font-mono">සිංහල පරිවර්තනය: ද්‍රවශීලතාවය සූරා දැමීම / POI Mitigation</span>
+                        </div>
+                      </label>
 
-                          {/* Rule 3 */}
-                          <label className="flex items-center gap-3 cursor-pointer select-none py-1 border-t border-[#1E2235]/40 mt-1 pt-2">
-                            <input
-                              type="checkbox"
-                              checked={smcLiquidityPoolsSwept}
-                              onChange={(e) => setSmcLiquidityPoolsSwept(e.target.checked)}
-                              className="w-4 h-4 rounded text-emerald-600 bg-[#141626] border-[#1E2235] focus:ring-emerald-500"
-                            />
-                            <div className="flex flex-col">
-                              <span className="text-xs font-semibold text-white">Rule 3: Second Mitigation Test (Double Tap Re-test)</span>
-                              <span className="text-[9px] text-emerald-400/80 font-mono">සිංහල පරිවර්තනය: මිල දෙවන වරටත් POI කලාපය re-test කිරීම සනාථ වීම</span>
-                            </div>
-                          </label>
+                      {/* Rule 3: 1m Rejection Wick */}
+                      <label className="flex items-center gap-3 cursor-pointer select-none py-1 border-t border-[#1E2235]/40 mt-1 pt-2">
+                        <input
+                          type="checkbox"
+                          checked={smcInducementSwept}
+                          onChange={(e) => setSmcInducementSwept(e.target.checked)}
+                          className="w-4 h-4 rounded text-emerald-600 bg-[#141626] border-[#1E2235] focus:ring-emerald-500"
+                        />
+                        <div className="flex flex-col">
+                          <span className="text-xs font-semibold text-white">Rule 3: 1m Rejection Wick Confirmation (Wick &gt;= 35%) (10%)</span>
+                          <span className="text-[9px] text-emerald-400/80 font-mono">සිංහල පරිවර්තනය: 1m chart එකෙහි Rejection Wick එකක් පිහිටුවීම</span>
+                        </div>
+                      </label>
 
-                          {/* Rule 4 */}
-                          <label className="flex items-center gap-3 cursor-pointer select-none py-1 border-t border-[#1E2235]/40 mt-1 pt-2">
-                            <input
-                              type="checkbox"
-                              checked={smcInducementSwept}
-                              onChange={(e) => setSmcInducementSwept(e.target.checked)}
-                              className="w-4 h-4 rounded text-emerald-600 bg-[#141626] border-[#1E2235] focus:ring-emerald-500"
-                            />
-                            <div className="flex flex-col">
-                              <span className="text-xs font-semibold text-white">Rule 4: 1m Rejection Wick Confirmation (Wick &gt;= 35%)</span>
-                              <span className="text-[9px] text-emerald-400/80 font-mono">සිංහල පරිවර්තනය: 1m chart එකෙහි Rejection Wick එකක් පිහිටුවීම</span>
-                            </div>
-                          </label>
+                      {/* Rule 4: LTF Shift/MSS Choch */}
+                      <label className="flex items-center gap-3 cursor-pointer select-none py-1 border-t border-[#1E2235]/40 mt-1 pt-2">
+                        <input
+                          type="checkbox"
+                          checked={smcSwingValidated}
+                          onChange={(e) => setSmcSwingValidated(e.target.checked)}
+                          className="w-4 h-4 rounded text-emerald-600 bg-[#141626] border-[#1E2235] focus:ring-emerald-500"
+                        />
+                        <div className="flex flex-col">
+                          <span className="text-xs font-semibold text-white">Rule 4: LTF Shift/MSS Choch (10%)</span>
+                          <span className="text-[9px] text-emerald-400/80 font-mono">සිංහල පරිවර්තනය: 1m MSS (Market Structure Shift) එකක් සනාථ වීම</span>
+                        </div>
+                      </label>
 
-                          {/* Rule 5 */}
-                          <label className="flex items-center gap-3 cursor-pointer select-none py-1 border-t border-[#1E2235]/40 mt-1 pt-2">
-                            <input
-                              type="checkbox"
-                              checked={smcSwingValidated}
-                              onChange={(e) => setSmcSwingValidated(e.target.checked)}
-                              className="w-4 h-4 rounded text-emerald-600 bg-[#141626] border-[#1E2235] focus:ring-emerald-500"
-                            />
-                            <div className="flex flex-col">
-                              <span className="text-xs font-semibold text-white">Rule 5: 1m MSS/CHoCH Shift with Displacement</span>
-                              <span className="text-[9px] text-emerald-400/80 font-mono">සිංහල පරිවර්තනය: 1m MSS (Market Structure Shift) සහ displacement එකක් සනාථ වීම</span>
-                            </div>
-                          </label>
+                      {/* Rule 5: Wait for Pullback / Limit Entry */}
+                      <label className="flex items-center gap-3 cursor-pointer select-none py-1 border-t border-[#1E2235]/40 mt-1 pt-2">
+                        <input
+                          type="checkbox"
+                          checked={smcLtfChoch}
+                          onChange={(e) => setSmcLtfChoch(e.target.checked)}
+                          className="w-4 h-4 rounded text-emerald-600 bg-[#141626] border-[#1E2235] focus:ring-emerald-500"
+                        />
+                        <div className="flex flex-col">
+                          <span className="text-xs font-semibold text-white">Rule 5: Wait for Pullback / Limit Order Entry (10%)</span>
+                          <span className="text-[9px] text-emerald-400/80 font-mono">සිංහල පරිවර්තනය: FVG / OB Pullback මට්ටමේ Limit Entry එකක් පිහිටුවීම</span>
+                        </div>
+                      </label>
 
-                          {/* Rule 6 */}
-                          <label className="flex items-center gap-3 cursor-pointer select-none py-1 border-t border-[#1E2235]/40 mt-1 pt-2">
-                            <input
-                              type="checkbox"
-                              checked={smcLtfChoch}
-                              onChange={(e) => setSmcLtfChoch(e.target.checked)}
-                              className="w-4 h-4 rounded text-emerald-600 bg-[#141626] border-[#1E2235] focus:ring-emerald-500"
-                            />
-                            <div className="flex flex-col">
-                              <span className="text-xs font-semibold text-white">Rule 6: FVG / OB Pullback Limit Entry Set</span>
-                              <span className="text-[9px] text-emerald-400/80 font-mono">සිංහල පරිවර්තනය: FVG / OB Pullback මට්ටමේ Limit Entry එකක් පිහිටුවීම</span>
-                            </div>
-                          </label>
-                        </>
-                      ) : (
-                        <>
-                          {/* Rule 1 */}
-                          <label className="flex items-center gap-3 cursor-pointer select-none py-1">
-                            <input
-                              type="checkbox"
-                              checked={true}
-                              readOnly
-                              className="w-4 h-4 rounded text-emerald-600 bg-[#141626] border-[#1E2235] focus:ring-emerald-500 opacity-60"
-                            />
-                            <div className="flex flex-col">
-                              <span className="text-xs font-semibold text-white">Rule 1: HTF 1H & 15m Trend Alignment</span>
-                              <span className="text-[9px] text-emerald-400/80 font-mono">සිංහල පරිවර්තනය: 1H Trend එක Uptrend නම් 15m Trend එකද Uptrend විය යුතුය</span>
-                            </div>
-                          </label>
+                      {/* Rule 6: RSI Momentum Check */}
+                      <label className="flex items-center gap-3 cursor-pointer select-none py-1 border-t border-[#1E2235]/40 mt-1 pt-2">
+                        <input
+                          type="checkbox"
+                          checked={smcBosConfirmed}
+                          onChange={(e) => setSmcBosConfirmed(e.target.checked)}
+                          className="w-4 h-4 rounded text-emerald-600 bg-[#141626] border-[#1E2235] focus:ring-emerald-500"
+                        />
+                        <div className="flex flex-col">
+                          <span className="text-xs font-semibold text-white">Rule 6: RSI Momentum Confirmation (10%)</span>
+                          <span className="text-[9px] text-emerald-400/80 font-mono">සිංහල පරිවර්තනය: RSI ගම්‍යතාවය (momentum) සනාථ වීම</span>
+                        </div>
+                      </label>
 
-                          {/* Rule 2 */}
-                          <label className="flex items-center gap-3 cursor-pointer select-none py-1 border-t border-[#1E2235]/40 mt-1 pt-2">
-                            <input
-                              type="checkbox"
-                              checked={true}
-                              readOnly
-                              className="w-4 h-4 rounded text-emerald-600 bg-[#141626] border-[#1E2235] focus:ring-emerald-500 opacity-60"
-                            />
-                            <div className="flex flex-col">
-                              <span className="text-xs font-semibold text-white">Rule 2: 15m Downtrend Pullback Filter</span>
-                              <span className="text-[9px] text-emerald-400/80 font-mono">සිංහල පරිවර්තනය: 15m Down වුවහොත්, 1m downtrend pullback එක ඔස්සේ (Sell) හෝ 1m නැවත Up වන තෙක් බලා සිටීම</span>
-                            </div>
-                          </label>
+                      {/* Rule 7: M1 Liquidity Sweep */}
+                      <label className="flex items-center gap-3 cursor-pointer select-none py-1 border-t border-[#1E2235]/40 mt-1 pt-2">
+                        <input
+                          type="checkbox"
+                          checked={smcM1LiquiditySweep}
+                          onChange={(e) => setSmcM1LiquiditySweep(e.target.checked)}
+                          className="w-4 h-4 rounded text-emerald-600 bg-[#141626] border-[#1E2235] focus:ring-emerald-500"
+                        />
+                        <div className="flex flex-col">
+                          <span className="text-xs font-semibold text-white">Rule 7: M1 Liquidity Sweep (Major Wick Sweep) (10%)</span>
+                          <span className="text-[9px] text-emerald-400/80 font-mono">සිංහල පරිවර්තනය: 1M Major High/Low එකක් Wick එකෙන් sweep වීම</span>
+                        </div>
+                      </label>
 
-                          {/* Rule 3 */}
-                          <label className="flex items-center gap-3 cursor-pointer select-none py-1 border-t border-[#1E2235]/40 mt-1 pt-2">
-                            <input
-                              type="checkbox"
-                              checked={smcLiquidityPoolsSwept}
-                              onChange={(e) => setSmcLiquidityPoolsSwept(e.target.checked)}
-                              className="w-4 h-4 rounded text-emerald-600 bg-[#141626] border-[#1E2235] focus:ring-emerald-500"
-                            />
-                            <div className="flex flex-col">
-                              <span className="text-xs font-semibold text-white">Rule 3: 1m Liquidity Wick Sweep (Stop Loss Hunt)</span>
-                              <span className="text-[9px] text-emerald-400/80 font-mono">සිංහල පරිවර්තනය: සීමාන්තික මිල මට්ටමේ ඇති Stop Loss සූරා දැමීම (Wick Sweep)</span>
-                            </div>
-                          </label>
+                      {/* Rule 8: Displacement CHoCH */}
+                      <label className="flex items-center gap-3 cursor-pointer select-none py-1 border-t border-[#1E2235]/40 mt-1 pt-2">
+                        <input
+                          type="checkbox"
+                          checked={smcDisplacementChoch}
+                          onChange={(e) => setSmcDisplacementChoch(e.target.checked)}
+                          className="w-4 h-4 rounded text-emerald-600 bg-[#141626] border-[#1E2235] focus:ring-emerald-500"
+                        />
+                        <div className="flex flex-col">
+                          <span className="text-xs font-semibold text-white">Rule 8: Displacement CHoCH (Strong Body Close) (10%)</span>
+                          <span className="text-[9px] text-emerald-400/80 font-mono">සිංහල පරිවර්තනය: Strong Big Candle එකකින් Body close එකක් සිදුවීම</span>
+                        </div>
+                      </label>
 
-                          {/* Rule 4 */}
-                          <label className="flex items-center gap-3 cursor-pointer select-none py-1 border-t border-[#1E2235]/40 mt-1 pt-2">
-                            <input
-                              type="checkbox"
-                              checked={smcSwingValidated}
-                              onChange={(e) => setSmcSwingValidated(e.target.checked)}
-                              className="w-4 h-4 rounded text-emerald-600 bg-[#141626] border-[#1E2235] focus:ring-emerald-500"
-                            />
-                            <div className="flex flex-col">
-                              <span className="text-xs font-semibold text-white">Rule 4: 1m CHoCH/MSS Shift with Displacement</span>
-                              <span className="text-[9px] text-emerald-400/80 font-mono">සිංහල පරිවර්තනය: 1m ප්‍රස්ථාරයේ අවසාන swing මට්ටම candle body එකකින් බිඳ වැටීම</span>
-                            </div>
-                          </label>
-
-                          {/* Rule 5 */}
-                          <label className="flex items-center gap-3 cursor-pointer select-none py-1 border-t border-[#1E2235]/40 mt-1 pt-2">
-                            <input
-                              type="checkbox"
-                              checked={smcLtfChoch}
-                              onChange={(e) => setSmcLtfChoch(e.target.checked)}
-                              className="w-4 h-4 rounded text-emerald-600 bg-[#141626] border-[#1E2235] focus:ring-emerald-500"
-                            />
-                            <div className="flex flex-col">
-                              <span className="text-xs font-semibold text-white">Rule 5: FVG / OB Pullback Limit Order Setup</span>
-                              <span className="text-[9px] text-emerald-400/80 font-mono">සිංහල පරිවර්තනය: FVG සීමාවේ හෝ OB මධ්‍ය ලක්ෂ්‍යයේ Limit Order එක පිහිටුවීම</span>
-                            </div>
-                          </label>
-
-                          {/* Rule 6 */}
-                          <label className="flex items-center gap-3 cursor-pointer select-none py-1 border-t border-[#1E2235]/40 mt-1 pt-2">
-                            <input
-                              type="checkbox"
-                              checked={true}
-                              readOnly
-                              className="w-4 h-4 rounded text-emerald-600 bg-[#141626] border-[#1E2235] focus:ring-emerald-500 opacity-60"
-                            />
-                            <div className="flex flex-col">
-                              <span className="text-xs font-semibold text-white">Rule 6: Tight Stop Loss & 10-15 Minutes Max Hold</span>
-                              <span className="text-[9px] text-emerald-400/80 font-mono">සිංහල පරිවර්තනය: Stop Loss එක manipulation extreme එකෙන් ඔබ්බට තබා විනාඩි 10-15ක් රඳවා ගැනීම</span>
-                            </div>
-                          </label>
-                        </>                      )}
+                      {/* Rule 9: 1M FVG + OB Confluence */}
+                      <label className="flex items-center gap-3 cursor-pointer select-none py-1 border-t border-[#1E2235]/40 mt-1 pt-2">
+                        <input
+                          type="checkbox"
+                          checked={smcFvgObConfluence}
+                          onChange={(e) => setSmcFvgObConfluence(e.target.checked)}
+                          className="w-4 h-4 rounded text-emerald-600 bg-[#141626] border-[#1E2235] focus:ring-emerald-500"
+                        />
+                        <div className="flex flex-col">
+                          <span className="text-xs font-semibold text-white">Rule 9: 1M FVG + OB Confluence (10%)</span>
+                          <span className="text-[9px] text-emerald-400/80 font-mono">සිංහල පරිවර්තනය: FVG සහ Order Block එකම තැන පිහිටීම</span>
+                        </div>
+                      </label>
                     </div>
-
-                    {/* PO3 Phase Selection */}
                     <div className="flex flex-col gap-1.5">
                       <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider font-mono">PO3 Institutional AMD Phase</label>
                       <select
@@ -4270,31 +4660,64 @@ export default function Dashboard() {
                             <div className="flex items-center justify-between p-2 rounded bg-black/20 border border-[#1E2235]/40">
                               <span className="text-gray-400">1. HTF Trend Alignment</span>
                               <span className={smcResult.daily_bias !== "NEUTRAL" ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
-                                {smcResult.daily_bias !== "NEUTRAL" ? "+35% (Met)" : "0% (Failed)"}
+                                {smcResult.daily_bias !== "NEUTRAL" ? "+20% (Met)" : "0% (Failed)"}
                               </span>
                             </div>
                             <div className="flex items-center justify-between p-2 rounded bg-black/20 border border-[#1E2235]/40">
-                              <span className="text-gray-400">2. Wick Liquidity Sweep/Mitigation</span>
+                              <span className="text-gray-400">2. POI Double Mitigation</span>
                               <span className={smcLiquidityPoolsSwept ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
-                                {smcLiquidityPoolsSwept ? "+20% (Met)" : "0% (Failed)"}
+                                {smcLiquidityPoolsSwept ? "+10% (Met)" : "0% (Failed)"}
                               </span>
                             </div>
                             <div className="flex items-center justify-between p-2 rounded bg-black/20 border border-[#1E2235]/40">
-                              <span className="text-gray-400">3. LTF 1m Rejection Wick</span>
+                              <span className="text-gray-400">3. 1m Rejection Wick</span>
+                              <span className={smcInducementSwept ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
+                                {smcInducementSwept ? "+10% (Met)" : "0% (Failed)"}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between p-2 rounded bg-black/20 border border-[#1E2235]/40">
+                              <span className="text-gray-400">4. LTF Shift/MSS Choch</span>
                               <span className={smcSwingValidated ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
-                                {smcSwingValidated ? "+20% (Met)" : "0% (Failed)"}
+                                {smcSwingValidated ? "+10% (Met)" : "0% (Failed)"}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between p-2 rounded bg-black/20 border border-[#1E2235]/40">
+                              <span className="text-gray-400">5. Limit Entry / Pullback</span>
+                              <span className={smcLtfChoch ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
+                                {smcLtfChoch ? "+10% (Met)" : "0% (Failed)"}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between p-2 rounded bg-black/20 border border-[#1E2235]/40">
+                              <span className="text-gray-400">6. RSI Momentum Confirmation</span>
+                              <span className={smcBosConfirmed ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
+                                {smcBosConfirmed ? "+10% (Met)" : "0% (Failed)"}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between p-2 rounded bg-black/20 border border-[#1E2235]/40">
+                              <span className="text-gray-400">7. M1 Liquidity Sweep</span>
+                              <span className={smcResult.m1_liquidity_sweep !== false && smcM1LiquiditySweep ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
+                                {smcResult.m1_liquidity_sweep !== false && smcM1LiquiditySweep ? "+10% (Met)" : "0% (Failed)"}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between p-2 rounded bg-black/20 border border-[#1E2235]/40">
+                              <span className="text-gray-400">8. Displacement CHoCH</span>
+                              <span className={smcResult.displacement_choch !== false && smcDisplacementChoch ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
+                                {smcResult.displacement_choch !== false && smcDisplacementChoch ? "+10% (Met)" : "0% (Failed)"}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between p-2 rounded bg-black/20 border border-[#1E2235]/40">
+                              <span className="text-gray-400">9. 1M FVG + OB Confluence</span>
+                              <span className={smcResult.fvg_ob_confluence !== false && smcFvgObConfluence ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
+                                {smcResult.fvg_ob_confluence !== false && smcFvgObConfluence ? "+10% (Met)" : "0% (Failed)"}
                               </span>
                             </div>
                             <div className="flex items-center justify-between p-2 rounded bg-black/20 border border-[#1E2235]/40 col-span-1 md:col-span-2">
-                              <span className="text-gray-400">5. FRVP Volume Profile Node</span>
+                              <span className="text-gray-400">FRVP Volume Profile Node</span>
                               <span className={smcResult?.frvp_ok ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
                                 {smcResult?.frvp_ok ? "Aligned (Met)" : "Mismatch (Pending)"}
                               </span>
                             </div>
                           </div>
-                        </div>
-
-                        {/* Warning/Success Banner */}
                         {!smcResult.is_valid && (
                           <div className="flex flex-col gap-3">
                             <div className="bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl p-3.5 text-xs font-mono flex items-center gap-2">
@@ -4680,7 +5103,12 @@ export default function Dashboard() {
                       {tradeHistory.map((trade: any) => (
                         <tr key={trade.id} className="border-b border-[#1E2235]/40 hover:bg-[#141626]/20 transition-all">
                           <td className="p-3 text-gray-400">
-                            {new Date(trade.timestamp ? (trade.timestamp.endsWith('Z') || trade.timestamp.includes('+') ? trade.timestamp : trade.timestamp + 'Z') : "").toLocaleString()}
+                            {trade.timestamp ? (() => {
+                              const ts = String(trade.timestamp);
+                              const formatted = (ts.endsWith('Z') || ts.includes('+')) ? ts : ts + 'Z';
+                              const d = new Date(formatted);
+                              return isNaN(d.getTime()) ? "N/A" : d.toLocaleString();
+                            })() : "N/A"}
                           </td>
                           <td className="p-3 text-white font-bold">
                             <div className="flex flex-col gap-0.5">
@@ -4774,7 +5202,584 @@ export default function Dashboard() {
               )}
             </div>
           </section>
+        
+        ) : activeView === "tcs" ? (
+          <section className="flex flex-col gap-6 w-full animate-fadeIn" id="tcs-model-section">
+            {/* Header Banner */}
+            <div className="bg-[#11131F]/90 border border-violet-500/30 rounded-2xl p-6 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-96 h-96 bg-violet-500/5 rounded-full filter blur-3xl pointer-events-none" />
+              <div className="flex flex-col gap-1.5 z-10">
+                <div className="flex items-center gap-2">
+                  <span className="bg-violet-500/10 text-violet-400 border border-violet-500/30 text-[10px] font-bold px-2.5 py-0.5 rounded font-mono uppercase tracking-wider">
+                    90% WIN-RATE ULTRA-PRECISION SCALPER
+                  </span>
+                  <span className="text-xs text-gray-400 font-mono">• 1M Precision Workspace</span>
+                </div>
+                <h2 className="text-xl font-extrabold text-white tracking-tight flex items-center gap-2">
+                  1M Ultra-Precision Scalper Console ⚡
+                </h2>
+                <p className="text-xs text-gray-400 leading-relaxed max-w-2xl font-mono">
+                  Pure mechanical flow on M1 chart. Checks Liquidity Sweep (SFP), Displacement body break (CHoCH), and overlap zones (FVG+OB) with spread protection buffers.
+                </p>
+              </div>
+              <div className="flex items-center gap-3 z-10 shrink-0">
+                <button
+                  onClick={() => handleResetTcsSearch()}
+                  className="bg-[#1C1F37] hover:bg-[#252A4A] border border-[#2E355E] text-gray-300 px-4 py-2 rounded-xl text-xs font-semibold tracking-wider uppercase transition-all flex items-center gap-2"
+                >
+                  Clear Screen
+                </button>
+              </div>
+            </div>
+
+            {/* TWO COLUMN WORKSPACE LAYOUT */}
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+              {/* LEFT COLUMN: Controls & TCS Validation Tree Matrix */}
+              <div className="xl:col-span-1 flex flex-col gap-6">
+                
+                {/* Control Panel Card */}
+                <div className="bg-[#11131F]/90 border border-[#1E2235] rounded-2xl p-5 flex flex-col gap-4 shadow-xl">
+                  <h3 className="text-xs font-bold tracking-wider text-violet-400 uppercase flex items-center gap-2">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                    </svg>
+                    Scalper Controls
+                  </h3>
+
+                  <div className="flex flex-col gap-3">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Trading Symbol</label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          placeholder="e.g. BTCUSDT.P"
+                          value={tcsSymbol}
+                          onChange={(e) => setTcsSymbol(e.target.value.toUpperCase())}
+                          className="flex-1 bg-[#141626] border border-[#1E2235] rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-violet-500 font-mono transition-colors"
+                        />
+                        <button
+                          onClick={() => handleRunTcsAnalysis(false)}
+                          disabled={tcsLoading}
+                          className="bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all flex items-center gap-1.5 tracking-wider uppercase shrink-0"
+                        >
+                          {tcsLoading ? "Scanning..." : "Scan Market ⚡"}
+                        </button>
+                        <button
+                          onClick={() => handleResetTcsSearch()}
+                          className="bg-[#1C1F37] hover:bg-[#252A4A] border border-[#2E355E] text-gray-300 text-xs font-bold px-4 py-2.5 rounded-xl transition-all tracking-wider uppercase shrink-0"
+                        >
+                          Reset
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 mt-1">
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Execution Timeframe</label>
+                        <div className="bg-[#141626] border border-[#1E2235] rounded-xl px-3.5 py-2.5 text-xs text-white font-mono flex items-center justify-between min-h-[38px]">
+                          <span>1m</span>
+                          <span className="text-[8px] bg-violet-500/10 text-violet-400 border border-violet-500/30 px-1.5 py-0.5 rounded font-sans font-bold">REQUIRED</span>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">M1 Auto-Detected Bias</label>
+                        <div className="bg-[#141626] border border-[#1E2235] rounded-xl px-3.5 py-2.5 text-xs font-mono flex items-center justify-between min-h-[38px]">
+                          {tcsHtfTrend === "BULLISH" ? (
+                            <>
+                              <span className="text-emerald-400 font-bold">BULLISH</span>
+                              <span className="text-[8px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 rounded font-sans font-bold">BUY SETUP</span>
+                            </>
+                          ) : tcsHtfTrend === "BEARISH" ? (
+                            <>
+                              <span className="text-rose-400 font-bold">BEARISH</span>
+                              <span className="text-[8px] bg-rose-500/10 text-rose-400 border border-rose-500/30 px-1.5 py-0.5 rounded font-sans font-bold">SELL SETUP</span>
+                            </>
+                          ) : (
+                            <>
+                              <span className="text-amber-400 font-bold">NEUTRAL</span>
+                              <span className="text-[8px] bg-amber-500/10 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded font-sans font-bold">LOCKOUT</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* CHECKLIST VALIDATION TREE MATRIX FOR ALL 6 CONFIRMATIONS */}
+                <div className="bg-[#11131F]/90 border border-[#1E2235] rounded-2xl p-5 flex flex-col gap-4 shadow-xl">
+                  <div className="flex justify-between items-center border-b border-[#1E2235] pb-3">
+                    <h3 className="text-xs font-bold tracking-wider text-violet-400 uppercase flex items-center gap-2 font-mono">
+                      <span>📐</span> TCS Validation Tree Matrix
+                    </h3>
+                    <span className="text-[10px] font-mono text-gray-500 font-bold text-violet-400">STATUS MONITOR</span>
+                  </div>
+
+                  {/* Highlighted overall confirmation status badge */}
+                  {tcsResult && tcsResult.confidence >= 100 ? (
+                    <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3.5 text-center flex flex-col items-center justify-center gap-1.5 animate-pulse">
+                      <span className="text-emerald-400 text-xs font-black font-mono tracking-wider flex items-center gap-1">
+                        ✓ 100% CONFIRMED (100% තහවුරුයි)
+                      </span>
+                      <span className="text-[10px] text-emerald-300 font-mono">All 6 checklist items are READY. Setup is safe to place Limit order!</span>
+                    </div>
+                  ) : tcsResult && tcsResult.confidence >= 80 ? (
+                    <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-3.5 text-center flex flex-col items-center justify-center gap-1.5 animate-pulse">
+                      <span className="text-emerald-400 text-xs font-black font-mono tracking-wider flex items-center gap-1">
+                        ⚡ {tcsResult.confidence}% CONFIRMED ({tcsResult.confidence}% තහවුරුයි)
+                      </span>
+                      <span className="text-[10px] text-gray-300 font-mono">80%+ mandatory rules met. Setup is safe for fast execution!</span>
+                    </div>
+                  ) : (
+                    <div className="bg-[#1C1F37]/30 border border-[#2E355E]/30 rounded-xl p-3.5 text-center flex flex-col items-center justify-center gap-1">
+                      <span className="text-amber-500 text-xs font-bold font-mono tracking-wider">
+                        ⏳ WAIT FOR CONFIRMATIONS ({tcsResult ? `${tcsResult.confidence}%` : "0%"})
+                      </span>
+                      <span className="text-[10px] text-gray-400 font-mono">Setup locked. All mandatory rules must be satisfied to unlock.</span>
+                    </div>
+                  )}
+
+                  <div className="flex flex-col gap-3">
+                    {/* Step 1: Sweep */}
+                    <div className="bg-[#07080E]/40 border border-[#1E2235]/40 rounded-xl p-3 flex items-start gap-3 hover:border-violet-500/20 transition-all">
+                      <div className={`w-6 h-6 rounded-full shrink-0 flex items-center justify-center font-bold text-xs font-mono border ${
+                        tcsRule1 
+                          ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" 
+                          : "bg-rose-500/10 text-rose-400 border-rose-500/25"
+                      }`}>
+                        {tcsRule1 ? "✓" : "1"}
+                      </div>
+                      <div className="flex flex-col gap-0.5 w-full">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider font-mono">Step 1: Liquidity Sweep (SFP)</span>
+                          <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded font-mono ${
+                            tcsRule1 ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400"
+                          }`}>
+                            {tcsRule1 ? "READY / සූදානම්" : "PENDING / රැඳී පවතී"}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-white leading-relaxed font-mono mt-0.5">
+                          {tcsResult?.sb_step_1_details ? tcsResult.sb_step_1_details.split("|")[0].trim() : "Waiting for swing high/low wick sweep."}
+                        </p>
+                        <span className="text-[10px] text-violet-400/90 font-sans mt-0.5">
+                          {tcsResult?.sb_step_1_details ? (tcsResult.sb_step_1_details.split("|")[1]?.trim() || "Wick sweep පරීක්ෂාව.") : "Wick sweep පරීක්ෂාව."}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Step 2: Displacement */}
+                    <div className="bg-[#07080E]/40 border border-[#1E2235]/40 rounded-xl p-3 flex items-start gap-3 hover:border-violet-500/20 transition-all">
+                      <div className={`w-6 h-6 rounded-full shrink-0 flex items-center justify-center font-bold text-xs font-mono border ${
+                        tcsRule2 
+                          ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" 
+                          : "bg-rose-500/10 text-rose-400 border-rose-500/25"
+                      }`}>
+                        {tcsRule2 ? "✓" : "2"}
+                      </div>
+                      <div className="flex flex-col gap-0.5 w-full">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider font-mono">Step 2: Displacement CHoCH</span>
+                          <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded font-mono ${
+                            tcsRule2 ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400"
+                          }`}>
+                            {tcsRule2 ? "READY / සූදානම්" : "PENDING / රැඳී පවතී"}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-white leading-relaxed font-mono mt-0.5">
+                          {tcsResult?.sb_step_2_details ? tcsResult.sb_step_2_details.split("|")[0].trim() : "Waiting for aggressive body break shift."}
+                        </p>
+                        <span className="text-[10px] text-violet-400/90 font-sans mt-0.5">
+                          {tcsResult?.sb_step_2_details ? (tcsResult.sb_step_2_details.split("|")[1]?.trim() || "Displacement body break පරීක්ෂාව.") : "Displacement body break පරීක්ෂාව."}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Step 3: FVG OB */}
+                    <div className="bg-[#07080E]/40 border border-[#1E2235]/40 rounded-xl p-3 flex items-start gap-3 hover:border-violet-500/20 transition-all">
+                      <div className={`w-6 h-6 rounded-full shrink-0 flex items-center justify-center font-bold text-xs font-mono border ${
+                        tcsRule3 
+                          ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" 
+                          : "bg-rose-500/10 text-rose-400 border-rose-500/25"
+                      }`}>
+                        {tcsRule3 ? "✓" : "3"}
+                      </div>
+                      <div className="flex flex-col gap-0.5 w-full">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider font-mono">Step 3: FVG + OB Overlap</span>
+                          <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded font-mono ${
+                            tcsRule3 ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400"
+                          }`}>
+                            {tcsRule3 ? "READY / සූදානම්" : "PENDING / රැඳී පවතී"}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-white leading-relaxed font-mono mt-0.5">
+                          {tcsResult?.sb_step_3_details ? tcsResult.sb_step_3_details.split("|")[0].trim() : "Waiting for overlapping imbalance zone."}
+                        </p>
+                        <span className="text-[10px] text-violet-400/90 font-sans mt-0.5">
+                          {tcsResult?.sb_step_3_details ? (tcsResult.sb_step_3_details.split("|")[1]?.trim() || "FVG සහ OB Overlap පරීක්ෂාව.") : "FVG සහ OB Overlap පරීක්ෂාව."}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Step 4: Elliott Wave Exhaustion */}
+                    <div className="bg-[#07080E]/40 border border-[#1E2235]/40 rounded-xl p-3 flex items-start gap-3 hover:border-violet-500/20 transition-all">
+                      <div className={`w-6 h-6 rounded-full shrink-0 flex items-center justify-center font-bold text-xs font-mono border ${
+                        tcsRule4 
+                          ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" 
+                          : "bg-rose-500/10 text-rose-400 border-rose-500/25"
+                      }`}>
+                        {tcsRule4 ? "✓" : "4"}
+                      </div>
+                      <div className="flex flex-col gap-0.5 w-full">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider font-mono">Step 4: Elliott Wave Exhaustion</span>
+                          <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded font-mono ${
+                            tcsRule4 ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400"
+                          }`}>
+                            {tcsRule4 ? "READY / සූදානම්" : "PENDING / රැඳී පවතී"}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-white leading-relaxed font-mono mt-0.5">
+                          {tcsResult?.sb_step_4_details ? tcsResult.sb_step_4_details.split("|")[0].trim() : "Wave 5 / Wave C exhaustion check."}
+                        </p>
+                        <span className="text-[10px] text-violet-400/90 font-sans mt-0.5">
+                          {tcsResult?.sb_step_4_details ? (tcsResult.sb_step_4_details.split("|")[1]?.trim() || "Elliott Wave Exhaustion පරීක්ෂාව.") : "Elliott Wave Exhaustion පරීක්ෂාව."}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Step 5: Inducement Trap */}
+                    <div className="bg-[#07080E]/40 border border-[#1E2235]/40 rounded-xl p-3 flex items-start gap-3 hover:border-violet-500/20 transition-all">
+                      <div className={`w-6 h-6 rounded-full shrink-0 flex items-center justify-center font-bold text-xs font-mono border ${
+                        tcsRule5 
+                          ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" 
+                          : "bg-rose-500/10 text-rose-400 border-rose-500/25"
+                      }`}>
+                        {tcsRule5 ? "✓" : "5"}
+                      </div>
+                      <div className="flex flex-col gap-0.5 w-full">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider font-mono">Step 5: Inducement Trap</span>
+                          <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded font-mono ${
+                            tcsRule5 ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400"
+                          }`}>
+                            {tcsRule5 ? "READY / සූදානම්" : "PENDING / රැඳී පවතී"}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-white leading-relaxed font-mono mt-0.5">
+                          {tcsResult?.sb_step_5_details ? tcsResult.sb_step_5_details.split("|")[0].trim() : "Fake high/low inducement check."}
+                        </p>
+                        <span className="text-[10px] text-violet-400/90 font-sans mt-0.5">
+                          {tcsResult?.sb_step_5_details ? (tcsResult.sb_step_5_details.split("|")[1]?.trim() || "Inducement Trap පරීක්ෂාව.") : "Inducement Trap පරීක්ෂාව."}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Step 6: Volatility Session & News */}
+                    <div className="bg-[#07080E]/40 border border-[#1E2235]/40 rounded-xl p-3 flex items-start gap-3 hover:border-violet-500/20 transition-all">
+                      <div className={`w-6 h-6 rounded-full shrink-0 flex items-center justify-center font-bold text-xs font-mono border ${
+                        tcsRule6 
+                          ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" 
+                          : "bg-rose-500/10 text-rose-400 border-rose-500/25"
+                      }`}>
+                        {tcsRule6 ? "✓" : "6"}
+                      </div>
+                      <div className="flex flex-col gap-0.5 w-full">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider font-mono">Step 6: Time & News Volatility</span>
+                          <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded font-mono ${
+                            tcsRule6 ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400"
+                          }`}>
+                            {tcsRule6 ? "READY / සූදානම්" : "LOCKED / තහනම්"}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-white leading-relaxed font-mono mt-0.5">
+                          {tcsResult?.sb_step_6_details ? tcsResult.sb_step_6_details.split("|")[0].trim() : "Economic news lockout check."}
+                        </p>
+                        <span className="text-[10px] text-violet-400/90 font-sans mt-0.5">
+                          {tcsResult?.sb_step_6_details ? (tcsResult.sb_step_6_details.split("|")[1]?.trim() || "ආර්ථික පුවත් තහනම පරීක්ෂාව.") : "ආර්ථික පුවත් තහනම පරීක්ෂාව."}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* RIGHT COLUMN: Live TradingView chart widget and Custom Levels Override inputs */}
+              <div className="xl:col-span-2 flex flex-col gap-6">
+                
+                {/* TradingView Frame */}
+                <div className="bg-[#11131F]/90 border border-[#1E2235] rounded-2xl p-4 shadow-xl flex flex-col gap-3 min-h-[460px]">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-xs font-bold tracking-wider text-violet-400 uppercase flex items-center gap-2">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                      </svg>
+                      TCS Live Chart Widget
+                    </h3>
+                    <div className="flex items-center gap-3">
+                      <span className="text-[10px] font-mono text-gray-500">{tcsSymbol || "NO ASSET"} • {tcsTimeframe}</span>
+                      {tcsSymbol && (
+                        <a
+                          href={`https://www.tradingview.com/chart/?symbol=${getTradingViewSymbol(tcsSymbol)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-lg text-[9px] font-semibold tracking-wider uppercase transition-all flex items-center gap-1.5 font-mono"
+                        >
+                          Open in TradingView ↗
+                        </a>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex-1 w-full h-[400px] bg-[#141626]/40 rounded-xl overflow-hidden border border-[#1E2235]/40 flex items-center justify-center relative">
+                    {tcsSymbol ? (
+                      <iframe
+                        id="tcs-tv-chart-iframe"
+                        title="TCS TradingView Chart"
+                        src={`https://s.tradingview.com/widgetembed/?frameElementId=tradingview_tcs&symbol=${encodeURIComponent(
+                          getTradingViewSymbol(tcsSymbol)
+                        )}&interval=${getIntervalForTradingView(tcsTimeframe)}&theme=dark&style=1&timezone=exchange`}
+                        className="w-full h-full border-0 absolute inset-0"
+                        allowFullScreen
+                      />
+                    ) : (
+                      <div className="text-center p-6 flex flex-col items-center justify-center h-full gap-2 text-gray-500 font-mono text-xs">
+                        <svg className="w-8 h-8 opacity-40 animate-pulse text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
+                        Type a symbol to fetch TradingView frame
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* MANUAL EXECUTION SETUP OVERRIDE CARD */}
+                <div className="bg-[#11131F]/90 border border-[#1E2235] rounded-2xl p-5 shadow-xl flex flex-col gap-4">
+                  <div className="flex justify-between items-center border-b border-[#1E2235] pb-3">
+                    <h3 className="text-xs font-bold tracking-wider text-violet-400 uppercase flex items-center gap-2">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                      Manual Execution Setup
+                    </h3>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-gray-500 font-mono uppercase">Confidence:</span>
+                      <span className="bg-[#8B5CF6]/10 text-[#8B5CF6] border border-[#8B5CF6]/30 px-2 py-0.5 rounded font-bold font-mono text-xs">
+                        {tcsResult ? tcsResult.confidence : 0}% CONFIRMED
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Dynamic daily ref limits */}
+                  <div className="grid grid-cols-4 gap-3 bg-[#141626]/50 p-3 rounded-xl border border-[#1E2235]/40 text-xs font-mono text-gray-400">
+                    <div>Live Price: <span className="text-white">${tcsCurrentPrice || "0.00"}</span></div>
+                    <div>Daily Open: <span className="text-white">${tcsOpen || "0.00"}</span></div>
+                    <div>Prev High (PDH): <span className="text-white">${tcsPdh || "0.00"}</span></div>
+                    <div>Prev Low (PDL): <span className="text-white">${tcsPdl || "0.00"}</span></div>
+                  </div>
+
+                  {tcsResult && tcsResult.confidence >= 80 ? (
+                    <>
+                      {/* Custom fields override */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-fadeIn">
+                        <div className="flex flex-col gap-1.5">
+                          <div className="flex justify-between items-center">
+                            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Your Entry Price</label>
+                            <span className={`text-[9px] font-extrabold font-mono px-1.5 py-0.5 rounded border ${
+                              tcsHtfTrend === "BULLISH" 
+                                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" 
+                                : "bg-rose-500/10 border-rose-500/30 text-rose-400"
+                            }`}>
+                              {tcsHtfTrend === "BULLISH" ? "🟢 BUY LIMIT" : "🔴 SELL LIMIT"}
+                            </span>
+                          </div>
+                          <input
+                            type="number"
+                            step="any"
+                            value={tcsManualEntry}
+                            onChange={(e) => setTcsManualEntry(e.target.value)}
+                            placeholder={String(tcsCurrentPrice || "")}
+                            className="bg-[#141626] border border-[#1E2235] rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-violet-500 font-mono transition-colors"
+                          />
+                        </div>
+
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[10px] font-bold text-[#F43F5E] uppercase tracking-wider">Custom Stop Loss (SL)</label>
+                          <input
+                            type="number"
+                            step="any"
+                            value={tcsManualSl}
+                            onChange={(e) => setTcsManualSl(e.target.value)}
+                            placeholder="Below entry for longs"
+                            className="bg-[#141626] border border-[#1E2235] rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-rose-500 font-mono transition-colors"
+                          />
+                        </div>
+
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[10px] font-bold text-[#10B981] uppercase tracking-wider">Custom Take Profit (TP)</label>
+                          <input
+                            type="number"
+                            step="any"
+                            value={tcsManualTp}
+                            onChange={(e) => setTcsManualTp(e.target.value)}
+                            placeholder="Above entry for longs"
+                            className="bg-[#141626] border border-[#1E2235] rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono transition-colors"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Calculated metrics and triggers */}
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[#141626]/30 border border-[#1E2235]/60 p-4 rounded-xl mt-1">
+                        <div className="flex flex-col gap-1">
+                          <div className="text-xs text-gray-400 font-mono flex items-center gap-1.5">
+                            <span>Calculated Reward-to-Risk (RR) Ratio:</span>
+                            {(() => {
+                              const entryVal = parseFloat(tcsManualEntry || "0");
+                              const slVal = parseFloat(tcsManualSl || "0");
+                              const tpVal = parseFloat(tcsManualTp || "0");
+                              if (entryVal <= 0 || slVal <= 0 || tpVal <= 0 || entryVal === slVal) return <span className="text-gray-500">N/A</span>;
+                              const risk = Math.abs(entryVal - slVal);
+                              const reward = Math.abs(tpVal - entryVal);
+                              const rr = reward / risk;
+                              const color = rr >= 2.0 ? "text-emerald-400 font-bold" : "text-amber-400 font-semibold";
+                              return <span className={color}>1:{rr.toFixed(2)}</span>;
+                            })()}
+                          </div>
+                          <p className="text-[10px] text-gray-500 font-mono">
+                            Note: 1M Scalper Master Rule: Limit entry at 50% midpoint FVG/OB. SL includes broker spread protection buffers (+2 pips). Strict 1:3 RR targets.
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            onClick={handleResetTcsManualFields}
+                            className="bg-[#1C1F37] hover:bg-[#252A4A] border border-[#2E355E] text-gray-400 hover:text-gray-200 px-4 py-2.5 rounded-xl text-xs font-semibold tracking-wider uppercase transition-all flex items-center gap-1.5"
+                          >
+                            Reset
+                          </button>
+
+                          <button
+                            onClick={handleAddToTcsWatchlist}
+                            className="bg-[#1C1F37] hover:bg-[#252A4A] border border-[#2E355E] text-violet-400 hover:text-violet-300 px-4 py-2.5 rounded-xl text-xs font-semibold tracking-wider uppercase transition-all flex items-center gap-1.5"
+                          >
+                            Add to Watchlist
+                          </button>
+
+                          <button
+                            onClick={handleLogTcsTrade}
+                            className="bg-violet-600 hover:bg-violet-500 text-white px-4 py-2.5 rounded-xl text-xs font-bold tracking-wider uppercase transition-all flex items-center gap-1.5"
+                          >
+                            Log TCS Trade
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="bg-rose-500/5 border border-rose-500/20 rounded-xl p-6 text-center flex flex-col items-center justify-center gap-2 font-mono">
+                      <span className="text-rose-400 text-xs font-bold uppercase tracking-wider font-mono">
+                        {"⚠️ ENTRY BLOCKED (CONFIDENCE < 80%) / ඇතුල්වීමක් නොමැත (විශ්වාසනීයත්වය < 80%)"}
+                      </span>
+                      <p className="text-[10px] text-gray-400 max-w-md leading-relaxed">
+                        TCS 90% Win-Rate Scalper strategy mandates a minimum confidence score of 80% to reveal trading parameters.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* TCS MONITOR WATCHLIST */}
+            <div className="bg-[#11131F]/90 border border-[#1E2235] rounded-2xl p-5 shadow-xl">
+              <div className="flex items-center justify-between border-b border-[#1E2235] pb-4 mb-4">
+                <h3 className="text-xs font-bold tracking-wider text-violet-400 uppercase flex items-center gap-2">
+                  <svg className="w-4 h-4 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                  TCS Active Monitor Watchlist
+                </h3>
+                <span className="text-[10px] bg-violet-500/10 text-violet-400 border border-violet-500/30 px-2.5 py-0.5 rounded font-mono font-semibold">
+                  {tcsMonitoredCoins.length} Active Tracks
+                </span>
+              </div>
+
+              {tcsMonitoredCoins.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center text-gray-500 font-mono text-xs gap-3 bg-[#141626]/20 border border-[#1E2235]/40 rounded-xl">
+                  <svg className="w-8 h-8 opacity-40 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <div>
+                    Watchlist is Empty.
+                    <p className="text-[10px] text-gray-600 mt-1">Search a token above, toggle your checklist confirmations, and click &quot;Add to Watchlist&quot; to monitor.</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs font-mono text-gray-300">
+                    <thead>
+                      <tr className="border-b border-[#1E2235]/60 text-gray-500 uppercase tracking-wider text-[10px]">
+                        <th className="py-3 px-4">Symbol</th>
+                        <th className="py-3 px-4">TF</th>
+                        <th className="py-3 px-4">HTF Bias</th>
+                        <th className="py-3 px-4">Target Limit Entry</th>
+                        <th className="py-3 px-4">Stop Loss</th>
+                        <th className="py-3 px-4">Take Profit</th>
+                        <th className="py-3 px-4">Live Price</th>
+                        <th className="py-3 px-4 text-center">Confluences</th>
+                        <th className="py-3 px-4 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#1E2235]/30">
+                      {tcsMonitoredCoins.map((coin: any, index: number) => {
+                        const signalColor = getSignalColor(coin.htfTrend);
+                        return (
+                          <tr key={coin.id || index} className="hover:bg-[#141626]/40 transition-colors">
+                            <td className="py-3.5 px-4 font-bold text-white flex items-center gap-1.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-violet-500 animate-pulse"></span>
+                              {coin.symbol}
+                            </td>
+                            <td className="py-3.5 px-4 text-gray-400">{coin.timeframe}</td>
+                            <td className="py-3.5 px-4">
+                              <span className={`px-2.5 py-0.5 rounded border text-[10px] font-bold ${signalColor}`}>
+                                {coin.htfTrend}
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4 text-amber-400">${parseFloat(String(coin.entryPrice || 0)).toFixed(4)}</td>
+                            <td className="py-3.5 px-4 text-rose-500">${parseFloat(String(coin.stopLoss || 0)).toFixed(4)}</td>
+                            <td className="py-3.5 px-4 text-emerald-500">${parseFloat(String(coin.takeProfit || 0)).toFixed(4)}</td>
+                            <td className="py-3.5 px-4 text-gray-400">${parseFloat(String(coin.currentPrice || 0)).toFixed(4)}</td>
+                            <td className="py-3.5 px-4 text-center">
+                              <span className="bg-[#8B5CF6]/10 text-violet-400 border border-violet-500/20 px-2 py-0.5 rounded text-[10px] font-bold">
+                                {coin.confidence}%
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4 text-right">
+                              <button
+                                onClick={() => {
+                                  setTcsMonitoredCoins(prev => prev.filter(c => c.symbol !== coin.symbol));
+                                }}
+                                className="text-rose-500 hover:text-rose-400 transition-colors hover:scale-105"
+                                title="Remove Tracker"
+                              >
+                                <svg className="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </section>
         ) : (
+
           <>
             {/* LEFT COLUMN: Strategy Control Panel */}
             <section className="xl:col-span-1 flex flex-col gap-6" id="strategy-section">

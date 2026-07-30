@@ -18,7 +18,7 @@ echo Please complete the installation window that pops up.
 start /wait OllamaSetup.exe
 echo.
 echo Step 3: Starting Ollama background service...
-start "" "%LOCALAPPDATA%\Ollama\ollama app.exe"
+start "" "%LOCALAPPDATA%\Programs\Ollama\ollama app.exe"
 echo Waiting for Ollama service to boot...
 timeout /t 8
 echo.

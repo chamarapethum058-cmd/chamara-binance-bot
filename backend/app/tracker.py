@@ -270,3 +270,95 @@ def start_smc_tracker():
     global smc_tracker_task
     if smc_tracker_task is None or smc_tracker_task.done():
         smc_tracker_task = asyncio.create_task(run_smc_tracker_loop())
+
+# TCS Watchlist Tracker Loop
+tcs_tracker_task = None
+tcs_notified_symbols = {}
+
+async def run_tcs_tracker_loop():
+    logger.info("Starting background TCS Watchlist Tracker loop...")
+    from app.telegram_service import TelegramService
+    
+    while True:
+        db = SessionLocal()
+        try:
+            from app.models import PreferenceModel
+            pref = db.query(PreferenceModel).filter(PreferenceModel.key == "tcs_monitored_coins").first()
+            if not pref or not pref.value:
+                db.close()
+                await asyncio.sleep(10)
+                continue
+                
+            watchlist = json.loads(pref.value)
+            if not watchlist:
+                db.close()
+                await asyncio.sleep(10)
+                continue
+                
+            for coin in watchlist:
+                symbol = coin.get("symbol", "").upper()
+                if not symbol:
+                    continue
+                    
+                # Fetch live price
+                try:
+                    price = await fetch_ticker_price(symbol)
+                except Exception:
+                    price = None
+                    
+                if price is None:
+                    continue
+                    
+                entry_price_str = coin.get("entryPrice")
+                if not entry_price_str:
+                    continue
+                    
+                try:
+                    entry_price = float(entry_price_str)
+                except ValueError:
+                    continue
+                    
+                htf_trend = coin.get("htfTrend", "BULLISH")
+                sl = coin.get("stopLoss", "0")
+                tp = coin.get("takeProfit", "0")
+                confidence = coin.get("confidence", 100)
+                
+                # Check for crossing/touching of manual limit entry price
+                key = f"tcs_{symbol}_{entry_price}"
+                should_notify = False
+                if htf_trend == "BULLISH":
+                    if price <= entry_price:
+                        should_notify = True
+                else:
+                    if price >= entry_price:
+                        should_notify = True
+                        
+                if should_notify and not tcs_notified_symbols.get(key):
+                    msg = (
+                        f"🔔 <b>TCS ALERT: LIMIT ENTRY TOUCHED!</b>\n\n"
+                        f"🪙 <b>Symbol:</b> {symbol}\n"
+                        f"📈 <b>Strategy:</b> TCS IDM Model\n"
+                        f"🎯 <b>Target Entry:</b> ${entry_price:.4f}\n"
+                        f"📊 <b>Current Price:</b> ${price:.4f}\n"
+                        f"🛡️ <b>Stop Loss:</b> ${sl}\n"
+                        f"💰 <b>Take Profit:</b> ${tp}\n"
+                        f"🔥 <b>Confidence:</b> {confidence}%\n\n"
+                        f"📍 <i>Price has touched your manual limit execution level. Please check your exchange/terminal.</i>\n\n"
+                        f"<b>සිංහල පරිවර්තනය (Sinhala):</b>\n"
+                        f"TCS එන්ට්‍රිය ක්‍රියාත්මක විය! {symbol} සඳහා ඇතුළත් කළ Limit මිල (${entry_price:.4f}) සජීවී මිල සමඟ සමපාත වී ඇත."
+                    )
+                    asyncio.create_task(TelegramService.send_message(msg))
+                    tcs_notified_symbols[key] = True
+                    
+        except Exception as e:
+            logger.error(f"Error in TCS tracker loop: {e}")
+        finally:
+            db.close()
+            
+        await asyncio.sleep(10)
+
+def start_tcs_tracker():
+    global tcs_tracker_task
+    if tcs_tracker_task is None or tcs_tracker_task.done():
+        tcs_tracker_task = asyncio.create_task(run_tcs_tracker_loop())
+
