@@ -4718,6 +4718,7 @@ export default function Dashboard() {
                               </span>
                             </div>
                           </div>
+                        </div>
                         {!smcResult.is_valid && (
                           <div className="flex flex-col gap-3">
                             <div className="bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl p-3.5 text-xs font-mono flex items-center gap-2">
