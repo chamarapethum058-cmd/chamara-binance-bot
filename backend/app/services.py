@@ -2977,6 +2977,8 @@ You must return a JSON object with the following fields:
 - "fvg_ob_confluence": boolean
 - "fib_retracement": float
 - "fib_zone_ok": boolean
+
+CRITICAL: Return ONLY raw, valid JSON. Do not include markdown code block syntax (like ```json). Ensure all double quotes inside string fields (like reasoning, invalidation, risk_notes) are properly escaped with a backslash (\") to prevent JSON decoding errors.
 """
 
         # Convert datetime objects to string format for JSON serialization
@@ -3037,7 +3039,7 @@ Live 50 Candles Data:
         t15m = str(trend_15m).upper().strip()
         t1m = str(trend_1m).upper().strip()
         
-        if not (t1h == t15m == t1m):
+        if not (t1h == t15m == t1m == "BULLISH" or t1h == t15m == t1m == "BEARISH"):
             result["entry_price_area"] = "No Entry (Trend Mismatch Lockout)"
             result["is_valid"] = False
             result["confidence"] = 0
