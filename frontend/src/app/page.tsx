@@ -417,6 +417,7 @@ export default function Dashboard() {
   const [smcTrend1h, setSmcTrend1h] = useState<string>("");
   const [smcResult, setSmcResult] = useState<any | null>(null);
   const [monitoredCoins, setMonitoredCoins] = useState<any[]>([]);
+  const activeSmcSearchSymbolRef = useRef("");
 
   // TCS states
   const [tcsSymbol, setTcsSymbol] = useState("");
@@ -810,10 +811,15 @@ export default function Dashboard() {
   const [smcLoading, setSmcLoading] = useState(false);
 
   const handleRunSmcAnalysis = async (addToWatchlist: boolean = false) => {
+    let searchSymbol = smcSymbol.toUpperCase().trim();
+    if (!searchSymbol) {
+      setSmcLoading(false);
+      return;
+    }
+    activeSmcSearchSymbolRef.current = searchSymbol;
     setSmcLoading(true);
     setSmcResult(null);
     try {
-      let searchSymbol = smcSymbol.toUpperCase().trim();
       if (searchSymbol) {
         const isForexOrCommodity = ["GOLD", "XAUUSD", "XAU/USD", "EURUSD", "EUR/USD", "GBPUSD", "GBP/USD", "USDJPY"].includes(searchSymbol);
         if (!isForexOrCommodity) {
@@ -827,8 +833,10 @@ export default function Dashboard() {
         }
       }
       setSmcSymbol(searchSymbol);
+      activeSmcSearchSymbolRef.current = searchSymbol;
 
       const resPrice = await fetch(`${API_BASE}/market/price?symbol=${encodeURIComponent(searchSymbol)}&t=${Date.now()}`);
+      if (activeSmcSearchSymbolRef.current !== searchSymbol) return;
       let fetchedPrice = Number(smcCurrentPrice) || 0;
       let fetchedPdh = Number(smcPdh) || 0;
       let fetchedPdl = Number(smcPdl) || 0;
@@ -837,6 +845,7 @@ export default function Dashboard() {
       let activeHtfTrend = smcHtfTrend;
       if (resPrice.ok) {
         const data = await resPrice.json();
+        if (activeSmcSearchSymbolRef.current !== searchSymbol) return;
         fetchedPrice = data.current_price || fetchedPrice;
         fetchedPdh = data.pdh || fetchedPdh;
         fetchedPdl = data.pdl || fetchedPdl;
@@ -879,9 +888,11 @@ export default function Dashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
+      if (activeSmcSearchSymbolRef.current !== searchSymbol) return;
 
       if (resSMC.ok) {
         const smcData = await resSMC.json();
+        if (activeSmcSearchSymbolRef.current !== searchSymbol) return;
         setSmcResult(smcData);
 
         // Add to monitoredCoins watchlist ONLY if explicitly requested
@@ -938,6 +949,7 @@ export default function Dashboard() {
   };
 
   const handleResetSearch = () => {
+    activeSmcSearchSymbolRef.current = "";
     setSmcSymbol("");
     setSmcCurrentPrice("");
     setSmcPdh("");
@@ -948,6 +960,7 @@ export default function Dashboard() {
     setSmcTrend1h("");
     setSmcResult(null);
     setSmcHtfTrend("NEUTRAL");
+    setSmcLoading(false);
   };
 
   // Trigger SMC analysis/fetch automatically on timeframe changes
