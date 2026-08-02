@@ -843,25 +843,38 @@ export default function Dashboard() {
       let fetchedOpen = Number(smcOpen) || 0;
 
       let activeHtfTrend = smcHtfTrend;
-      if (resPrice.ok) {
-        const data = await resPrice.json();
-        if (activeSmcSearchSymbolRef.current !== searchSymbol) return;
-        fetchedPrice = data.current_price || fetchedPrice;
-        fetchedPdh = data.pdh || fetchedPdh;
-        fetchedPdl = data.pdl || fetchedPdl;
-        fetchedOpen = data.open || fetchedOpen;
-        setSmcCurrentPrice(fetchedPrice);
-        setSmcPdh(fetchedPdh);
-        setSmcPdl(fetchedPdl);
-        setSmcOpen(fetchedOpen);
-        if (data.daily_bias) {
-          setSmcHtfTrend(data.daily_bias);
-          activeHtfTrend = data.daily_bias;
-        }
-        if (data.trend_1m) setSmcTrend1m(data.trend_1m);
-        if (data.trend_15m) setSmcTrend15m(data.trend_15m);
-        if (data.trend_1h) setSmcTrend1h(data.trend_1h);
+      if (!resPrice.ok) {
+        const errData = await resPrice.json().catch(() => ({ detail: "Invalid symbol or market data fetch failed." }));
+        alert(`Error: ${errData.detail || "Invalid symbol or market data fetch failed."}`);
+        setSmcResult(null);
+        setSmcCurrentPrice("");
+        setSmcPdh("");
+        setSmcPdl("");
+        setSmcOpen("");
+        setSmcTrend1m("");
+        setSmcTrend15m("");
+        setSmcTrend1h("");
+        setSmcLoading(false);
+        return;
       }
+
+      const data = await resPrice.json();
+      if (activeSmcSearchSymbolRef.current !== searchSymbol) return;
+      fetchedPrice = data.current_price || fetchedPrice;
+      fetchedPdh = data.pdh || fetchedPdh;
+      fetchedPdl = data.pdl || fetchedPdl;
+      fetchedOpen = data.open || fetchedOpen;
+      setSmcCurrentPrice(fetchedPrice);
+      setSmcPdh(fetchedPdh);
+      setSmcPdl(fetchedPdl);
+      setSmcOpen(fetchedOpen);
+      if (data.daily_bias) {
+        setSmcHtfTrend(data.daily_bias);
+        activeHtfTrend = data.daily_bias;
+      }
+      if (data.trend_1m) setSmcTrend1m(data.trend_1m);
+      if (data.trend_15m) setSmcTrend15m(data.trend_15m);
+      if (data.trend_1h) setSmcTrend1h(data.trend_1h);
 
       // Fetch SMC analysis from the backend API endpoint
       const payload = {
