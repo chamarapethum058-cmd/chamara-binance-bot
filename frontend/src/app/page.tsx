@@ -54,10 +54,6 @@ export default function Dashboard() {
   // Settings & preferences states
   const [geminiApiKey, setGeminiApiKey] = useState("");
   const [tempApiKey, setTempApiKey] = useState("");
-  const [llmProvider, setLlmProvider] = useState("GEMINI");
-  const [tempLlmProvider, setTempLlmProvider] = useState("GEMINI");
-  const [ollamaModel, setOllamaModel] = useState("qwen2.5-coder:7b");
-  const [tempOllamaModel, setTempOllamaModel] = useState("qwen2.5-coder:7b");
   const [geminiStatus, setGeminiStatus] = useState<{ status: string; details: string; provider?: string }>({ status: "UNKNOWN", details: "Checking key status..." });
   const [showSettings, setShowSettings] = useState(false);
 
@@ -397,10 +393,10 @@ export default function Dashboard() {
   const [sbSearchError, setSbSearchError] = useState<string | null>(null);
 
   // SMC Method States
-  const [smcSymbol, setSmcSymbol] = useState("BTCUSDT");
+  const [smcSymbol, setSmcSymbol] = useState("");
   const [smcStrategyModel, setSmcStrategyModel] = useState("double_mitigation");
   const [smcTimeframe, setSmcTimeframe] = useState("15m");
-  const [smcHtfTrend, setSmcHtfTrend] = useState("BULLISH");
+  const [smcHtfTrend, setSmcHtfTrend] = useState("NEUTRAL");
   const [smcLiquidityPoolsSwept, setSmcLiquidityPoolsSwept] = useState(true);
   const [smcInducementSwept, setSmcInducementSwept] = useState(true);
   const [smcSwingValidated, setSmcSwingValidated] = useState(true);
@@ -412,10 +408,10 @@ export default function Dashboard() {
   const [smcM1LiquiditySweep, setSmcM1LiquiditySweep] = useState(true);
   const [smcDisplacementChoch, setSmcDisplacementChoch] = useState(true);
   const [smcFvgObConfluence, setSmcFvgObConfluence] = useState(true);
-  const [smcPdh, setSmcPdh] = useState<number | "">(65000);
-  const [smcPdl, setSmcPdl] = useState<number | "">(64000);
-  const [smcOpen, setSmcOpen] = useState<number | "">(64200);
-  const [smcCurrentPrice, setSmcCurrentPrice] = useState<number | "">(64100);
+  const [smcPdh, setSmcPdh] = useState<number | "">("");
+  const [smcPdl, setSmcPdl] = useState<number | "">("");
+  const [smcOpen, setSmcOpen] = useState<number | "">("");
+  const [smcCurrentPrice, setSmcCurrentPrice] = useState<number | "">("");
   const [smcTrend1m, setSmcTrend1m] = useState<string>("");
   const [smcTrend15m, setSmcTrend15m] = useState<string>("");
   const [smcTrend1h, setSmcTrend1h] = useState<string>("");
@@ -423,17 +419,17 @@ export default function Dashboard() {
   const [monitoredCoins, setMonitoredCoins] = useState<any[]>([]);
 
   // TCS states
-  const [tcsSymbol, setTcsSymbol] = useState("BTCUSDT");
+  const [tcsSymbol, setTcsSymbol] = useState("");
   const [tcsStrategyModel, setTcsStrategyModel] = useState("trend_following");
   const [tcsTimeframe, setTcsTimeframe] = useState("1m");
-  const [tcsHtfTrend, setTcsHtfTrend] = useState("BULLISH");
+  const [tcsHtfTrend, setTcsHtfTrend] = useState("NEUTRAL");
   const [tcsSmaAligned, setTcsSmaAligned] = useState(true);
   const [tcsRsiAligned, setTcsRsiAligned] = useState(true);
   const [tcsFrvpAligned, setTcsFrvpAligned] = useState(true);
-  const [tcsPdh, setTcsPdh] = useState<number | "">(65000);
-  const [tcsPdl, setTcsPdl] = useState<number | "">(64000);
-  const [tcsOpen, setTcsOpen] = useState<number | "">(64200);
-  const [tcsCurrentPrice, setTcsCurrentPrice] = useState<number | "">(64100);
+  const [tcsPdh, setTcsPdh] = useState<number | "">("");
+  const [tcsPdl, setTcsPdl] = useState<number | "">("");
+  const [tcsOpen, setTcsOpen] = useState<number | "">("");
+  const [tcsCurrentPrice, setTcsCurrentPrice] = useState<number | "">("");
   const [tcsTrend1m, setTcsTrend1m] = useState<string>("");
   const [tcsTrend15m, setTcsTrend15m] = useState<string>("");
   const [tcsTrend1h, setTcsTrend1h] = useState<string>("");
@@ -560,203 +556,6 @@ export default function Dashboard() {
     syncTcsWatchlistToBackend(tcsMonitoredCoins);
   }, [tcsMonitoredCoins]);
 
-  // 5-Second Local API Watchlist Polling Loop
-  useEffect(() => {
-    if (monitoredCoins.length === 0) return;
-
-    const intervalId = setInterval(async () => {
-      const currentCoins = [...monitoredCoins];
-      if (currentCoins.length === 0) return;
-
-      const updated = await Promise.all(
-        currentCoins.map(async (coin) => {
-          try {
-            const sym = getTradingViewSymbol(coin.symbol);
-            const cleanSym = sym.includes(":") ? sym.split(":")[1] : sym;
-            
-            // 1. Fetch live market price & daily levels
-            const resPrice = await fetch(`http://127.0.0.1:8000/api/market/price?symbol=${encodeURIComponent(cleanSym)}`);
-            if (resPrice.ok) {
-              const priceData = await resPrice.json();
-              const currentPrice = priceData.current_price || coin.currentPrice;
-              const pdh = priceData.pdh || coin.pdh;
-              const pdl = priceData.pdl || coin.pdl;
-              const open = priceData.open || coin.open;
-              const htfTrend = priceData.daily_bias || coin.htfTrend;
-
-              // 2. Fetch full programmatic SMC analysis from backend
-              const resSMC = await fetch(`http://127.0.0.1:8000/api/smc/analyze`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  symbol: cleanSym,
-                  timeframe: coin.timeframe,
-                  current_price: currentPrice,
-                  pdh: pdh,
-                  pdl: pdl,
-                  daily_open: open,
-                  htf_trend: htfTrend
-                })
-              });
-
-              if (resSMC.ok) {
-                const smcData = await resSMC.json();
-                return {
-                  ...coin,
-                  currentPrice: currentPrice,
-                  pdh: pdh,
-                  pdl: pdl,
-                  open: open,
-                  htfTrend: smcData.daily_bias || htfTrend,
-                  confidence: smcData.confidence,
-                  is_valid: smcData.is_valid,
-                  entryPrice: smcData.entry_price_area,
-                  stopLoss: smcData.stop_loss_level,
-                  takeProfit: smcData.liquidity_target,
-                  liquidityPoolsSwept: smcData.sb_step_2_liquidity_sweep_ok,
-                  swingValidated: smcData.sb_step_3_displacement_mss_ok,
-                  ltfChoch: smcData.sb_step_9_ltf_choch_ok
-                };
-              }
-            }
-          } catch (e) {
-            console.error("Error refreshing monitored coin:", coin.symbol, e);
-          }
-          return coin;
-        })
-      );
-
-      setMonitoredCoins(prevCoins => {
-        return prevCoins.map(prevCoin => {
-          const match = updated.find(u => u.symbol === prevCoin.symbol);
-          return match ? {
-            ...prevCoin,
-            ...match
-          } : prevCoin;
-        });
-      });
-    }, 5000);
-
-    return () => clearInterval(intervalId);
-  }, [monitoredCoins]);
-
-  // 5-Second Local API TCS Watchlist Polling Loop
-  useEffect(() => {
-    if (tcsMonitoredCoins.length === 0) return;
-
-    const intervalId = setInterval(async () => {
-      const currentCoins = [...tcsMonitoredCoins];
-      if (currentCoins.length === 0) return;
-
-      const updated = await Promise.all(
-        currentCoins.map(async (coin) => {
-          try {
-            const sym = getTradingViewSymbol(coin.symbol);
-            const cleanSym = sym.includes(":") ? sym.split(":")[1] : sym;
-
-            // 1. Fetch live market price & daily levels
-            const resPrice = await fetch(`http://127.0.0.1:8000/api/market/price?symbol=${encodeURIComponent(cleanSym)}`);
-            if (resPrice.ok) {
-              const priceData = await resPrice.json();
-              const currentPrice = priceData.current_price || coin.currentPrice;
-              const pdh = priceData.pdh || coin.pdh;
-              const pdl = priceData.pdl || coin.pdl;
-              const open = priceData.open || coin.open;
-              const htfTrend = priceData.daily_bias || coin.htfTrend;
-
-              // 2. Fetch full programmatic TCS analysis from backend
-              const resTCS = await fetch(`http://127.0.0.1:8000/api/tcs/analyze`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  symbol: cleanSym,
-                  timeframe: coin.timeframe,
-                  current_price: currentPrice,
-                  pdh: pdh,
-                  pdl: pdl,
-                  daily_open: open,
-                  htf_trend: htfTrend
-                })
-              });
-
-              if (resTCS.ok) {
-                const tcsData = await resTCS.json();
-                return {
-                  ...coin,
-                  currentPrice: currentPrice,
-                  pdh: pdh,
-                  pdl: pdl,
-                  open: open,
-                  htfTrend: tcsData.daily_bias || htfTrend,
-                  confidence: tcsData.confidence || coin.confidence, // Preserve calculated confidence rating
-                  is_valid: tcsData.is_valid,
-                  entryPrice: coin.entryPrice,
-                  stopLoss: coin.stopLoss,
-                  takeProfit: coin.takeProfit,
-                  smaAligned: coin.smaAligned,
-                  rsiAligned: coin.rsiAligned
-                };
-              }
-            }
-          } catch (e) {
-            console.error("Error refreshing TCS monitored coin:", coin.symbol, e);
-          }
-          return coin;
-        })
-      );
-
-      setTcsMonitoredCoins(prevCoins => {
-        return prevCoins.map(prevCoin => {
-          const match = updated.find(u => u.symbol === prevCoin.symbol);
-          return match ? {
-            ...prevCoin,
-            ...match
-          } : prevCoin;
-        });
-      });
-    }, 5000);
-
-    return () => clearInterval(intervalId);
-  }, [tcsMonitoredCoins]);
-
-  // 5-Second Journal Trades Price Polling Loop
-  useEffect(() => {
-    if (tradeHistory.length === 0) return;
-
-    const fetchJournalPrices = async () => {
-      const uniqueSymbols = Array.from(new Set(tradeHistory.map((t: any) => t.symbol.toUpperCase())));
-      const priceMap: Record<string, number> = { ...livePrices };
-      let changed = false;
-
-      await Promise.all(
-        uniqueSymbols.map(async (symbol) => {
-          try {
-            const sym = getTradingViewSymbol(symbol);
-            const cleanSym = sym.includes(":") ? sym.split(":")[1] : sym;
-            const res = await fetch(`http://127.0.0.1:8000/api/market/price?symbol=${encodeURIComponent(cleanSym)}`);
-            if (res.ok) {
-              const data = await res.json();
-              if (data.current_price !== undefined) {
-                priceMap[symbol] = data.current_price;
-                changed = true;
-              }
-            }
-          } catch (e) {
-            console.error("Error fetching live price for journal symbol:", symbol, e);
-          }
-        })
-      );
-
-      if (changed) {
-        setLivePrices(priceMap);
-      }
-    };
-
-    fetchJournalPrices();
-    const intervalId = setInterval(fetchJournalPrices, 5000);
-    return () => clearInterval(intervalId);
-  }, [tradeHistory]);
-
   // Watchlist Local Strategy Recalculators
   const calculateCoinConfidence = (coin: any) => {
     const isBullish = coin.htfTrend === "BULLISH";
@@ -785,7 +584,7 @@ export default function Dashboard() {
   };
 
   const getCoinParameters = (coin: any) => {
-    if (coin.confidence !== undefined && coin.entryPrice !== undefined) {
+    if (coin.confidence !== undefined && coin.entryPrice !== undefined && coin.entryPrice !== "") {
       let entry = coin.currentPrice;
       if (coin.entryPrice && typeof coin.entryPrice === "string") {
         const matches = coin.entryPrice.match(/\d+(?:\.\d+)?/);
@@ -821,10 +620,198 @@ export default function Dashboard() {
       take_profit: tp2
     };
   };
+
+  // 5-Second Local API Watchlist Polling Loop
+  useEffect(() => {
+    if (monitoredCoins.length === 0) return;
+
+    const intervalId = setInterval(async () => {
+      const currentCoins = [...monitoredCoins];
+      if (currentCoins.length === 0) return;
+
+      const updated = await Promise.all(
+        currentCoins.map(async (coin) => {
+          try {
+            const sym = getTradingViewSymbol(coin.symbol);
+            const cleanSym = sym.includes(":") ? sym.split(":")[1] : sym;
+            
+            // 1. Fetch live market price & daily levels (100% Free yfinance/Binance local call)
+            const resPrice = await fetch(`http://127.0.0.1:8000/api/market/price?symbol=${encodeURIComponent(cleanSym)}&t=${Date.now()}`);
+            if (resPrice.ok) {
+              const priceData = await resPrice.json();
+              const currentPrice = priceData.current_price || coin.currentPrice;
+              const pdh = priceData.pdh || coin.pdh;
+              const pdl = priceData.pdl || coin.pdl;
+              const open = priceData.open || coin.open;
+              const htfTrend = priceData.daily_bias || coin.htfTrend;
+
+              // 2. Perform 100% local programmatic confluences and confidence calculation
+              const localCoin = {
+                ...coin,
+                currentPrice: currentPrice,
+                pdh: pdh,
+                pdl: pdl,
+                open: open,
+                htfTrend: htfTrend
+              };
+              
+              const localParams = getCoinParameters(localCoin);
+
+              return {
+                ...localCoin,
+                currentPrice: currentPrice,
+                pdh: pdh,
+                pdl: pdl,
+                open: open,
+                htfTrend: htfTrend,
+                confidence: localParams.confidence,
+                is_valid: localParams.is_valid,
+                entryPrice: localParams.entry_price,
+                stopLoss: localParams.stop_loss,
+                takeProfit: localParams.take_profit,
+                liquidityPoolsSwept: coin.liquidityPoolsSwept,
+                swingValidated: coin.swingValidated,
+                ltfChoch: coin.ltfChoch
+              };
+            }
+          } catch (e) {
+            console.error("Error refreshing monitored coin programmatically:", coin.symbol, e);
+          }
+          return coin;
+        })
+      );
+
+      setMonitoredCoins(prevCoins => {
+        return prevCoins.map(prevCoin => {
+          const match = updated.find(u => u.symbol === prevCoin.symbol);
+          return match ? {
+            ...prevCoin,
+            ...match
+          } : prevCoin;
+        });
+      });
+    }, 5000);
+
+    return () => clearInterval(intervalId);
+  }, [monitoredCoins]);
+
+  // 5-Second Local API TCS Watchlist Polling Loop
+  useEffect(() => {
+    if (tcsMonitoredCoins.length === 0) return;
+
+    const intervalId = setInterval(async () => {
+      const currentCoins = [...tcsMonitoredCoins];
+      if (currentCoins.length === 0) return;
+
+      const updated = await Promise.all(
+        currentCoins.map(async (coin) => {
+          try {
+            const sym = getTradingViewSymbol(coin.symbol);
+            const cleanSym = sym.includes(":") ? sym.split(":")[1] : sym;
+
+            // 1. Fetch live market price & daily levels (100% Free yfinance/Binance local call)
+            const resPrice = await fetch(`http://127.0.0.1:8000/api/market/price?symbol=${encodeURIComponent(cleanSym)}&t=${Date.now()}`);
+            if (resPrice.ok) {
+              const priceData = await resPrice.json();
+              const currentPrice = priceData.current_price || coin.currentPrice;
+              const pdh = priceData.pdh || coin.pdh;
+              const pdl = priceData.pdl || coin.pdl;
+              const open = priceData.open || coin.open;
+              const htfTrend = priceData.daily_bias || coin.htfTrend;
+
+              // 2. Perform 100% local programmatic confluences and confidence calculation
+              const localCoin = {
+                ...coin,
+                currentPrice: currentPrice,
+                pdh: pdh,
+                pdl: pdl,
+                open: open,
+                htfTrend: htfTrend
+              };
+              
+              const localParams = getCoinParameters(localCoin);
+
+              return {
+                ...localCoin,
+                currentPrice: currentPrice,
+                pdh: pdh,
+                pdl: pdl,
+                open: open,
+                htfTrend: htfTrend,
+                confidence: localParams.confidence,
+                is_valid: localParams.is_valid,
+                entryPrice: localParams.entry_price,
+                stopLoss: localParams.stop_loss,
+                takeProfit: localParams.take_profit,
+                smaAligned: coin.smaAligned,
+                rsiAligned: coin.rsiAligned
+              };
+            }
+          } catch (e) {
+            console.error("Error refreshing TCS monitored coin programmatically:", coin.symbol, e);
+          }
+          return coin;
+        })
+      );
+
+      setTcsMonitoredCoins(prevCoins => {
+        return prevCoins.map(prevCoin => {
+          const match = updated.find(u => u.symbol === prevCoin.symbol);
+          return match ? {
+            ...prevCoin,
+            ...match
+          } : prevCoin;
+        });
+      });
+    }, 5000);
+
+    return () => clearInterval(intervalId);
+  }, [tcsMonitoredCoins]);
+
+  // 5-Second Journal Trades Price Polling Loop
+  useEffect(() => {
+    if (tradeHistory.length === 0) return;
+
+    const fetchJournalPrices = async () => {
+      const uniqueSymbols = Array.from(new Set(tradeHistory.map((t: any) => t.symbol.toUpperCase())));
+      const priceMap: Record<string, number> = { ...livePrices };
+      let changed = false;
+
+      await Promise.all(
+        uniqueSymbols.map(async (symbol) => {
+          try {
+            const sym = getTradingViewSymbol(symbol);
+            const cleanSym = sym.includes(":") ? sym.split(":")[1] : sym;
+            const res = await fetch(`http://127.0.0.1:8000/api/market/price?symbol=${encodeURIComponent(cleanSym)}&t=${Date.now()}`);
+            if (res.ok) {
+              const data = await res.json();
+              if (data.current_price !== undefined) {
+                priceMap[symbol] = data.current_price;
+                changed = true;
+              }
+            }
+          } catch (e) {
+            console.error("Error fetching live price for journal symbol:", symbol, e);
+          }
+        })
+      );
+
+      if (changed) {
+        setLivePrices(priceMap);
+      }
+    };
+
+    fetchJournalPrices();
+    const intervalId = setInterval(fetchJournalPrices, 5000);
+    return () => clearInterval(intervalId);
+  }, [tradeHistory]);
+
+  // Watchlist Local Strategy Recalculators
   const [smcLoading, setSmcLoading] = useState(false);
 
   const handleRunSmcAnalysis = async (addToWatchlist: boolean = false) => {
     setSmcLoading(true);
+    setSmcResult(null);
     try {
       let searchSymbol = smcSymbol.toUpperCase().trim();
       if (searchSymbol) {
@@ -841,7 +828,7 @@ export default function Dashboard() {
       }
       setSmcSymbol(searchSymbol);
 
-      const resPrice = await fetch(`${API_BASE}/market/price?symbol=${encodeURIComponent(searchSymbol)}`);
+      const resPrice = await fetch(`${API_BASE}/market/price?symbol=${encodeURIComponent(searchSymbol)}&t=${Date.now()}`);
       let fetchedPrice = Number(smcCurrentPrice) || 0;
       let fetchedPdh = Number(smcPdh) || 0;
       let fetchedPdl = Number(smcPdl) || 0;
@@ -939,9 +926,11 @@ export default function Dashboard() {
           });
         }
       } else {
+        setSmcResult(null);
         alert("Failed to analyze SMC setup.");
       }
     } catch (err) {
+      setSmcResult(null);
       console.error("Error running SMC analysis:", err);
     } finally {
       setSmcLoading(false);
@@ -958,7 +947,7 @@ export default function Dashboard() {
     setSmcTrend15m("");
     setSmcTrend1h("");
     setSmcResult(null);
-    setSmcHtfTrend("BULLISH");
+    setSmcHtfTrend("NEUTRAL");
   };
 
   // Trigger SMC analysis/fetch automatically on timeframe changes
@@ -970,6 +959,7 @@ export default function Dashboard() {
 
   const handleRunTcsAnalysis = async (addToWatchlist: boolean = false) => {
     setTcsLoading(true);
+    setTcsResult(null);
     try {
       let searchSymbol = tcsSymbol.toUpperCase().trim();
       if (searchSymbol) {
@@ -986,7 +976,7 @@ export default function Dashboard() {
       }
       setTcsSymbol(searchSymbol);
 
-      const resPrice = await fetch(`${API_BASE}/market/price?symbol=${encodeURIComponent(searchSymbol)}`);
+      const resPrice = await fetch(`${API_BASE}/market/price?symbol=${encodeURIComponent(searchSymbol)}&t=${Date.now()}`);
       if (!resPrice.ok) {
         setTcsResult(null);
         setTcsCurrentPrice("");
@@ -1094,8 +1084,12 @@ export default function Dashboard() {
             }
           });
         }
+      } else {
+        setTcsResult(null);
+        alert("Failed to analyze TCS setup.");
       }
     } catch (err) {
+      setTcsResult(null);
       console.error("Error running TCS analysis:", err);
     } finally {
       setTcsLoading(false);
@@ -1112,7 +1106,7 @@ export default function Dashboard() {
     setTcsTrend15m("");
     setTcsTrend1h("");
     setTcsResult(null);
-    setTcsHtfTrend("BULLISH");
+    setTcsHtfTrend("NEUTRAL");
     setTcsManualEntry("");
     setTcsManualSl("");
     setTcsManualTp("");
@@ -1353,7 +1347,7 @@ export default function Dashboard() {
     setSbSearchLoading(true);
     setSbSearchError(null);
     try {
-      const res = await fetch(`${API_BASE}/market/price?symbol=${encodeURIComponent(sbSymbol.trim())}`);
+      const res = await fetch(`${API_BASE}/market/price?symbol=${encodeURIComponent(sbSymbol.trim())}&t=${Date.now()}`);
       if (res.ok) {
         const data = await res.json();
         if (data.pdh !== undefined) {
@@ -1518,16 +1512,6 @@ export default function Dashboard() {
           setGeminiApiKey(apiKeyPref.value);
           setTempApiKey(apiKeyPref.value);
         }
-        const providerPref = data.find((p: any) => p.key === "llm_provider");
-        if (providerPref) {
-          setLlmProvider(providerPref.value);
-          setTempLlmProvider(providerPref.value);
-        }
-        const modelPref = data.find((p: any) => p.key === "ollama_model");
-        if (modelPref) {
-          setOllamaModel(modelPref.value);
-          setTempOllamaModel(modelPref.value);
-        }
       }
     } catch (e) {
       console.error("Error fetching preferences:", e);
@@ -1537,28 +1521,14 @@ export default function Dashboard() {
   const saveApiKey = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const [res1, res2, res3] = await Promise.all([
-        fetch(`${API_BASE}/preferences`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ key: "gemini_api_key", value: tempApiKey }),
-        }),
-        fetch(`${API_BASE}/preferences`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ key: "llm_provider", value: tempLlmProvider }),
-        }),
-        fetch(`${API_BASE}/preferences`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ key: "ollama_model", value: tempOllamaModel }),
-        })
-      ]);
+      const res = await fetch(`${API_BASE}/preferences`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: "gemini_api_key", value: tempApiKey }),
+      });
 
-      if (res1.ok && res2.ok && res3.ok) {
+      if (res.ok) {
         setGeminiApiKey(tempApiKey);
-        setLlmProvider(tempLlmProvider);
-        setOllamaModel(tempOllamaModel);
         setShowSettings(false);
         alert("Configuration saved successfully! | සැකසුම් සාර්ථකව සුරකින ලදී!");
         checkHealth();
@@ -2117,18 +2087,12 @@ export default function Dashboard() {
               }}
             >
               {
-                geminiStatus.provider === "LOCAL" ? (
-                  geminiStatus.status === "VALID" ? "LOCAL ACTIVE" :
-                  geminiStatus.status === "ERROR" ? "LOCAL OFFLINE" :
-                  "CHECKING LOCAL"
-                ) : (
-                  geminiStatus.status === "VALID" ? "GEMINI ACTIVE" :
-                  geminiStatus.status === "INVALID" ? "GEMINI INVALID" :
-                  geminiStatus.status === "HIGH_DEMAND" ? "GEMINI BUSY" :
-                  geminiStatus.status === "MISSING" ? "NO GEMINI KEY" :
-                  geminiStatus.status === "ERROR" ? "GEMINI ERROR" :
-                  "CHECKING GEMINI"
-                )
+                geminiStatus.status === "VALID" ? "GEMINI ACTIVE" :
+                geminiStatus.status === "INVALID" ? "GEMINI INVALID" :
+                geminiStatus.status === "HIGH_DEMAND" ? "GEMINI BUSY" :
+                geminiStatus.status === "MISSING" ? "NO GEMINI KEY" :
+                geminiStatus.status === "ERROR" ? "GEMINI ERROR" :
+                "CHECKING GEMINI"
               }
             </span>
           </div>
@@ -2142,8 +2106,6 @@ export default function Dashboard() {
           <button
             onClick={() => {
               setTempApiKey(geminiApiKey);
-              setTempLlmProvider(llmProvider);
-              setTempOllamaModel(ollamaModel);
               setShowSettings(true);
             }}
             id="btn-settings"
@@ -4612,24 +4574,30 @@ export default function Dashboard() {
                       <div className="flex justify-between items-center px-1">
                         <span className="text-[10px] font-semibold text-emerald-400 uppercase tracking-widest font-mono flex items-center gap-1.5">
                           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                          TradingView Live SMC Chart ({smcSymbol})
+                          TradingView Live SMC Chart {smcSymbol ? `(${smcSymbol})` : ""}
                         </span>
-                        <a
-                          href={`https://www.tradingview.com/chart/?symbol=${getTradingViewSymbol(smcSymbol)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-[10px] text-emerald-400 hover:text-emerald-300 transition-colors font-semibold flex items-center gap-1 font-mono bg-emerald-500/10 px-2 py-1 rounded border border-emerald-500/20"
-                        >
-                          Open in TradingView ↗
-                        </a>
+                        {smcSymbol && (
+                          <a
+                            href={`https://www.tradingview.com/chart/?symbol=${getTradingViewSymbol(smcSymbol)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[10px] text-emerald-400 hover:text-emerald-300 transition-colors font-semibold flex items-center gap-1 font-mono bg-emerald-500/10 px-2 py-1 rounded border border-emerald-500/20"
+                          >
+                            Open in TradingView ↗
+                          </a>
+                        )}
                       </div>
-                      <div className="flex-1 w-full rounded-lg overflow-hidden border border-[#1E2235]/40 bg-black/40 relative">
-                        <iframe
-                          id="tradingview-smc-chart-widget"
-                          src={`https://s.tradingview.com/widgetembed/?frameElementId=tradingview-smc-chart-widget&symbol=${getTradingViewSymbol(smcSymbol)}&interval=${getIntervalForTradingView(smcTimeframe)}&theme=dark&style=1&timezone=America%2FNew_York&hide_volume=false`}
-                          className="w-full h-full border-none"
-                          allowFullScreen
-                        />
+                      <div className="flex-1 w-full rounded-lg overflow-hidden border border-[#1E2235]/40 bg-black/40 relative flex items-center justify-center">
+                        {smcSymbol ? (
+                          <iframe
+                            id="tradingview-smc-chart-widget"
+                            src={`https://s.tradingview.com/widgetembed/?frameElementId=tradingview-smc-chart-widget&symbol=${getTradingViewSymbol(smcSymbol)}&interval=${getIntervalForTradingView(smcTimeframe)}&theme=dark&style=1&timezone=America%2FNew_York&hide_volume=false`}
+                            className="w-full h-full border-none absolute inset-0"
+                            allowFullScreen
+                          />
+                        ) : (
+                          <span className="text-gray-500 text-xs font-mono text-center px-4">Type a symbol and click Fetch Price to view TradingView chart</span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -4730,45 +4698,7 @@ export default function Dashboard() {
                               </span>
                             </div>
 
-                            {/* Required Target Price Conditions */}
-                            <div className="bg-rose-950/15 border border-rose-500/15 rounded-xl p-3.5 text-xs font-mono flex flex-col gap-2">
-                              <div className="text-rose-300 font-bold uppercase tracking-wider text-[10px] flex items-center gap-1.5 border-b border-rose-500/10 pb-1.5">
-                                <span>🎯</span> REQUIRED PRICE TRIGGERS (ඇතුළත් වීමට අවශ්‍ය මිල සීමාවන්):
-                              </div>
-                              <div className="flex flex-col gap-2 text-gray-300">
-                                {smcHtfTrend === "BULLISH" ? (
-                                  <>
-                                    <div className="flex justify-between items-center gap-2">
-                                      <span>• Point 2 (Discount Zone):</span>
-                                      <span className="text-rose-400 font-semibold">Price &lt; ${(smcResult.equilibrium_price || 0).toFixed(4)}</span>
-                                    </div>
-                                    <div className="text-[10px] text-rose-300/60 pl-3">සිංහල: මිල මීට වඩා අඩු විය යුතුය.</div>
-
-                                    <div className="flex justify-between items-center gap-2 mt-1">
-                                      <span>• Point 3 (Daily Open Relation):</span>
-                                      <span className="text-rose-400 font-semibold">Price &lt; ${(Number(smcOpen) || 0).toFixed(4)}</span>
-                                    </div>
-                                    <div className="text-[10px] text-rose-300/60 pl-3">සිංහල: මිල Daily Open එකට වඩා අඩු විය යුතුය.</div>
-                                  </>
-                                ) : (
-                                  <>
-                                    <div className="flex justify-between items-center gap-2">
-                                      <span>• Point 2 (Premium Zone):</span>
-                                      <span className="text-emerald-400 font-semibold">Price &gt; ${(smcResult.equilibrium_price || 0).toFixed(4)}</span>
-                                    </div>
-                                    <div className="text-[10px] text-emerald-300/60 pl-3">සිංහල: මිල මීට වඩා වැඩි විය යුතුය.</div>
-
-                                    <div className="flex justify-between items-center gap-2 mt-1">
-                                      <span>• Point 3 (Daily Open Relation):</span>
-                                      <span className="text-emerald-400 font-semibold">Price &gt; ${(Number(smcOpen) || 0).toFixed(4)}</span>
-                                    </div>
-                                    <div className="text-[10px] text-emerald-300/60 pl-3">සිංහල: මිල Daily Open එකට වඩා වැඩි විය යුතුය.</div>
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        )}
+                         )}
                         {smcResult.is_valid && (
                           <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl p-3.5 text-xs font-mono flex items-center gap-2 animate-pulse">
                             <span>✅</span>
@@ -6280,64 +6210,34 @@ export default function Dashboard() {
             <form onSubmit={saveApiKey} className="flex flex-col gap-4">
               <div className="flex flex-col gap-3">
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs text-gray-400 font-semibold uppercase tracking-wider">AI Model Provider</label>
-                  <select
-                    value={tempLlmProvider}
-                    onChange={(e) => setTempLlmProvider(e.target.value)}
-                    className="w-full bg-[#141626] border border-[#1E2235] rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#6366F1] font-mono cursor-pointer"
+                  <label className="text-xs text-gray-400 font-semibold uppercase tracking-wider">Gemini API Key</label>
+                  <input
+                    type="password"
+                    placeholder="AIzaSy... or AQ..."
+                    value={tempApiKey}
+                    onChange={(e) => setTempApiKey(e.target.value)}
+                    className="w-full bg-[#141626] border border-[#1E2235] rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#6366F1] font-mono"
+                  />
+                  <p className="text-[10px] text-gray-500 leading-normal mt-1">
+                    This key is stored securely in the database preferences and used by the AI Brain for technical analysis.
+                  </p>
+                  <a
+                    href="https://aistudio.google.com/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[10px] text-indigo-400 hover:text-indigo-300 font-semibold mt-1.5 self-start flex items-center gap-1 font-mono transition-colors"
                   >
-                    <option value="GEMINI">Gemini (Google AI Studio Cloud)</option>
-                    <option value="LOCAL">Local LLM (Ollama Offline)</option>
-                  </select>
-                </div>
+                    Check API Limits & Usage ↗
+                  </a>
 
-                {tempLlmProvider === "GEMINI" ? (
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-xs text-gray-400 font-semibold uppercase tracking-wider">Gemini API Key</label>
-                    <input
-                      type="password"
-                      placeholder="AIzaSy... or AQ..."
-                      value={tempApiKey}
-                      onChange={(e) => setTempApiKey(e.target.value)}
-                      className="w-full bg-[#141626] border border-[#1E2235] rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#6366F1] font-mono"
-                    />
-                    <p className="text-[10px] text-gray-500 leading-normal mt-1">
-                      This key is stored securely in the database preferences and used by the AI Brain for technical analysis.
-                    </p>
-                    <a
-                      href="https://aistudio.google.com/"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[10px] text-indigo-400 hover:text-indigo-300 font-semibold mt-1.5 self-start flex items-center gap-1 font-mono transition-colors"
-                    >
-                      Check API Limits & Usage ↗
-                    </a>
-
-                    {tempApiKey && tempApiKey.startsWith("AQ.") && tempApiKey.length < 100 && (
-                      <p className="text-[10px] text-amber-400 font-medium leading-normal mt-2 border border-amber-500/20 bg-amber-500/5 p-2 rounded-lg font-mono">
-                        ⚠️ WARNING: This key appears to be truncated (too short)! Make sure to copy the ENTIRE key using the official "Copy" button in Google AI Studio instead of manually highlighting screen text.
-                        <br />
-                        <span className="text-gray-400 font-normal">(සිංහල: මෙම Key එක අසම්පූර්ණයි (truncation). AI Studio හි ඇති "Copy" බොත්තම මඟින් සම්පූර්ණ Key එකම copy කරගන්න.)</span>
-                      </p>
-                    )}
-                  </div>
-                ) : (
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-xs text-gray-400 font-semibold uppercase tracking-wider">Ollama Model Name</label>
-                    <input
-                      type="text"
-                      placeholder="qwen2.5-coder:7b or llama3"
-                      value={tempOllamaModel}
-                      onChange={(e) => setTempOllamaModel(e.target.value)}
-                      className="w-full bg-[#141626] border border-[#1E2235] rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#6366F1] font-mono"
-                    />
-                    <p className="text-[10px] text-gray-500 leading-normal mt-1">
-                      Ensure Ollama is running locally on your computer at <code className="text-gray-300 font-semibold font-mono">http://localhost:11434</code>. Pull the model first by running:
+                  {tempApiKey && tempApiKey.startsWith("AQ.") && tempApiKey.length < 100 && (
+                    <p className="text-[10px] text-amber-400 font-medium leading-normal mt-2 border border-amber-500/20 bg-amber-500/5 p-2 rounded-lg font-mono">
+                      ⚠️ WARNING: This key appears to be truncated (too short)! Make sure to copy the ENTIRE key using the official "Copy" button in Google AI Studio instead of manually highlighting screen text.
                       <br />
-                      <code className="text-[#8B5CF6] block mt-1 font-semibold font-mono">ollama pull {tempOllamaModel || 'qwen2.5-coder:7b'}</code>
+                      <span className="text-gray-400 font-normal">(සිංහල: මෙම Key එක අසම්පූර්ණයි (truncation). AI Studio හි ඇති "Copy" බොත්තම මඟින් සම්පූර්ණ Key එකම copy කරගන්න.)</span>
                     </p>
-                  </div>
-                )}
+                  )}
+                </div>
 
                 {/* API Key Status Feedback */}
                 <div 
@@ -6372,11 +6272,7 @@ export default function Dashboard() {
                       "bg-blue-500"
                     }`}></span>
                     Connection Status: {
-                      geminiStatus.provider === "LOCAL" ? (
-                        geminiStatus.status === "VALID" ? "OLLAMA CONNECTED" : "OLLAMA OFFLINE"
-                      ) : (
-                        geminiStatus.status === "HIGH_DEMAND" ? "RATE LIMITED (429)" : geminiStatus.status
-                      )
+                      geminiStatus.status === "HIGH_DEMAND" ? "RATE LIMITED (429)" : geminiStatus.status
                     }
                   </div>
                   <p className="text-[10px] text-gray-300 font-medium leading-normal mt-0.5">

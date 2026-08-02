@@ -34,54 +34,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-def auto_start_ollama():
-    import socket
-    import subprocess
-    import shutil
-    import os
-
-    # Check if port 11434 is already open
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.settimeout(1.0)
-    try:
-        s.connect(("127.0.0.1", 11434))
-        s.close()
-        return  # Already running
-    except Exception:
-        pass
-
-    # Find the ollama executable path
-    ollama_path = shutil.which("ollama")
-    if not ollama_path:
-        user_profile = os.getenv("USERPROFILE", "")
-        possible_path = os.path.join(user_profile, "AppData", "Local", "Programs", "Ollama", "ollama.exe")
-        if os.path.exists(possible_path):
-            ollama_path = possible_path
-
-    if ollama_path:
-        try:
-            # Spawn a background detached process so it doesn't block the backend
-            if os.name == 'nt':
-                DETACHED_PROCESS = 0x00000008
-                subprocess.Popen(
-                    [ollama_path, "serve"],
-                    creationflags=DETACHED_PROCESS,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL
-                )
-            else:
-                subprocess.Popen(
-                    [ollama_path, "serve"],
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL
-                )
-        except Exception:
-            pass
-
 # Initialize default strategy if empty
 @app.on_event("startup")
 def startup_populate():
-    auto_start_ollama()
     db = SessionLocal()
     
     # Check if SMC exists, if not seed it
@@ -232,22 +187,6 @@ The engine must strictly monitor setups only during these three independent oper
         db.commit()
         print("Default Telegram Chat ID preference seeded from settings.")
         
-    # Seed default LLM provider if not set in DB
-    llm_prov_pref = db.query(PreferenceModel).filter(PreferenceModel.key == "llm_provider").first()
-    if not llm_prov_pref:
-        db_pref = PreferenceModel(key="llm_provider", value="GEMINI")
-        db.add(db_pref)
-        db.commit()
-        print("Default LLM Provider (GEMINI) preference seeded.")
-        
-    # Seed default Ollama model if not set in DB
-    ollama_m_pref = db.query(PreferenceModel).filter(PreferenceModel.key == "ollama_model").first()
-    if not ollama_m_pref:
-        db_pref = PreferenceModel(key="ollama_model", value=settings.OLLAMA_MODEL)
-        db.add(db_pref)
-        db.commit()
-        print("Default Ollama model preference seeded.")
-        
     db.close()
     
     # Start the background SMC watchlist tracker loop
@@ -337,60 +276,27 @@ _gemini_status_cache = {"status": "UNKNOWN", "details": "", "timestamp": 0.0}
 
 @app.get("/api/preferences/gemini-status")
 async def get_gemini_status(db: Session = Depends(get_db)):
-    provider_pref = db.query(PreferenceModel).filter(PreferenceModel.key == "llm_provider").first()
-    provider = provider_pref.value if provider_pref else "GEMINI"
-    
     import time
     global _gemini_status_cache
     now = time.time()
     
-    if provider == "LOCAL":
-        if _gemini_status_cache.get("provider") == "LOCAL" and (now - _gemini_status_cache.get("timestamp", 0.0)) < 10:
-            return _gemini_status_cache
-        try:
-            import httpx
-            url = f"{settings.OLLAMA_BASE_URL}/api/tags"
-            async with httpx.AsyncClient() as client:
-                res = await client.get(url, timeout=3.0)
-                if res.status_code == 200:
-                    _gemini_status_cache = {
-                        "status": "VALID",
-                        "details": "Local Ollama is active & connected. | දේශීය Ollama සේවාව සක්‍රිය සහ සම්බන්ධ වී ඇත.",
-                        "timestamp": now,
-                        "provider": "LOCAL"
-                    }
-                else:
-                    _gemini_status_cache = {
-                        "status": "ERROR",
-                        "details": f"Local Ollama returned status {res.status_code}. | දේශීය Ollama සේවාව {res.status_code} දෝෂයක් ලබා දෙයි.",
-                        "timestamp": now,
-                        "provider": "LOCAL"
-                    }
-        except Exception:
-            _gemini_status_cache = {
-                "status": "ERROR",
-                "details": "Ollama is not running on http://localhost:11434. Please start Ollama. | Ollama ක්‍රියාත්මක නොවේ, කරුණාකර එය ධාවනය කරන්න.",
-                "timestamp": now,
-                "provider": "LOCAL"
-            }
-        return _gemini_status_cache
-
     pref = db.query(PreferenceModel).filter(PreferenceModel.key == "gemini_api_key").first()
-    api_key = pref.value if pref else None
+    api_key = pref.value if (pref and pref.value) else settings.GEMINI_API_KEY
     if not api_key:
         return {
             "status": "MISSING", 
             "details": "Gemini API Key is missing. Enter it in Settings to enable AI features. | Gemini API Key එක ඇතුලත් කර නැත."
         }
     
-    if _gemini_status_cache.get("provider") != "LOCAL" and _gemini_status_cache["status"] != "UNKNOWN" and (now - _gemini_status_cache["timestamp"]) < 120:
+    # Only cache VALID status. If it was INVALID or ERROR, do NOT return cached status, allowing immediate retry when changing networks/IPs
+    if _gemini_status_cache.get("status") == "VALID" and (now - _gemini_status_cache.get("timestamp", 0.0)) < 120:
         return dict(_gemini_status_cache)
         
     try:
         from google import genai
         client = genai.Client(api_key=api_key)
         client.models.generate_content(
-            model="gemini-2.0-flash",
+            model="gemini-3.5-flash",
             contents="hi"
         )
         _gemini_status_cache = {
@@ -472,7 +378,7 @@ def set_preference(pref: PreferenceCreate, db: Session = Depends(get_db)):
     db.refresh(db_pref)
     
     # Invalidate cache if key was updated
-    if pref.key in ["gemini_api_key", "llm_provider", "ollama_model"]:
+    if pref.key == "gemini_api_key":
         global _gemini_status_cache
         _gemini_status_cache = {"status": "UNKNOWN", "details": "", "timestamp": 0.0}
         
@@ -724,7 +630,6 @@ async def silverbullet_analyze(req: SilverBulletRequest, db: Session = Depends(g
 @app.post("/api/smc/analyze", response_model=SilverBulletResponse)
 async def smc_analyze(req: SilverBulletRequest, db: Session = Depends(get_db)):
     result = await AIService.calculate_programmatic_smc(req.dict())
-    
     # Sanitize float fields
     for field in ["liquidity_target", "stop_loss_level", "equilibrium_price"]:
         val = result.get(field)
@@ -801,7 +706,11 @@ async def smc_analyze(req: SilverBulletRequest, db: Session = Depends(get_db)):
         displacement_choch=result.get("displacement_choch"),
         fvg_ob_confluence=result.get("fvg_ob_confluence"),
         fib_retracement=result.get("fib_retracement"),
-        fib_zone_ok=result.get("fib_zone_ok")
+        fib_zone_ok=result.get("fib_zone_ok"),
+        tp1_target=result.get("tp1_target"),
+        tp2_target=result.get("tp2_target"),
+        tp1_rr=result.get("tp1_rr"),
+        tp2_rr=result.get("tp2_rr")
     )
 
 
@@ -880,7 +789,11 @@ async def tcs_analyze(req: SilverBulletRequest, db: Session = Depends(get_db)):
         upcoming_news_events=result.get("upcoming_news_events"),
         original_extreme_entry=result.get("original_extreme_entry"),
         fvg_boundary_entry=result.get("fvg_boundary_entry"),
-        po3_phase=result.get("po3_phase")
+        po3_phase=result.get("po3_phase"),
+        tp1_target=result.get("tp1_target"),
+        tp2_target=result.get("tp2_target"),
+        tp1_rr=result.get("tp1_rr"),
+        tp2_rr=result.get("tp2_rr")
     )
 
 
