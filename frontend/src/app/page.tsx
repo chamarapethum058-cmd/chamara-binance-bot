@@ -4698,7 +4698,8 @@ export default function Dashboard() {
                               </span>
                             </div>
 
-                         )}
+                          </div>
+                        )}
                         {smcResult.is_valid && (
                           <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl p-3.5 text-xs font-mono flex items-center gap-2 animate-pulse">
                             <span>✅</span>
