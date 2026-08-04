@@ -3166,6 +3166,62 @@ Live 200 Candles Data:
             
         result["confidence"] = calculated_conf
 
+        # Programmatic Stop-Loss & Take-Profit Safety Protocol (Rule 19 & Rule 25)
+        # Guarantees that the Stop Loss is ALWAYS placed outside the absolute Swing Extreme range.
+        if result.get("is_valid") is True:
+            import re
+            epa = result.get("entry_price_area")
+            entry_price = None
+            if epa and isinstance(epa, str):
+                m = re.search(r'\d+(?:\.\d+)?', epa)
+                if m:
+                    try:
+                        entry_price = float(m.group(0))
+                    except ValueError:
+                        pass
+            
+            if entry_price is not None:
+                bias = result.get("daily_bias") or ""
+                current_sl = result.get("stop_loss_level")
+                
+                if "BULLISH" in bias or "Buy" in epa:
+                    # Buy Limit setup
+                    safe_sl = round(range_low * 0.999, 4)
+                    if current_sl is None or current_sl > safe_sl:
+                        result["stop_loss_level"] = safe_sl
+                        logger.info(f"Programmatic SL Overridden: Adjusted Buy SL from {current_sl} to safe level {safe_sl} (below range low {range_low})")
+                    
+                    # Update TP levels to maintain risk-reward structure (Rule 21)
+                    risk = entry_price - result["stop_loss_level"]
+                    if risk > 0:
+                        result["tp1_target"] = round(entry_price + risk * 2.0, 4)
+                        result["tp2_target"] = round(entry_price + risk * 3.0, 4)
+                        result["tp3_target"] = round(entry_price + risk * 4.0, 4)
+                        result["liquidity_target"] = result["tp2_target"]
+                        result["tp1_rr"] = "1:2.0 RR"
+                        result["tp2_rr"] = "1:3.0 RR"
+                        result["tp3_rr"] = "1:4.0 RR"
+                        result["target_reward_ratio"] = "1:3.0 RR"
+                        
+                elif "BEARISH" in bias or "Sell" in epa:
+                    # Sell Limit setup
+                    safe_sl = round(range_high * 1.001, 4)
+                    if current_sl is None or current_sl < safe_sl:
+                        result["stop_loss_level"] = safe_sl
+                        logger.info(f"Programmatic SL Overridden: Adjusted Sell SL from {current_sl} to safe level {safe_sl} (above range high {range_high})")
+                        
+                    # Update TP levels to maintain risk-reward structure (Rule 21)
+                    risk = result["stop_loss_level"] - entry_price
+                    if risk > 0:
+                        result["tp1_target"] = round(entry_price - risk * 2.0, 4)
+                        result["tp2_target"] = round(entry_price - risk * 3.0, 4)
+                        result["tp3_target"] = round(entry_price - risk * 4.0, 4)
+                        result["liquidity_target"] = result["tp2_target"]
+                        result["tp1_rr"] = "1:2.0 RR"
+                        result["tp2_rr"] = "1:3.0 RR"
+                        result["tp3_rr"] = "1:4.0 RR"
+                        result["target_reward_ratio"] = "1:3.0 RR"
+
         result["news_lockout_active"] = news_lockout_active
         result["active_news_event"] = active_news_event
         result["upcoming_news_events"] = upcoming_news_events
