@@ -3159,16 +3159,22 @@ Live 200 Candles Data:
                 if "BULLISH" in bias or "Buy" in epa:
                     # Buy Limit setup
                     local_low = min(c["low"] for c in candles[-50:]) if len(candles) >= 50 else range_low
-                    safe_sl = round(local_low * 0.999, 4)
+                    if entry_price is not None and entry_price <= local_low:
+                        local_low = range_low
+                        
+                    ref_price = entry_price or local_low
+                    precision = 6 if ref_price < 1.0 else 4 if ref_price < 10.0 else 2
+                    
+                    safe_sl = round(local_low * 0.999, precision)
                     result["stop_loss_level"] = safe_sl
                     logger.info(f"Programmatic SL Override: Set Buy SL to tight local level {safe_sl} (below local low {local_low})")
                     
                     # Update TP levels to maintain risk-reward structure (Rule 21)
-                    risk = entry_price - result["stop_loss_level"]
+                    risk = entry_price - result["stop_loss_level"] if entry_price is not None else 0
                     if risk > 0:
-                        result["tp1_target"] = round(entry_price + risk * 2.0, 4)
-                        result["tp2_target"] = round(entry_price + risk * 3.0, 4)
-                        result["tp3_target"] = round(entry_price + risk * 4.0, 4)
+                        result["tp1_target"] = round(entry_price + risk * 2.0, precision)
+                        result["tp2_target"] = round(entry_price + risk * 3.0, precision)
+                        result["tp3_target"] = round(entry_price + risk * 4.0, precision)
                         result["liquidity_target"] = result["tp2_target"]
                         result["tp1_rr"] = "1:2.0 RR"
                         result["tp2_rr"] = "1:3.0 RR"
@@ -3181,16 +3187,22 @@ Live 200 Candles Data:
                 elif "BEARISH" in bias or "Sell" in epa:
                     # Sell Limit setup
                     local_high = max(c["high"] for c in candles[-50:]) if len(candles) >= 50 else range_high
-                    safe_sl = round(local_high * 1.001, 4)
+                    if entry_price is not None and entry_price >= local_high:
+                        local_high = range_high
+                        
+                    ref_price = entry_price or local_high
+                    precision = 6 if ref_price < 1.0 else 4 if ref_price < 10.0 else 2
+                    
+                    safe_sl = round(local_high * 1.001, precision)
                     result["stop_loss_level"] = safe_sl
                     logger.info(f"Programmatic SL Override: Set Sell SL to tight local level {safe_sl} (above local high {local_high})")
                         
                     # Update TP levels to maintain risk-reward structure (Rule 21)
-                    risk = result["stop_loss_level"] - entry_price
+                    risk = result["stop_loss_level"] - entry_price if entry_price is not None else 0
                     if risk > 0:
-                        result["tp1_target"] = round(entry_price - risk * 2.0, 4)
-                        result["tp2_target"] = round(entry_price - risk * 3.0, 4)
-                        result["tp3_target"] = round(entry_price - risk * 4.0, 4)
+                        result["tp1_target"] = round(entry_price - risk * 2.0, precision)
+                        result["tp2_target"] = round(entry_price - risk * 3.0, precision)
+                        result["tp3_target"] = round(entry_price - risk * 4.0, precision)
                         result["liquidity_target"] = result["tp2_target"]
                         result["tp1_rr"] = "1:2.0 RR"
                         result["tp2_rr"] = "1:3.0 RR"
