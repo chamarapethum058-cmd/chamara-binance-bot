@@ -220,3 +220,11 @@ The bot must strictly enforce the following high-impact news rules:
 > 1. **Outer Boundary Entry Placement:** When the market pulls back to tap an unmitigated Fair Value Gap (FVG) or Order Block (OB) zone, there is a high probability of immediate reversal upon first contact. Therefore, the recommended Limit Entry price must be placed exactly at the outer boundary/edge of the zone (the top edge for Buy setups, and the bottom edge for Sell setups) where the market first enters the zone.
 > 2. **No Middle/50% Placements:** Do not place the entry price at the 50% consequent encroachment or mean threshold by default, to ensure that the order is successfully filled before the market reverses.
 > 3. **Sinhala Translation (සිංහල පරිවර්තනය):** FVG/OB කලාපයේ (zone) මිල ස්පර්ශ කර (tap කර) වහාම ආපසු හැරීමට ඇති ඉඩකඩ වැඩි බැවින්, ඇතුල්වීමේ මිල (Entry Price) කලාපය මැදින් (50% level) නොතබා, වෙළඳපල මිල පැමිණෙන දිශාවේ ඇති කලාපයේ පළමු සීමාවෙහි (outer boundary / edge - Buy සෙටප් සඳහා ඉහළ සීමාවේ සහ Sell සෙටප් සඳහා පහළ සීමාවේ) තැබිය යුතුය.
+
+## 29. Gemini API Billing & Request Protection Protocol (New Rule)
+> [!IMPORTANT]
+> **GEMINI API BILLING PROTECTION RULES:**
+> 1. **Manual Trigger Only:** The Gemini AI API must ONLY be triggered during manual, on-demand UI "Scan Market" or "Run Analysis" / "Search" operations initiated explicitly by the user.
+> 2. **Zero Background Usage:** Any background tracking loop, watchlist monitoring loop, price check loop, or status-polling loop must NEVER call the Gemini API directly, and must calculate parameters programmatically and locally in Python to guarantee 100% free and credit-safe operation.
+> 3. **Bypassing / Blocking Violating Requests:** If any request attempts to call Google AI services automatically in the background, it must be intercepted and served locally using fallback mock responses.
+> 4. **Sinhala Translation (සිංහල පරිවර්තනය):** Gemini API එක ක්‍රියාත්මක විය යුත්තේ පරිශීලකයා විසින් මැනුවල් ලෙස සිදු කරන සෙවීම් වලදී ("Search" හෝ "Run Analysis" ක්ලික් කළ විට) පමණි. පසුබිමින් ධාවනය වන අනෙකුත් සියලුම ක්‍රියාවලීන් (trackers, polling loops) දේශීයව (locally in Python) ක්‍රියාත්මක විය යුතු අතර, අනවශ්‍ය ලෙස Google Gemini API එක කැඳවීම සහ ක්‍රෙඩිට්ස් භාවිතය තහනම් වේ.
