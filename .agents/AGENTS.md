@@ -231,3 +231,12 @@ The bot must strictly enforce the following high-impact news rules:
 > 2. **Zero Background Usage:** Any background tracking loop, watchlist monitoring loop, price check loop, or status-polling loop must NEVER call the Gemini API directly, and must calculate parameters programmatically and locally in Python to guarantee 100% free and credit-safe operation.
 > 3. **Bypassing / Blocking Violating Requests:** If any request attempts to call Google AI services automatically in the background, it must be intercepted and served locally using fallback mock responses.
 > 4. **Sinhala Translation (සිංහල පරිවර්තනය):** Gemini API එක ක්‍රියාත්මක විය යුත්තේ පරිශීලකයා විසින් මැනුවල් ලෙස සිදු කරන සෙවීම් වලදී ("Search" හෝ "Run Analysis" ක්ලික් කළ විට) පමණි. පසුබිමින් ධාවනය වන අනෙකුත් සියලුම ක්‍රියාවලීන් (trackers, polling loops) දේශීයව (locally in Python) ක්‍රියාත්මක විය යුතු අතර, අනවශ්‍ය ලෙස Google Gemini API එක කැඳවීම සහ ක්‍රෙඩිට්ස් භාවිතය තහනම් වේ.
+
+## 30. SMC Sniper Limit Order Entry & Patient Execution Protocol (New Rule)
+> [!IMPORTANT]
+> **SMC SNIPER LIMIT ENTRY & PATIENT EXECUTION RULES:**
+> 1. **High-Confirmation Sniper Entry:** The bot must focus strictly on identifying and delivering high-confirmation Limit Entry prices at key FVG/OB boundaries, where the price is expected to tap and reverse immediately with maximum probability.
+> 2. **Pullback Patience over Lockouts:** The user places pending Limit Orders on their exchange and waits patiently for the market to reach and trigger them. Therefore, the bot must NEVER suppress, lock out, or invalidate setups because they are "too close to the market price" or because the Swing Extreme is wide (which results in a wider SL and TP). All valid structural setups must be displayed.
+> 3. **Absolute Stop Loss Protection:** To prevent waiting orders from getting stopped out prematurely by manipulation wicks, the Stop Loss must strictly be placed past the absolute Swing Extreme (Strong High/Low) with the programmatic 0.1% buffer (Rule 19 & 25).
+> 4. **Sinhala Translation (සිංහල පරිවර්තනය):** පරිශීලකයා විසින් Limit Orders යොදා වෙළඳපල මිල එම මට්ටමට පැමිණෙන තෙක් ඉවසීමෙන් බලා සිටීමට සූදානම් බැවින්, ඇතුල්වීමේ මිල වත්මන් මිලට ආසන්න වීම හෝ Swing Low/High පරාසය පළල් වීම මත පදනම්ව සෙටප් අවහිර නොකළ යුතුය. ඇතුල්වීම සැමවිටම FVG/OB සීමාවේදී Sniper Entry එකක් ලෙස සකසා, Stop Loss එක සැමවිටම swing extreme එකෙන් පිටත 0.1% ක බෆරයක් සහිතව තැබිය යුතුය.
+
