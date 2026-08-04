@@ -3136,7 +3136,12 @@ Live 200 Candles Data:
             result["is_valid"] = False
             result["entry_price_area"] = f"No Entry (Confidence < 80% - {calculated_conf}% Confirmed)"
             
-        result["confidence"] = calculated_conf if result.get("is_valid") is True else 0
+        # Force confidence to 0 for structural, news, or risk lockouts. Otherwise, retain the true calculated confluences sum.
+        epa_str = str(result.get("entry_price_area") or "")
+        if "Trend Mismatch" in epa_str or "News Lockout" in epa_str or "SL Range Too Wide" in epa_str or "Invalid SL" in epa_str:
+            result["confidence"] = 0
+        else:
+            result["confidence"] = calculated_conf
 
         # Programmatic Stop-Loss & Take-Profit Safety Protocol (Rule 19 & Rule 25)
         # Guarantees that the Stop Loss is ALWAYS placed outside the absolute Swing Extreme range.
