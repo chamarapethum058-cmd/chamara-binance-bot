@@ -3094,22 +3094,22 @@ Live 200 Candles Data:
                 try:
                     entry_val = float(match.group(1))
                     if t1m_val == "BULLISH": # Buy Limit setup
-                        if entry_val >= price * 0.9988:
+                        if entry_val >= price:
                             result["entry_price_area"] = "No Entry (Too Close to Market Price / No Pullback Room)"
                             result["is_valid"] = False
                             result["confidence"] = 0
-                            reason_eng = "The Buy Limit entry price is too close to the current market price. Adequate pullback room is required."
-                            reason_sin = "Buy Limit ඇතුල්වීමේ මිල වත්මන් වෙළඳපල මිලට වඩා ආසන්න වැඩි බැවින් (Too Close to Market Price) ඇතුල්වීම් අවහිර කර ඇත."
+                            reason_eng = "The Buy Limit entry price is at or above the current market price, which would trigger immediate execution. Wait for a pullback."
+                            reason_sin = "Buy Limit ඇතුල්වීමේ මිල වත්මන් වෙළඳපල මිලට වඩා සමාන හෝ වැඩි බැවින් ක්ෂණිකව ක්‍රියාත්මක වේ. එබැවින් ඇතුල්වීම් අවහිර කර ඇත."
                             result["reasoning"] = f"{reason_eng}\n\n---\n\n**සිංහල පරිවර්තනය (Sinhala Translation):**\n{reason_sin}"
                             result["invalidation"] = "N/A"
                             result["risk_notes"] = "N/A"
                     elif t1m_val == "BEARISH": # Sell Limit setup
-                        if entry_val <= price * 1.0012:
+                        if entry_val <= price:
                             result["entry_price_area"] = "No Entry (Too Close to Market Price / No Pullback Room)"
                             result["is_valid"] = False
                             result["confidence"] = 0
-                            reason_eng = "The Sell Limit entry price is too close to the current market price. Adequate pullback room is required."
-                            reason_sin = "Sell Limit ඇතුල්වීමේ මිල වත්මන් වෙළඳපල මිලට වඩා ආසන්න වැඩි බැවින් (Too Close to Market Price) ඇතුල්වීම් අවහිර කර ඇත."
+                            reason_eng = "The Sell Limit entry price is at or below the current market price, which would trigger immediate execution. Wait for a pullback."
+                            reason_sin = "Sell Limit ඇතුල්වීමේ මිල වත්මන් වෙළඳපල මිලට වඩා සමාන හෝ අඩු බැවින් ක්ෂණිකව ක්‍රියාත්මක වේ. එබැවින් ඇතුල්වීම් අවහිර කර ඇත."
                             result["reasoning"] = f"{reason_eng}\n\n---\n\n**සිංහල පරිවර්තනය (Sinhala Translation):**\n{reason_sin}"
                             result["invalidation"] = "N/A"
                             result["risk_notes"] = "N/A"
@@ -3223,15 +3223,20 @@ Live 200 Candles Data:
                         result["target_reward_ratio"] = "1:3.0 RR"
 
             # Enforce 10-15 Minutes High-Velocity Scalping SL Width Constraint (Rule 4)
-            # If the calculated Stop Loss is wider than 0.15% of the asset price, it is not a high-velocity scalp setup.
+            # If the calculated Stop Loss is wider than the allowed threshold, it is not a high-velocity scalp setup.
             # In this case, invalidate and lockout to protect from long holding periods or massive risk.
             if result.get("is_valid") is True and entry_price is not None and result.get("stop_loss_level") is not None:
                 risk_pct = abs(entry_price - result["stop_loss_level"]) / entry_price
-                if risk_pct > 0.0015:
+                
+                # Determine threshold dynamically based on asset class (Crypto vs traditional Forex/Gold)
+                is_crypto = any(x in payload.get("symbol", "").upper() for x in ["USDT", "BUSD", "BTC", "ETH", "SOL"])
+                max_risk_allowed = 0.012 if is_crypto else 0.002  # 1.2% for crypto, 0.2% for gold/forex
+                
+                if risk_pct > max_risk_allowed:
                     result["is_valid"] = False
                     result["entry_price_area"] = f"No Entry (SL Range Too Wide - {risk_pct*100:.2f}%)"
-                    reason_eng = f"The setup is invalidated because the Stop Loss range ({risk_pct*100:.2f}%) exceeds the maximum 0.15% threshold required for a high-velocity 10-15 minute scalp."
-                    reason_sin = f"Stop Loss පරාසය ({risk_pct*100:.2f}%) මිනිත්තු 10-15 ක scalp trade එකක් සඳහා අවශ්‍ය උපරිම 0.15% සීමාව ඉක්මවා යන බැවින් මෙම සෙටප් එක අවලංගු කර ඇත."
+                    reason_eng = f"The setup is invalidated because the Stop Loss range ({risk_pct*100:.2f}%) exceeds the maximum {max_risk_allowed*100:.2f}% threshold required for a high-velocity scalp."
+                    reason_sin = f"Stop Loss පරාසය ({risk_pct*100:.2f}%) scalp trade එකක් සඳහා අවශ්‍ය උපරිම {max_risk_allowed*100:.2f}% සීමාව ඉක්මවා යන බැවින් මෙම සෙටප් එක අවලංගු කර ඇත."
                     result["reasoning"] = f"{reason_eng}\n\n---\n\n**සිංහල පරිවර්තනය (Sinhala Translation):**\n{reason_sin}"
                     result["stop_loss_level"] = None
                     result["liquidity_target"] = None
