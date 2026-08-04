@@ -2933,7 +2933,10 @@ You are the AI Brain of Project Falcon, a Personal AI Trading Assistant acting a
 Your core task is to analyze the provided market data and strategy rules to determine if a valid SMC setup exists.
 
 You must strictly evaluate these 8 rules:
-1. Triple-Timeframe Trend Alignment: Buy setup is allowed ONLY when 1H, 15m, and 1m trends are all BULLISH. Sell setup is allowed ONLY when 1H, 15m, and 1m trends are all BEARISH. If they mismatch, set is_valid = false and return "No Entry (Trend Mismatch)" as the entry price.
+1. 1m Timeframe Structure Execution: Setups are analyzed and executed strictly based on the 1-minute (1m) timeframe structure.
+   - BUY Side: If the 1m trend is BULLISH -> Search for a "Buy Limit" entry at the 1m OB/FVG boundary.
+   - SELL Side: If the 1m trend is BEARISH -> Search for a "Sell Limit" entry at the 1m OB/FVG boundary.
+   - No macro trend alignment is required; do not lockout setups due to 1H/15M trend mismatches. Let the active 1m trend determine the bias.
 2. RSI Momentum Check: Buy setup is allowed only when RSI <= 65. Sell setup is allowed only when RSI >= 35. Otherwise, invalidate the setup.
 3. Swing Extreme Stop Loss: Place Stop Loss (SL) strictly outside the swing extreme boundaries with a 0.1% buffer:
    - Buy setup (Long): SL = swing_low * 0.999
@@ -2945,6 +2948,7 @@ You must strictly evaluate these 8 rules:
 7. Risk-to-Reward Ratio & Target Duration: Ensure the Risk-to-Reward (RR) ratio is between 1:2.0 and 1:4.0 (do not target distant high-timeframe ranges if they require more than 1:4.0 RR or take too long). All setups must target close take profits (TPs) designed to hit within 20-30 minutes maximum.
 8. Sinhala Translation: Provide English text followed by its Sinhala translation (සිංහල පරිවර්තනය) inside 'reasoning', 'invalidation', and 'risk_notes' fields.
 9. Equilibrium Matrix Bypassed: This calculation is strictly bypassed for SMC setups. Do NOT restrict, lock, or invalidate Buy/Long setups in the Premium zone, and do NOT restrict, lock, or invalidate Sell/Short setups in the Discount zone. The setup remains valid regardless of whether it is in premium or discount.
+10. Pre-Choch Market Structure Reversal Protocol (Rule 26): If the market is reversing (e.g. following a deep sweep of major previous highs/lows, double tops/bottoms, momentum exhaustion wicks, or volume node POC clusters) but a Choch/MSS has not officially formed yet, the setup is still valid. You must analyze the reversal confluences carefully and recommend the entry with extra caution warnings and appropriate stop-loss limits (placing the SL past the swing extreme and the exhaustion wick).
 
 You must return a JSON object with the following fields:
 - "is_valid": boolean
@@ -3034,25 +3038,32 @@ Live 50 Candles Data:
                 logger.error(f"Gemini SMC analysis failed: {e}. Falling back to mock analysis.")
                 result = cls._get_mock_smc_analysis(symbol, timeframe, price)
 
-        # Enforce overrides programmatically on the final result before returning! (Rule 16)
+        # Enforce overrides programmatically on the final result before returning! (Rule 16: 1m Trend Check)
         t1h = str(trend_1h).upper().strip()
         t15m = str(trend_15m).upper().strip()
-        t1m = str(trend_1m).upper().strip()
+        t1m_val = str(trend_1m).upper().strip()
         
-        if not (t1h == t15m == t1m == "BULLISH" or t1h == t15m == t1m == "BEARISH"):
-            result["entry_price_area"] = "No Entry (Trend Mismatch Lockout)"
+        result["daily_bias"] = t1m_val
+        entry_area = str(result.get("entry_price_area") or "")
+        
+        if t1m_val == "BULLISH" and "Sell" in entry_area:
+            result["entry_price_area"] = "No Entry (Trend Mismatch - Buy Only)"
             result["is_valid"] = False
             result["confidence"] = 0
-        else:
-            entry_area = str(result.get("entry_price_area") or "")
-            if t1h == "BULLISH" and "Sell" in entry_area:
-                result["entry_price_area"] = "No Entry (Trend Mismatch - Buy Only)"
-                result["is_valid"] = False
-                result["confidence"] = 0
-            elif t1h == "BEARISH" and "Buy" in entry_area:
-                result["entry_price_area"] = "No Entry (Trend Mismatch - Sell Only)"
-                result["is_valid"] = False
-                result["confidence"] = 0
+            reason_eng = "The 1-Minute trend is BULLISH, which only allows Buy setups. Sell setups are prohibited."
+            reason_sin = "1-Minute ප්‍රවණතාවය BULLISH වන බැවින්, ලබාගත හැක්කේ Buy setups පමණි. Sell setups ලබා ගැනීම තහනම් වේ."
+            result["reasoning"] = f"{reason_eng}\n\n---\n\n**සිංහල පරිවර්තනය (Sinhala Translation):**\n{reason_sin}"
+            result["invalidation"] = "N/A"
+            result["risk_notes"] = "N/A"
+        elif t1m_val == "BEARISH" and "Buy" in entry_area:
+            result["entry_price_area"] = "No Entry (Trend Mismatch - Sell Only)"
+            result["is_valid"] = False
+            result["confidence"] = 0
+            reason_eng = "The 1-Minute trend is BEARISH, which only allows Sell setups. Buy setups are prohibited."
+            reason_sin = "1-Minute ප්‍රවණතාවය BEARISH වන බැවින්, ලබාගත හැක්කේ Sell setups පමණි. Buy setups ලබා ගැනීම තහනම් වේ."
+            result["reasoning"] = f"{reason_eng}\n\n---\n\n**සිංහල පරිවර්තනය (Sinhala Translation):**\n{reason_sin}"
+            result["invalidation"] = "N/A"
+            result["risk_notes"] = "N/A"
         
         # Enforce Rule 12 Pullback Buffer (No immediate market executions, allow 5-6 mins window)
         if result.get("is_valid") is True:
@@ -3062,18 +3073,56 @@ Live 50 Candles Data:
             if match:
                 try:
                     entry_val = float(match.group(1))
-                    if t1h == "BULLISH":
+                    if t1m_val == "BULLISH": # Buy Limit setup
                         if entry_val >= price * 0.9988:
                             result["entry_price_area"] = "No Entry (Too Close to Market Price / No Pullback Room)"
                             result["is_valid"] = False
                             result["confidence"] = 0
-                    elif t1h == "BEARISH":
+                            reason_eng = "The Buy Limit entry price is too close to the current market price. Adequate pullback room is required."
+                            reason_sin = "Buy Limit ඇතුල්වීමේ මිල වත්මන් වෙළඳපල මිලට වඩා ආසන්න වැඩි බැවින් (Too Close to Market Price) ඇතුල්වීම් අවහිර කර ඇත."
+                            result["reasoning"] = f"{reason_eng}\n\n---\n\n**සිංහල පරිවර්තනය (Sinhala Translation):**\n{reason_sin}"
+                            result["invalidation"] = "N/A"
+                            result["risk_notes"] = "N/A"
+                    elif t1m_val == "BEARISH": # Sell Limit setup
                         if entry_val <= price * 1.0012:
                             result["entry_price_area"] = "No Entry (Too Close to Market Price / No Pullback Room)"
                             result["is_valid"] = False
                             result["confidence"] = 0
+                            reason_eng = "The Sell Limit entry price is too close to the current market price. Adequate pullback room is required."
+                            reason_sin = "Sell Limit ඇතුල්වීමේ මිල වත්මන් වෙළඳපල මිලට වඩා ආසන්න වැඩි බැවින් (Too Close to Market Price) ඇතුල්වීම් අවහිර කර ඇත."
+                            result["reasoning"] = f"{reason_eng}\n\n---\n\n**සිංහල පරිවර්තනය (Sinhala Translation):**\n{reason_sin}"
+                            result["invalidation"] = "N/A"
+                            result["risk_notes"] = "N/A"
                 except Exception:
                     pass
+
+        # Recalculate confidence score programmatically to show the true confirmation rate in the UI
+        calculated_conf = 0
+        if t1m_val in ["BULLISH", "BEARISH"]:
+            calculated_conf += 20
+        if result.get("double_mitigation_ok") is True:
+            calculated_conf += 10
+        if result.get("rejection_wick_ok") is True:
+            calculated_conf += 10
+        if result.get("sb_step_9_ltf_choch_ok") is True:
+            calculated_conf += 10
+        if result.get("sb_step_10_fvg_limit_ok") is True:
+            calculated_conf += 10
+        if result.get("rsi_ok") is True:
+            calculated_conf += 10
+        if result.get("m1_liquidity_sweep") is True:
+            calculated_conf += 10
+        if result.get("displacement_choch") is True:
+            calculated_conf += 10
+        if result.get("fvg_ob_confluence") is True:
+            calculated_conf += 10
+            
+        # Double check 80% minimum lockout rule safety
+        if result.get("is_valid") is True and calculated_conf < 80:
+            result["is_valid"] = False
+            result["entry_price_area"] = f"No Entry (Confidence < 80% - {calculated_conf}% Confirmed)"
+            
+        result["confidence"] = calculated_conf
 
         result["news_lockout_active"] = news_lockout_active
         result["active_news_event"] = active_news_event

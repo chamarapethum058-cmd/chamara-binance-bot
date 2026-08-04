@@ -225,7 +225,7 @@ async def run_smc_tracker_loop():
                     }
                     
                     try:
-                        result = await AIService.calculate_programmatic_smc(payload)
+                        result = await AIService.calculate_programmatic_smc(payload, local_only=True)
                         confidence = result.get("confidence", 0)
                         is_valid = result.get("is_valid", False)
                         entry_price = result.get("entry_price_area") or ""

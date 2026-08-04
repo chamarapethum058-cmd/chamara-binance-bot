@@ -288,8 +288,8 @@ async def get_gemini_status(db: Session = Depends(get_db)):
             "details": "Gemini API Key is missing. Enter it in Settings to enable AI features. | Gemini API Key එක ඇතුලත් කර නැත."
         }
     
-    # Only cache VALID status. If it was INVALID or ERROR, do NOT return cached status, allowing immediate retry when changing networks/IPs
-    if _gemini_status_cache.get("status") == "VALID" and (now - _gemini_status_cache.get("timestamp", 0.0)) < 120:
+    # If the key has already been verified and is VALID, bypass making a live connection request entirely!
+    if _gemini_status_cache.get("status") == "VALID" and _gemini_status_cache.get("api_key") == api_key:
         return dict(_gemini_status_cache)
         
     try:
@@ -303,7 +303,8 @@ async def get_gemini_status(db: Session = Depends(get_db)):
             "status": "VALID",
             "details": "Gemini API connection is active and valid. | Gemini සම්බන්ධතාවය සක්‍රිය සහ වලංගු වේ.",
             "timestamp": now,
-            "provider": "GEMINI"
+            "provider": "GEMINI",
+            "api_key": api_key
         }
     except Exception as e:
         err_str = str(e)
@@ -898,20 +899,18 @@ async def get_market_price(symbol: str):
     if not symbol_upper:
         raise HTTPException(status_code=400, detail="Symbol parameter is required")
         
+    import asyncio
     # 1. Try Yahoo Finance mapping
     yahoo_symbol = SYMBOL_MAP.get(symbol_upper)
     if yahoo_symbol:
         try:
             res_data = await fetch_yahoo_finance(yahoo_symbol)
-            trend_1h = AIService._detect_market_structure_bias(symbol_upper, "1h", fallback_bias="BULLISH")
-            trend_15m = AIService._detect_market_structure_bias(symbol_upper, "15m", fallback_bias="BULLISH")
-            trend_1m = AIService._detect_market_structure_bias(symbol_upper, "1m", fallback_bias="BULLISH")
-            if trend_1h == "BULLISH" and trend_15m == "BULLISH" and trend_1m == "BULLISH":
-                daily_bias = "BULLISH"
-            elif trend_1h == "BEARISH" and trend_15m == "BEARISH" and trend_1m == "BEARISH":
-                daily_bias = "BEARISH"
-            else:
-                daily_bias = "NEUTRAL"
+            trend_1h, trend_15m, trend_1m = await asyncio.gather(
+                asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "1h", "BULLISH"),
+                asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "15m", "BULLISH"),
+                asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "1m", "BULLISH")
+            )
+            daily_bias = trend_1m
             res_data["daily_bias"] = daily_bias
             res_data["trend_1m"] = trend_1m
             res_data["trend_15m"] = trend_15m
@@ -936,15 +935,12 @@ async def get_market_price(symbol: str):
                     prev_candle = data[0]
                     curr_candle = data[1]
                     fallback_bias = "BULLISH" if float(curr_candle[4]) >= float(prev_candle[1]) else "BEARISH"
-                    trend_1h = AIService._detect_market_structure_bias(symbol_upper, "1h", fallback_bias=fallback_bias)
-                    trend_15m = AIService._detect_market_structure_bias(symbol_upper, "15m", fallback_bias=fallback_bias)
-                    trend_1m = AIService._detect_market_structure_bias(symbol_upper, "1m", fallback_bias=fallback_bias)
-                    if trend_1h == "BULLISH" and trend_15m == "BULLISH" and trend_1m == "BULLISH":
-                        daily_bias = "BULLISH"
-                    elif trend_1h == "BEARISH" and trend_15m == "BEARISH" and trend_1m == "BEARISH":
-                        daily_bias = "BEARISH"
-                    else:
-                        daily_bias = "NEUTRAL"
+                    trend_1h, trend_15m, trend_1m = await asyncio.gather(
+                        asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "1h", fallback_bias),
+                        asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "15m", fallback_bias),
+                        asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "1m", fallback_bias)
+                    )
+                    daily_bias = trend_1m
                     return {
                         "symbol": original_symbol,
                         "pdh": float(prev_candle[2]),
@@ -963,15 +959,12 @@ async def get_market_price(symbol: str):
         # 3. Fallback: try Yahoo Finance as {symbol}-USD
         try:
             res_data = await fetch_yahoo_finance(f"{symbol_upper}-USD")
-            trend_1h = AIService._detect_market_structure_bias(symbol_upper, "1h", fallback_bias="BULLISH")
-            trend_15m = AIService._detect_market_structure_bias(symbol_upper, "15m", fallback_bias="BULLISH")
-            trend_1m = AIService._detect_market_structure_bias(symbol_upper, "1m", fallback_bias="BULLISH")
-            if trend_1h == "BULLISH" and trend_15m == "BULLISH" and trend_1m == "BULLISH":
-                daily_bias = "BULLISH"
-            elif trend_1h == "BEARISH" and trend_15m == "BEARISH" and trend_1m == "BEARISH":
-                daily_bias = "BEARISH"
-            else:
-                daily_bias = "NEUTRAL"
+            trend_1h, trend_15m, trend_1m = await asyncio.gather(
+                asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "1h", "BULLISH"),
+                asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "15m", "BULLISH"),
+                asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "1m", "BULLISH")
+            )
+            daily_bias = trend_1m
             res_data["daily_bias"] = daily_bias
             res_data["trend_1m"] = trend_1m
             res_data["trend_15m"] = trend_15m
@@ -981,12 +974,14 @@ async def get_market_price(symbol: str):
         except Exception:
             try:
                 res_data = await fetch_yahoo_finance(symbol_upper)
-                trend_1h = AIService._detect_market_structure_bias(symbol_upper, "1h", fallback_bias="BULLISH")
-                trend_15m = AIService._detect_market_structure_bias(symbol_upper, "15m", fallback_bias="BULLISH")
-                trend_1m = AIService._detect_market_structure_bias(symbol_upper, "1m", fallback_bias="BULLISH")
-                if trend_1h == "BULLISH" and trend_15m == "BULLISH" and trend_1m == "BULLISH":
+                trend_1h, trend_15m, trend_1m = await asyncio.gather(
+                    asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "1h", "BULLISH"),
+                    asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "15m", "BULLISH"),
+                    asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "1m", "BULLISH")
+                )
+                if trend_1h == "BULLISH" and trend_15m == "BULLISH":
                     daily_bias = "BULLISH"
-                elif trend_1h == "BEARISH" and trend_15m == "BEARISH" and trend_1m == "BEARISH":
+                elif trend_1h == "BEARISH" and trend_15m == "BEARISH":
                     daily_bias = "BEARISH"
                 else:
                     daily_bias = "NEUTRAL"
@@ -1032,9 +1027,11 @@ async def fetch_current_price_for_symbol(symbol: str) -> float:
             return 0.0
 
 @app.post("/api/trades/log", response_model=LoggedTradeResponse)
-def log_trade(trade: LoggedTradeCreate, db: Session = Depends(get_db)):
+async def log_trade(trade: LoggedTradeCreate, db: Session = Depends(get_db)):
     try:
-        AIService.validate_trade_stop_loss(
+        import asyncio
+        await asyncio.to_thread(
+            AIService.validate_trade_stop_loss,
             symbol=trade.symbol,
             timeframe=trade.timeframe or "1m",
             direction=trade.direction,
@@ -1075,7 +1072,13 @@ async def get_trade_history(strategy_type: Optional[str] = None, db: Session = D
                         # For 1m scalp entries, check 15m trend for counter-bias to allow normal 1m pullbacks.
                         # For 15m entries, check 1H trend.
                         tf = "15m" if (trade.timeframe or "1m") == "1m" else "1h"
-                        current_bias = AIService._detect_market_structure_bias(trade.symbol, tf, fallback_bias=trade.direction)
+                        import asyncio
+                        current_bias = await asyncio.to_thread(
+                            AIService._detect_market_structure_bias,
+                            trade.symbol,
+                            tf,
+                            trade.direction
+                        )
                         is_counter = (trade.direction == "BULLISH" and current_bias == "BEARISH") or \
                                      (trade.direction == "BEARISH" and current_bias == "BULLISH")
                         
@@ -1106,7 +1109,13 @@ async def get_trade_history(strategy_type: Optional[str] = None, db: Session = D
                 
                 # Fetch recent 100 1-minute candles from Binance
                 from app.market import get_candles
-                candles = get_candles(binance_symbol, "1m", limit=100)
+                import asyncio
+                candles = await asyncio.to_thread(
+                    get_candles,
+                    binance_symbol,
+                    "1m",
+                    100
+                )
                 
                 ts = trade.timestamp
                 if isinstance(ts, str):

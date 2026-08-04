@@ -864,17 +864,15 @@ export default function Dashboard() {
       fetchedPdh = data.pdh || fetchedPdh;
       fetchedPdl = data.pdl || fetchedPdl;
       fetchedOpen = data.open || fetchedOpen;
-      setSmcCurrentPrice(fetchedPrice);
-      setSmcPdh(fetchedPdh);
-      setSmcPdl(fetchedPdl);
-      setSmcOpen(fetchedOpen);
+
+      let tempDailyBias = activeHtfTrend;
       if (data.daily_bias) {
-        setSmcHtfTrend(data.daily_bias);
+        tempDailyBias = data.daily_bias;
         activeHtfTrend = data.daily_bias;
       }
-      if (data.trend_1m) setSmcTrend1m(data.trend_1m);
-      if (data.trend_15m) setSmcTrend15m(data.trend_15m);
-      if (data.trend_1h) setSmcTrend1h(data.trend_1h);
+      const tempTrend1m = data.trend_1m || "";
+      const tempTrend15m = data.trend_15m || "";
+      const tempTrend1h = data.trend_1h || "";
 
       // Fetch SMC analysis from the backend API endpoint
       const payload = {
@@ -906,6 +904,17 @@ export default function Dashboard() {
       if (resSMC.ok) {
         const smcData = await resSMC.json();
         if (activeSmcSearchSymbolRef.current !== searchSymbol) return;
+        
+        // Set all UI states at once so timeframe trend indicators and entry details appear together
+        setSmcCurrentPrice(fetchedPrice);
+        setSmcPdh(fetchedPdh);
+        setSmcPdl(fetchedPdl);
+        setSmcOpen(fetchedOpen);
+        setSmcHtfTrend(tempDailyBias);
+        setSmcTrend1m(tempTrend1m);
+        setSmcTrend15m(tempTrend15m);
+        setSmcTrend1h(tempTrend1h);
+        
         setSmcResult(smcData);
 
         // Add to monitoredCoins watchlist ONLY if explicitly requested
@@ -974,6 +983,17 @@ export default function Dashboard() {
     setSmcResult(null);
     setSmcHtfTrend("NEUTRAL");
     setSmcLoading(false);
+    
+    // Clear all manual confluences checkboxes immediately on reset
+    setSmcLiquidityPoolsSwept(false);
+    setSmcInducementSwept(false);
+    setSmcSwingValidated(false);
+    setSmcLtfChoch(false);
+    setSmcBosConfirmed(false);
+    setSmcM1LiquiditySweep(false);
+    setSmcDisplacementChoch(false);
+    setSmcFvgObConfluence(false);
+    setSmcPo3Phase("ACCUMULATION");
   };
 
   // Trigger SMC analysis/fetch automatically on timeframe changes
@@ -4313,6 +4333,11 @@ export default function Dashboard() {
                             setSmcTrend15m("");
                             setSmcTrend1h("");
                           }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              handleRunSmcAnalysis(false);
+                            }
+                          }}
                           className="bg-[#141626] border border-[#1E2235] rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono w-full"
                           placeholder="e.g. BTCUSDT, ETHUSDT"
                         />
@@ -4321,7 +4346,7 @@ export default function Dashboard() {
                           onClick={() => handleRunSmcAnalysis(false)}
                           className="bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/40 text-xs font-bold px-3 py-2 rounded-xl transition-all font-mono whitespace-nowrap cursor-pointer"
                         >
-                          Fetch Price
+                          Search
                         </button>
                         <button
                           type="button"
@@ -4659,50 +4684,50 @@ export default function Dashboard() {
                             </div>
                             <div className="flex items-center justify-between p-2 rounded bg-black/20 border border-[#1E2235]/40">
                               <span className="text-gray-400">2. POI Double Mitigation</span>
-                              <span className={smcLiquidityPoolsSwept ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
-                                {smcLiquidityPoolsSwept ? "+10% (Met)" : "0% (Failed)"}
+                              <span className={smcResult.double_mitigation_ok ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
+                                {smcResult.double_mitigation_ok ? "+10% (Met)" : "0% (Failed)"}
                               </span>
                             </div>
                             <div className="flex items-center justify-between p-2 rounded bg-black/20 border border-[#1E2235]/40">
                               <span className="text-gray-400">3. 1m Rejection Wick</span>
-                              <span className={smcInducementSwept ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
-                                {smcInducementSwept ? "+10% (Met)" : "0% (Failed)"}
+                              <span className={smcResult.rejection_wick_ok ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
+                                {smcResult.rejection_wick_ok ? "+10% (Met)" : "0% (Failed)"}
                               </span>
                             </div>
                             <div className="flex items-center justify-between p-2 rounded bg-black/20 border border-[#1E2235]/40">
                               <span className="text-gray-400">4. LTF Shift/MSS Choch</span>
-                              <span className={smcSwingValidated ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
-                                {smcSwingValidated ? "+10% (Met)" : "0% (Failed)"}
+                              <span className={smcResult.sb_step_9_ltf_choch_ok ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
+                                {smcResult.sb_step_9_ltf_choch_ok ? "+10% (Met)" : "0% (Failed)"}
                               </span>
                             </div>
                             <div className="flex items-center justify-between p-2 rounded bg-black/20 border border-[#1E2235]/40">
                               <span className="text-gray-400">5. Limit Entry / Pullback</span>
-                              <span className={smcLtfChoch ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
-                                {smcLtfChoch ? "+10% (Met)" : "0% (Failed)"}
+                              <span className={smcResult.sb_step_10_fvg_limit_ok ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
+                                {smcResult.sb_step_10_fvg_limit_ok ? "+10% (Met)" : "0% (Failed)"}
                               </span>
                             </div>
                             <div className="flex items-center justify-between p-2 rounded bg-black/20 border border-[#1E2235]/40">
                               <span className="text-gray-400">6. RSI Momentum Confirmation</span>
-                              <span className={smcBosConfirmed ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
-                                {smcBosConfirmed ? "+10% (Met)" : "0% (Failed)"}
+                              <span className={smcResult.rsi_ok ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
+                                {smcResult.rsi_ok ? "+10% (Met)" : "0% (Failed)"}
                               </span>
                             </div>
                             <div className="flex items-center justify-between p-2 rounded bg-black/20 border border-[#1E2235]/40">
                               <span className="text-gray-400">7. M1 Liquidity Sweep</span>
-                              <span className={smcResult.m1_liquidity_sweep !== false && smcM1LiquiditySweep ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
-                                {smcResult.m1_liquidity_sweep !== false && smcM1LiquiditySweep ? "+10% (Met)" : "0% (Failed)"}
+                              <span className={smcResult.m1_liquidity_sweep ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
+                                {smcResult.m1_liquidity_sweep ? "+10% (Met)" : "0% (Failed)"}
                               </span>
                             </div>
                             <div className="flex items-center justify-between p-2 rounded bg-black/20 border border-[#1E2235]/40">
                               <span className="text-gray-400">8. Displacement CHoCH</span>
-                              <span className={smcResult.displacement_choch !== false && smcDisplacementChoch ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
-                                {smcResult.displacement_choch !== false && smcDisplacementChoch ? "+10% (Met)" : "0% (Failed)"}
+                              <span className={smcResult.displacement_choch ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
+                                {smcResult.displacement_choch ? "+10% (Met)" : "0% (Failed)"}
                               </span>
                             </div>
                             <div className="flex items-center justify-between p-2 rounded bg-black/20 border border-[#1E2235]/40">
                               <span className="text-gray-400">9. 1M FVG + OB Confluence</span>
-                              <span className={smcResult.fvg_ob_confluence !== false && smcFvgObConfluence ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
-                                {smcResult.fvg_ob_confluence !== false && smcFvgObConfluence ? "+10% (Met)" : "0% (Failed)"}
+                              <span className={smcResult.fvg_ob_confluence ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
+                                {smcResult.fvg_ob_confluence ? "+10% (Met)" : "0% (Failed)"}
                               </span>
                             </div>
                             <div className="flex items-center justify-between p-2 rounded bg-black/20 border border-[#1E2235]/40 col-span-1 md:col-span-2">
@@ -4718,9 +4743,31 @@ export default function Dashboard() {
                             <div className="bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl p-3.5 text-xs font-mono flex items-center gap-2">
                               <span>⚠️</span>
                               <span>
-                                <strong>SMC Setup Locked:</strong> Confirmation rate is {smcResult.confidence}% (less than the mandatory 80% threshold). Entry parameters are suppressed from active logging.
-                                <br />
-                                <span className="text-[10px] text-rose-300/80">සිංහල පරිවර්තනය: උපාය මාර්ගික අනුකූලතාවය {smcResult.confidence}% ක් වන බැවින් (අවම 80% ට වඩා අඩු) ඇතුල්වීම් අවහිර කර ඇත.</span>
+                                {smcResult.entry_price_area?.includes("Macro Trend Mismatch") ? (
+                                  <>
+                                    <strong>SMC Setup Locked:</strong> Macro Trend Mismatch. 1-Hour and 15-Minute trends must align in opposite directions (e.g. 1H BULLISH and 15M BEARISH for Sells) for pullback/reversal setups.
+                                    <br />
+                                    <span className="text-[10px] text-rose-300/80">සිංහල පරිවර්තනය: මැක්‍රෝ ප්‍රවණතා නොගැලපීම (Macro Trend Mismatch) හේතුවෙන් ඇතුල්වීම් අවහිර කර ඇත. 1H සහ 15M ප්‍රවණතා ප්‍රතිවිරුද්ධ දිශාවන්ට තිබිය යුතුය.</span>
+                                  </>
+                                ) : smcResult.entry_price_area?.includes("News Lockout") ? (
+                                  <>
+                                    <strong>SMC Setup Locked:</strong> High-Impact USD News Lockout. Entries blocked within +/- 60 minutes of high-impact events.
+                                    <br />
+                                    <span className="text-[10px] text-rose-300/80">සිංහල පරිවර්තනය: ඉහළ බලපෑමක් සහිත ඇමරිකානු ඩොලර් (USD) පුවත්පත් නිවේදන (High-Impact News) හේතුවෙන් ඇතුල්වීම් අවහිර කර ඇත.</span>
+                                  </>
+                                ) : smcResult.entry_price_area?.includes("Too Close") ? (
+                                  <>
+                                    <strong>SMC Setup Locked:</strong> Price is too close to the current market price. Pullback mitigation room is required.
+                                    <br />
+                                    <span className="text-[10px] text-rose-300/80">සිංහල පරිවර්තනය: ඇතුල්වීමේ මිල වත්මන් වෙළඳපල මිලට වඩා ආසන්න වැඩි බැවින් (Too Close to Market Price) ඇතුල්වීම් අවහිර කර ඇත.</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <strong>SMC Setup Locked:</strong> Confirmation rate is {smcResult.confidence}% (less than the mandatory 80% threshold). Entry parameters are suppressed from active logging.
+                                    <br />
+                                    <span className="text-[10px] text-rose-300/80">සිංහල පරිවර්තනය: උපාය මාර්ගික අනුකූලතාවය {smcResult.confidence}% ක් වන බැවින් (අවම 80% ට වඩා අඩු) ඇතුල්වීම් අවහිර කර ඇත.</span>
+                                  </>
+                                )}
                               </span>
                             </div>
 
