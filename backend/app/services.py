@@ -2961,6 +2961,15 @@ You must strictly evaluate these 12 rules:
     - Stop Loss must be placed past the swing extreme low/high sweep point.
 12. Gemini API Billing & Request Protection Protocol (Rule 29): The Gemini AI API must ONLY be called during manual, on-demand UI "Scan Market" or "Run Analysis" / "Search" operations. Background monitoring, watchlist loops, and status polling are strictly blocked from calling the Gemini API and must operate 100% locally.
 
+SMC Candle Analysis & Structure Mapping Protocol:
+To ensure no market structure elements are missed, you must systematically scan all 200 candles in the dataset from oldest to newest:
+1. Swing Extreme Identification: Find and list recent Swing Highs (high higher than previous and next candle highs) and Swing Lows (low lower than previous and next candle lows).
+2. Liquidity Sweep Detection ($): Locate when a recent swing high has its high breached by a wick but the price closes below it (BSL Sweep) or when a recent swing low has its low breached by a wick but the price closes above it (SSL Sweep).
+3. Market Structure Shift (MSS / CHoCH): Confirm if the price closes above the last Swing High (Bullish CHoCH) or below the last Swing Low (Bearish CHoCH) with a strong displacement candle body. Note the exact candle close index.
+4. Inducement (IDM) Sweep: Identify the first pullback swing low (for Bullish trend) or swing high (for Bearish trend) within the displacement leg. If this inducement level is swept/taken before tapping the key zone, confirm it in the reasoning.
+5. FVG and Order Block Mapping: Locate the exact unmitigated Fair Value Gaps (3-candle imbalance) and Order Blocks (last opposite candle before the displacement leg). Map their exact boundaries (high and low levels).
+6. Setups that do not have a clear sweep of liquidity, a confirmed CHoCH/MSS, or a valid pullback to FVG/OB must be marked as invalid (is_valid = false).
+
 You must return a JSON object with the following fields:
 - "is_valid": boolean
 - "daily_bias": "BULLISH", "BEARISH", or "NEUTRAL"
@@ -3026,7 +3035,7 @@ Market Context:
 - Dealing Range High: {range_high}
 - Dealing Range Low: {range_low}
 
-Live 50 Candles Data:
+Live 200 Candles Data:
 {json.dumps(serializable_candles, indent=2)}
 """
         active_key = db_key or settings.GEMINI_API_KEY
