@@ -3157,10 +3157,11 @@ Live 200 Candles Data:
                 
                 if "BULLISH" in bias or "Buy" in epa:
                     # Buy Limit setup
-                    safe_sl = round(range_low * 0.999, 4)
+                    local_low = min(c["low"] for c in candles[-30:]) if len(candles) >= 30 else range_low
+                    safe_sl = round(local_low * 0.999, 4)
                     if current_sl is None or current_sl > safe_sl:
                         result["stop_loss_level"] = safe_sl
-                        logger.info(f"Programmatic SL Overridden: Adjusted Buy SL from {current_sl} to safe level {safe_sl} (below range low {range_low})")
+                        logger.info(f"Programmatic SL Overridden: Adjusted Buy SL from {current_sl} to safe level {safe_sl} (below local low {local_low})")
                     
                     # Update TP levels to maintain risk-reward structure (Rule 21)
                     risk = entry_price - result["stop_loss_level"]
@@ -3176,10 +3177,11 @@ Live 200 Candles Data:
                         
                 elif "BEARISH" in bias or "Sell" in epa:
                     # Sell Limit setup
-                    safe_sl = round(range_high * 1.001, 4)
+                    local_high = max(c["high"] for c in candles[-30:]) if len(candles) >= 30 else range_high
+                    safe_sl = round(local_high * 1.001, 4)
                     if current_sl is None or current_sl < safe_sl:
                         result["stop_loss_level"] = safe_sl
-                        logger.info(f"Programmatic SL Overridden: Adjusted Sell SL from {current_sl} to safe level {safe_sl} (above range high {range_high})")
+                        logger.info(f"Programmatic SL Overridden: Adjusted Sell SL from {current_sl} to safe level {safe_sl} (above local high {local_high})")
                         
                     # Update TP levels to maintain risk-reward structure (Rule 21)
                     risk = result["stop_loss_level"] - entry_price
