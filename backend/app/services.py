@@ -100,7 +100,7 @@ class AIService:
         elif sym in ["BTC", "ETH", "SOL"]:
             sym = f"{sym}USDT"
             
-        candles = get_candles(sym, timeframe or "1m", limit=50)
+        candles = get_candles(sym, timeframe or "1m", limit=30)
         if candles:
             swing_low = min(c["low"] for c in candles)
             swing_high = max(c["high"] for c in candles)
