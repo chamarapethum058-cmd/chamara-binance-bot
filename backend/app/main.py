@@ -296,7 +296,7 @@ async def get_gemini_status(db: Session = Depends(get_db)):
         from google import genai
         client = genai.Client(api_key=api_key)
         client.models.generate_content(
-            model="gemini-3.5-flash",
+            model="gemini-flash-lite-latest",
             contents="hi"
         )
         _gemini_status_cache = {
