@@ -3159,9 +3159,8 @@ Live 200 Candles Data:
                     # Buy Limit setup
                     local_low = min(c["low"] for c in candles[-12:]) if len(candles) >= 12 else range_low
                     safe_sl = round(local_low * 0.999, 4)
-                    if current_sl is None or current_sl > safe_sl:
-                        result["stop_loss_level"] = safe_sl
-                        logger.info(f"Programmatic SL Overridden: Adjusted Buy SL from {current_sl} to safe level {safe_sl} (below local low {local_low})")
+                    result["stop_loss_level"] = safe_sl
+                    logger.info(f"Programmatic SL Override: Set Buy SL to tight local level {safe_sl} (below local low {local_low})")
                     
                     # Update TP levels to maintain risk-reward structure (Rule 21)
                     risk = entry_price - result["stop_loss_level"]
@@ -3174,14 +3173,16 @@ Live 200 Candles Data:
                         result["tp2_rr"] = "1:3.0 RR"
                         result["tp3_rr"] = "1:4.0 RR"
                         result["target_reward_ratio"] = "1:3.0 RR"
+                    else:
+                        result["is_valid"] = False
+                        result["entry_price_area"] = "No Entry (Invalid SL Configuration)"
                         
                 elif "BEARISH" in bias or "Sell" in epa:
                     # Sell Limit setup
                     local_high = max(c["high"] for c in candles[-12:]) if len(candles) >= 12 else range_high
                     safe_sl = round(local_high * 1.001, 4)
-                    if current_sl is None or current_sl < safe_sl:
-                        result["stop_loss_level"] = safe_sl
-                        logger.info(f"Programmatic SL Overridden: Adjusted Sell SL from {current_sl} to safe level {safe_sl} (above local high {local_high})")
+                    result["stop_loss_level"] = safe_sl
+                    logger.info(f"Programmatic SL Override: Set Sell SL to tight local level {safe_sl} (above local high {local_high})")
                         
                     # Update TP levels to maintain risk-reward structure (Rule 21)
                     risk = result["stop_loss_level"] - entry_price
@@ -3194,6 +3195,9 @@ Live 200 Candles Data:
                         result["tp2_rr"] = "1:3.0 RR"
                         result["tp3_rr"] = "1:4.0 RR"
                         result["target_reward_ratio"] = "1:3.0 RR"
+                    else:
+                        result["is_valid"] = False
+                        result["entry_price_area"] = "No Entry (Invalid SL Configuration)"
 
             # Enforce 10-15 Minutes High-Velocity Scalping SL Width Constraint (Rule 4)
             # If the calculated Stop Loss is wider than the allowed threshold, it is not a high-velocity scalp setup.
