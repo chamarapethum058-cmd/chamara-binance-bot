@@ -198,13 +198,16 @@ The bot must strictly enforce the following high-impact news rules:
 >    - **Sell setup (Short):** Place the Stop Loss at `max(swing_high, ob_high, fvg_high) * 1.001` (0.1% buffer above the highest boundary of the Swing High, OB, or FVG).
 > 3. **Sinhala Translation (සිංහල පරිවර්තනය):** Stop Loss (SL) එක සැමවිටම Swing Extreme හෝ අදාළ OB/FVG සීමාවෙන් ඔබ්බට (outer boundary) තැබිය යුතුය. මිලදී ගැනීමේදී (Buy) OB/FVG අවම සීමාවට 0.1% ක් පහළින්ද (`min * 0.999`), විකිණීමේදී (Sell) OB/FVG උපරිම සීමාවට 0.1% ක් ඉහළින්ද (`max * 1.001`) SL එක තැබීමෙන්, වෙළඳපොල wick sweep එකකින් SL එක වැදීම (stop-hunt) වළක්වයි.
 
-## 26. Pre-Choch Market Structure Reversal Protocol (New Rule)
+## 26. Reversal Execution & Mandatory CHoCH Protocol (New Rule)
 > [!IMPORTANT]
-> **PRE-CHOCH REVERSAL & EXHAUSTION RULES:**
-> 1. **Bypassing Mandatory Choch:** A Market Structure Shift (MSS) or Choch is NOT strictly required to execute a reversal trade if other high-probability exhaustion confluences exist.
-> 2. **Alternative Reversal Confluences:** If the market shows signs of reversing (such as a deep sweep of major previous highs/lows, double tops/bottoms, momentum exhaustion wicks, or volume node POC clusters) before a Choch forms, the system must analyze these elements.
-> 3. **Cautionary Recommendation:** Recommend the entry with prominent caution flags, risk warnings, and appropriate stop-loss limits (placing the SL past the swing extreme and the exhaustion wick).
-> 4. **Sinhala Translation (සිංහල පරිවර්තනය):** වෙළඳපොල ආපසු හැරීමක් (Reversal) සිදු වීමට Choch එකක්ම පැවතීම අනිවාර්ය නොවේ. පෙර පැවති ප්‍රධාන High/Low Sweep වීම, double top/bottom පිහිටීම හෝ momentum exhaustion wicks වැනි සලකුණු ඇත්නම්, අවදානම් අවවාද (Risk warnings) සහිතව එන්ට්‍රියක් නිර්දේශ කරනු ලැබේ.
+> **REVERSAL EXECUTION & MANDATORY CHOCH RULES:**
+> 1. **CHoCH/MSS is Strictly Mandatory:** A Market Structure Shift (MSS) or Change of Character (CHoCH) is strictly MANDATORY to execute any reversal trade setup. Under no circumstances should a reversal entry be advised without a confirmed CHoCH/MSS (a clear breakout close of the recent swing high/low with a strong displacement candle body). If no validated CHoCH/MSS has occurred, the setup is considered invalid and must be locked out.
+> 2. **Reversal Layouts Mapping:**
+>    - **For Bearish Reversal (Sell Limit Setup):** Upward manipulation sweeps BSL/Highs ($) -> Bearish CHoCH/MSS (Swing Low breakout close to the downside) -> Pullback to supply OB/FVG -> Sell Limit order.
+>    - **For Bullish Reversal (Buy Limit Setup):** Downward manipulation sweeps SSL/Lows ($) -> Bullish CHoCH/MSS (Swing High breakout close to the upside) -> Pullback to demand OB/FVG -> Buy Limit order.
+> 3. **Sinhala Translation (සිංහල පරිවර්තනය):** වෙළඳපල ප්‍රවණතාවය ආපසු හැරීමේදී (Reversal) CHoCH හෝ MSS එකක් නිල වශයෙන් සනාථ වීම (displaced candle close එකක් මඟින්) අනිවාර්ය වේ. CHoCH/MSS එකක් නොමැතිව කිසිදු අයුරකින් ඇතුල්වීමක් (Entry) නිර්දේශ නොකළ යුතුය:
+>    - Bearish Reversal (Sell Limit): උඩින් ඇති Highs ($) sweep වී, Bearish CHoCH/MSS එකක් (Swing Low breakout) ඇතිවීමෙන් පසු Pullback එකකදී Sell Limit එන්ට්‍රිය ලබාදෙයි.
+>    - Bullish Reversal (Buy Limit): පහළින් ඇති Lows ($) sweep වී, Bullish CHoCH/MSS එකක් (Swing High breakout) ඇතිවීමෙන් පසු Pullback එකකදී Buy Limit එන්ට්‍රිය ලබාදෙයි.
 
 ## 27. SMC MentorFX Multi-PDF Structural Layout Integration Protocol (New Rule)
 > [!IMPORTANT]
