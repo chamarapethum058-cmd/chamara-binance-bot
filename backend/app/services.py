@@ -3200,8 +3200,8 @@ Live 200 Candles Data:
                 risk_pct = abs(entry_price - result["stop_loss_level"]) / entry_price
                 
                 # Determine threshold dynamically based on asset class (Crypto vs traditional Forex/Gold)
-                is_crypto = any(x in payload.get("symbol", "").upper() for x in ["USDT", "BUSD", "BTC", "ETH", "SOL"])
-                max_risk_allowed = 0.0025 if is_crypto else 0.0015  # 0.25% for crypto, 0.15% for gold/forex
+                is_crypto = any(x in payload.get("symbol", "").upper() for x in ["USDT", "BUSD", "BTC", "ETH", "SOL", "DOGE"])
+                max_risk_allowed = 0.0085 if is_crypto else 0.0015  # 0.85% for crypto, 0.15% for gold/forex
                 
                 if risk_pct > max_risk_allowed:
                     result["is_valid"] = False
