@@ -100,7 +100,7 @@ class AIService:
         elif sym in ["BTC", "ETH", "SOL"]:
             sym = f"{sym}USDT"
             
-        candles = get_candles(sym, timeframe or "1m", limit=30)
+        candles = get_candles(sym, timeframe or "1m", limit=50)
         if candles:
             swing_low = min(c["low"] for c in candles)
             swing_high = max(c["high"] for c in candles)
@@ -3158,7 +3158,7 @@ Live 200 Candles Data:
                 
                 if "BULLISH" in bias or "Buy" in epa:
                     # Buy Limit setup
-                    local_low = min(c["low"] for c in candles[-30:]) if len(candles) >= 30 else range_low
+                    local_low = min(c["low"] for c in candles[-50:]) if len(candles) >= 50 else range_low
                     safe_sl = round(local_low * 0.999, 4)
                     result["stop_loss_level"] = safe_sl
                     logger.info(f"Programmatic SL Override: Set Buy SL to tight local level {safe_sl} (below local low {local_low})")
@@ -3180,7 +3180,7 @@ Live 200 Candles Data:
                         
                 elif "BEARISH" in bias or "Sell" in epa:
                     # Sell Limit setup
-                    local_high = max(c["high"] for c in candles[-30:]) if len(candles) >= 30 else range_high
+                    local_high = max(c["high"] for c in candles[-50:]) if len(candles) >= 50 else range_high
                     safe_sl = round(local_high * 1.001, 4)
                     result["stop_loss_level"] = safe_sl
                     logger.info(f"Programmatic SL Override: Set Sell SL to tight local level {safe_sl} (above local high {local_high})")
