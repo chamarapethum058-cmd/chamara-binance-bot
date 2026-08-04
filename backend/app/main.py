@@ -619,12 +619,26 @@ async def silverbullet_analyze(req: SilverBulletRequest, db: Session = Depends(g
         sb_step_10_fvg_limit_ok=result.get("sb_step_10_fvg_limit_ok"),
         sb_step_10_details=result.get("sb_step_10_details"),
         
-        confidence=result.get("confidence"),
-        
-        # Economic news fields
+        confidence=result.get("confidence", 0),
         news_lockout_active=result.get("news_lockout_active", False),
         active_news_event=result.get("active_news_event"),
-        upcoming_news_events=result.get("upcoming_news_events")
+        upcoming_news_events=result.get("upcoming_news_events"),
+        original_extreme_entry=result.get("original_extreme_entry"),
+        fvg_boundary_entry=result.get("fvg_boundary_entry"),
+        po3_phase=result.get("po3_phase"),
+        m1_liquidity_sweep=result.get("m1_liquidity_sweep"),
+        displacement_choch=result.get("displacement_choch"),
+        fvg_ob_confluence=result.get("fvg_ob_confluence"),
+        fib_retracement=result.get("fib_retracement"),
+        fib_zone_ok=result.get("fib_zone_ok"),
+        double_mitigation_ok=result.get("double_mitigation_ok"),
+        rejection_wick_ok=result.get("rejection_wick_ok"),
+        rsi_ok=result.get("rsi_ok"),
+        frvp_ok=result.get("frvp_ok"),
+        tp1_target=result.get("tp1_target"),
+        tp2_target=result.get("tp2_target"),
+        tp1_rr=result.get("tp1_rr"),
+        tp2_rr=result.get("tp2_rr")
     )
 
 
@@ -708,6 +722,10 @@ async def smc_analyze(req: SilverBulletRequest, db: Session = Depends(get_db)):
         fvg_ob_confluence=result.get("fvg_ob_confluence"),
         fib_retracement=result.get("fib_retracement"),
         fib_zone_ok=result.get("fib_zone_ok"),
+        double_mitigation_ok=result.get("double_mitigation_ok"),
+        rejection_wick_ok=result.get("rejection_wick_ok"),
+        rsi_ok=result.get("rsi_ok"),
+        frvp_ok=result.get("frvp_ok"),
         tp1_target=result.get("tp1_target"),
         tp2_target=result.get("tp2_target"),
         tp1_rr=result.get("tp1_rr"),
@@ -791,6 +809,15 @@ async def tcs_analyze(req: SilverBulletRequest, db: Session = Depends(get_db)):
         original_extreme_entry=result.get("original_extreme_entry"),
         fvg_boundary_entry=result.get("fvg_boundary_entry"),
         po3_phase=result.get("po3_phase"),
+        m1_liquidity_sweep=result.get("m1_liquidity_sweep"),
+        displacement_choch=result.get("displacement_choch"),
+        fvg_ob_confluence=result.get("fvg_ob_confluence"),
+        fib_retracement=result.get("fib_retracement"),
+        fib_zone_ok=result.get("fib_zone_ok"),
+        double_mitigation_ok=result.get("double_mitigation_ok"),
+        rejection_wick_ok=result.get("rejection_wick_ok"),
+        rsi_ok=result.get("rsi_ok"),
+        frvp_ok=result.get("frvp_ok"),
         tp1_target=result.get("tp1_target"),
         tp2_target=result.get("tp2_target"),
         tp1_rr=result.get("tp1_rr"),
