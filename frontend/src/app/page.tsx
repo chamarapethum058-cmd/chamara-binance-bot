@@ -4745,11 +4745,11 @@ export default function Dashboard() {
                             <div className="bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl p-3.5 text-xs font-mono flex items-center gap-2">
                               <span>⚠️</span>
                               <span>
-                                {smcResult.entry_price_area?.includes("Macro Trend Mismatch") ? (
+                                {smcResult.entry_price_area?.includes("Trend Mismatch") ? (
                                   <>
-                                    <strong>SMC Setup Locked:</strong> Macro Trend Mismatch. 1-Hour and 15-Minute trends must align in opposite directions (e.g. 1H BULLISH and 15M BEARISH for Sells) for pullback/reversal setups.
+                                    <strong>SMC Setup Locked:</strong> Trend Mismatch. 1-Hour, 15-Minute, and 1-Minute trends must align properly (e.g. 1M trend determines the execution direction).
                                     <br />
-                                    <span className="text-[10px] text-rose-300/80">සිංහල පරිවර්තනය: මැක්‍රෝ ප්‍රවණතා නොගැලපීම (Macro Trend Mismatch) හේතුවෙන් ඇතුල්වීම් අවහිර කර ඇත. 1H සහ 15M ප්‍රවණතා ප්‍රතිවිරුද්ධ දිශාවන්ට තිබිය යුතුය.</span>
+                                    <span className="text-[10px] text-rose-300/80">සිංහල පරිවර්තනය: ප්‍රවණතා නොගැලපීම (Trend Mismatch) හේතුවෙන් ඇතුල්වීම් අවහිර කර ඇත.</span>
                                   </>
                                 ) : smcResult.entry_price_area?.includes("News Lockout") ? (
                                   <>

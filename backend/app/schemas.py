@@ -185,6 +185,8 @@ class SilverBulletResponse(BaseModel):
     fvg_boundary_entry: Optional[float] = None
     rsi_value: Optional[float] = None
     rsi_ok: Optional[bool] = None
+    double_mitigation_ok: Optional[bool] = None
+    rejection_wick_ok: Optional[bool] = None
     frvp_ok: Optional[bool] = None
     
     # 9-confluence strategy parameters

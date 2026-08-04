@@ -3135,7 +3135,7 @@ Live 200 Candles Data:
             result["is_valid"] = False
             result["entry_price_area"] = f"No Entry (Confidence < 80% - {calculated_conf}% Confirmed)"
             
-        result["confidence"] = calculated_conf
+        result["confidence"] = calculated_conf if result.get("is_valid") is True else 0
 
         # Programmatic Stop-Loss & Take-Profit Safety Protocol (Rule 19 & Rule 25)
         # Guarantees that the Stop Loss is ALWAYS placed outside the absolute Swing Extreme range.
