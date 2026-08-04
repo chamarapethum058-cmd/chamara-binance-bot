@@ -1537,29 +1537,29 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
             elif sym in ["BTC", "ETH", "SOL"]:
                 sym = f"{sym}USDT"
 
-            candles = get_candles(sym, timeframe, limit=50)
-            if not candles or len(candles) < 20:
+            # Dynamically analyze broad visible range of the last 200 candles (Rule 13)
+            candles = get_candles(sym, timeframe, limit=200)
+            if not candles or len(candles) < 50:
                 return fallback_bias
 
-            # Calculate SMA of closes
             closes = [c["close"] for c in candles]
-            sma_20 = sum(closes[-20:]) / 20.0
+            sma_50 = sum(closes[-50:]) / 50.0
             last_close = closes[-1]
 
-            # Detect swing high and low breaks
-            # Find local lowest low of candles 10 to 35
-            mid_candles = candles[10:35]
+            # Swing High and Low break detection on last 200 candles
+            # Use middle range (candles 40 to 180) to identify the major swing highs and lows
+            mid_candles = candles[40:180]
             lowest_pdl = min(c["low"] for c in mid_candles)
             highest_pdh = max(c["high"] for c in mid_candles)
 
-            # Check if any of the recent 5 candles closed below lowest_pdl (Bearish MSS)
-            bearish_mss = any(c["close"] < lowest_pdl for c in candles[-6:])
-            # Check if any of the recent 5 candles closed above highest_pdh (Bullish MSS)
-            bullish_mss = any(c["close"] > highest_pdh for c in candles[-6:])
+            # Check if any of the recent 10 candles closed below lowest_pdl (Bearish MSS)
+            bearish_mss = any(c["close"] < lowest_pdl for c in candles[-10:])
+            # Check if any of the recent 10 candles closed above highest_pdh (Bullish MSS)
+            bullish_mss = any(c["close"] > highest_pdh for c in candles[-10:])
 
-            # Count of consecutive down/up closes in recent 10 candles to identify momentum direction
-            down_closes = sum(1 for c in candles[-10:] if c["close"] < c["open"])
-            up_closes = sum(1 for c in candles[-10:] if c["close"] > c["open"])
+            # Count of consecutive down/up closes in recent 20 candles
+            down_closes = sum(1 for c in candles[-20:] if c["close"] < c["open"])
+            up_closes = sum(1 for c in candles[-20:] if c["close"] > c["open"])
 
             if bearish_mss and not bullish_mss:
                 logger.info(f"Dynamic structure detection for {sym}: BEARISH MSS detected.")
@@ -1568,11 +1568,11 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                 logger.info(f"Dynamic structure detection for {sym}: BULLISH MSS detected.")
                 return "BULLISH"
             
-            # Fallback to SMA & Close comparison and candle count momentum
-            if last_close < sma_20 and down_closes > up_closes:
+            # Fallback to SMA & Momentum closes
+            if last_close < sma_50 and down_closes > up_closes:
                 logger.info(f"Dynamic structure detection for {sym}: BEARISH SMA & Momentum trend.")
                 return "BEARISH"
-            elif last_close > sma_20 and up_closes > down_closes:
+            elif last_close > sma_50 and up_closes > down_closes:
                 logger.info(f"Dynamic structure detection for {sym}: BULLISH SMA & Momentum trend.")
                 return "BULLISH"
 
@@ -2826,13 +2826,17 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
         }
 
     @classmethod
-    async def calculate_programmatic_smc(cls, payload: Dict[str, Any], current_price: Optional[float] = None) -> Dict[str, Any]:
+    async def calculate_programmatic_smc(cls, payload: Dict[str, Any], current_price: Optional[float] = None, local_only: bool = False) -> Dict[str, Any]:
         """
         Evaluate SMC METHOD RULES using Gemini AI API based on live market context and rules.
         """
         symbol = str(payload.get("symbol") or "BTCUSDT").upper()
         timeframe = str(payload.get("timeframe") or "15m")
         price = float(current_price or payload.get("current_price") or 64100.0)
+        
+        if local_only:
+            # Return local/mock analysis directly to save credits and prevent API calls in background trackers
+            return cls._get_mock_smc_analysis(symbol, timeframe, price)
         pdh = float(payload.get("pdh") or price * 1.01)
         pdl = float(payload.get("pdl") or price * 0.99)
         daily_open = float(payload.get("daily_open") or price)
@@ -2848,7 +2852,7 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
         elif sym in ["BTC", "ETH", "SOL"]:
             sym = f"{sym}USDT"
             
-        candles = await asyncio.to_thread(get_candles, sym, timeframe, limit=50)
+        candles = await asyncio.to_thread(get_candles, sym, timeframe, limit=200)
         
         # Calculate local technical indicators to feed to AI
         range_low = min(c["low"] for c in candles) if candles else pdl
@@ -3095,6 +3099,28 @@ Live 50 Candles Data:
                             result["risk_notes"] = "N/A"
                 except Exception:
                     pass
+
+        # Merge manual frontend checkbox confluences from payload to ensure they are respected in the manual analysis
+        if payload.get("asian_sweep") is True:
+            result["double_mitigation_ok"] = True
+        if payload.get("rejection_wick_ok") is True:
+            result["rejection_wick_ok"] = True
+        if payload.get("demand_mitigation") is True:
+            result["displacement_choch"] = True
+        if payload.get("ltf_shift") is True:
+            result["fvg_ob_confluence"] = True
+        if payload.get("rsi_ok") is True:
+            result["rsi_ok"] = True
+        if payload.get("m1_liquidity_sweep") is True:
+            result["m1_liquidity_sweep"] = True
+        if payload.get("displacement_choch") is True:
+            result["displacement_choch"] = True
+        if payload.get("fvg_ob_confluence") is True:
+            result["fvg_ob_confluence"] = True
+
+        # Ensure UI-specific checklist keys are populated directly from the AI response confluences
+        result["sb_step_9_ltf_choch_ok"] = result.get("displacement_choch", False) or result.get("sb_step_9_ltf_choch_ok", False)
+        result["sb_step_10_fvg_limit_ok"] = result.get("fvg_ob_confluence", False) or result.get("sb_step_10_fvg_limit_ok", False)
 
         # Recalculate confidence score programmatically to show the true confirmation rate in the UI
         calculated_conf = 0

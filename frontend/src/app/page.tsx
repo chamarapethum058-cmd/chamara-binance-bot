@@ -890,6 +890,8 @@ export default function Dashboard() {
         m1_liquidity_sweep: smcM1LiquiditySweep,
         displacement_choch: smcDisplacementChoch,
         fvg_ob_confluence: smcFvgObConfluence,
+        rejection_wick_ok: smcInducementSwept,
+        rsi_ok: smcBosConfirmed,
         
         po3_phase: smcPo3Phase
       };

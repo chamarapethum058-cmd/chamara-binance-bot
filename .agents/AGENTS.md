@@ -205,3 +205,18 @@ The bot must strictly enforce the following high-impact news rules:
 > 2. **Alternative Reversal Confluences:** If the market shows signs of reversing (such as a deep sweep of major previous highs/lows, double tops/bottoms, momentum exhaustion wicks, or volume node POC clusters) before a Choch forms, the system must analyze these elements.
 > 3. **Cautionary Recommendation:** Recommend the entry with prominent caution flags, risk warnings, and appropriate stop-loss limits (placing the SL past the swing extreme and the exhaustion wick).
 > 4. **Sinhala Translation (සිංහල පරිවර්තනය):** වෙළඳපොල ආපසු හැරීමක් (Reversal) සිදු වීමට Choch එකක්ම පැවතීම අනිවාර්ය නොවේ. පෙර පැවති ප්‍රධාන High/Low Sweep වීම, double top/bottom පිහිටීම හෝ momentum exhaustion wicks වැනි සලකුණු ඇත්නම්, අවදානම් අවවාද (Risk warnings) සහිතව එන්ට්‍රියක් නිර්දේශ කරනු ලැබේ.
+
+## 27. SMC MentorFX Multi-PDF Structural Layout Integration Protocol (New Rule)
+> [!IMPORTANT]
+> **SMC MENTORFX MULTI-PDF INTEGRATION RULES:**
+> 1. **7 Guides Alignment:** All trade setups must align strictly with the structural patterns demonstrated in the 7 SMC MentorFX PDF guides (consisting of 1 previous PDF and 6 current PDFs).
+> 2. **Bullish Entry/Reversal Layout:** Traces Swing Low Sweep ($) -> CHoCH/MSS upside -> Pullback to sweep Inducement (IDM) -> Tap unmitigated Bullish OB (Top Edge) -> Buy Limit entry.
+> 3. **Bearish Entry/Reversal Layout:** Traces Swing High Sweep ($) -> CHoCH/MSS downside -> Pullback to sweep Inducement (IDM) -> Tap unmitigated Bearish OB (Bottom Edge) -> Sell Limit entry.
+> 4. **Sinhala Translation (සිංහල පරිවර්තනය):** සියලුම වෙළඳ සෙටප්ස් ඔබ ලබා දුන් PDF මාර්ගෝපදේශ 7 හි දැක්වෙන රටාවන්ට (BOS, CH, Inducement sweeps, and OB retests) අනුකූලව සිදු විය යුතුය.
+
+## 28. FVG/OB First-Tapped Boundary Entry Protocol (New Rule)
+> [!IMPORTANT]
+> **FVG/OB BOUNDARY ENTRY RULES:**
+> 1. **Outer Boundary Entry Placement:** When the market pulls back to tap an unmitigated Fair Value Gap (FVG) or Order Block (OB) zone, there is a high probability of immediate reversal upon first contact. Therefore, the recommended Limit Entry price must be placed exactly at the outer boundary/edge of the zone (the top edge for Buy setups, and the bottom edge for Sell setups) where the market first enters the zone.
+> 2. **No Middle/50% Placements:** Do not place the entry price at the 50% consequent encroachment or mean threshold by default, to ensure that the order is successfully filled before the market reverses.
+> 3. **Sinhala Translation (සිංහල පරිවර්තනය):** FVG/OB කලාපයේ (zone) මිල ස්පර්ශ කර (tap කර) වහාම ආපසු හැරීමට ඇති ඉඩකඩ වැඩි බැවින්, ඇතුල්වීමේ මිල (Entry Price) කලාපය මැදින් (50% level) නොතබා, වෙළඳපල මිල පැමිණෙන දිශාවේ ඇති කලාපයේ පළමු සීමාවෙහි (outer boundary / edge - Buy සෙටප් සඳහා ඉහළ සීමාවේ සහ Sell සෙටප් සඳහා පහළ සීමාවේ) තැබිය යුතුය.
