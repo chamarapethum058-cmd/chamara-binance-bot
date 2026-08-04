@@ -240,4 +240,13 @@ The bot must strictly enforce the following high-impact news rules:
 > 3. **Absolute Stop Loss Protection:** To prevent waiting orders from getting stopped out prematurely by manipulation wicks, the Stop Loss must strictly be placed past the absolute Swing Extreme (Strong High/Low) with the programmatic 0.1% buffer (Rule 19 & 25).
 > 4. **Sinhala Translation (සිංහල පරිවර්තනය):** වත්මන් වෙළඳපල මිලට ආසන්න නොගැඹුරු (shallow) ඇතුල්වීම් හෝ ක්ෂණික වෙළඳපල ඇණවුම් (market orders) නිර්දේශ කිරීම තහනම් වේ. ඇතුල්වීමේ මිල සැමවිටම වත්මන් මිලට වඩා 0.1% - 0.5% අතර පරතරයකින් පිහිටි ප්‍රධාන unmitigated FVG/OB සීමාවක තිබිය යුතුය. එමඟින් ඇණවුම ක්‍රියාත්මක වීමට පෙර පරිශීලකයාට ලිමිට් ඕඩරය සැකසීමට අවම වශයෙන් විනාඩි 5 ක කාලයක් ලැබේ. මෙම සීමාවන් නොමැති නම් සෙටප් එක අවලංගු කළ යුතුය. Stop Loss එක සැමවිටම swing extreme එකෙන් පිටත 0.1% ක බෆරයක් සහිතව තැබිය යුතුය.
 
+## 31. SMC EQL/EQH Liquidity Sweep & HTF Zone Stop Loss Protection Protocol (New Rule)
+> [!IMPORTANT]
+> **SMC EQL/EQH LIQUIDITY & HTF OB RETEST PROTECTION RULES:**
+> 1. **EQL/EQH Stop Loss Prohibited:** The system must never place the Stop Loss (SL) directly below/above an active **Equal Lows (EQL)** or **Equal Highs (EQH)** retail liquidity pool. Retail liquidity pools are high-probability targets for institutional stop-hunts and sweeps.
+> 2. **HTF Zone & Strong Low Protection:** If an unmitigated Higher Timeframe (HTF) Demand/Supply zone (such as 15m/1H Order Block) or a confirmed **Strong Low / Strong High** extreme lies underneath/above the EQL/EQH pool, the Stop Loss must strictly be placed past the outer boundary of that HTF zone or Strong Extreme with the 0.1% safety buffer.
+> 3. **Maximum Risk Range Lockout:** If placing the SL past the HTF zone or Strong Low/High violates the maximum allowed risk range (0.85% for Crypto, 0.15% for traditional Forex/Gold), the setup must be immediately invalidated (`is_valid = false`) and suppressed to shield the user from entering high-risk, wide SL setups.
+> 4. **Sinhala Translation (සිංහල පරිවර්තනය):** වෙළඳ සෙටප් එකක Stop Loss (SL) එක කිසිසේත්ම Equal Lows (EQL) හෝ Equal Highs (EQH) මට්ටමකට ආසන්නව නොතැබිය යුතුය. මන්ද මාකට් එක හැමවෙලේම EQL/EQH වලට යටින් ඇති orders sweep කිරීමට නැඹුරු වේ. ඊට පහළින් Strong Low හෝ HTF Demand zone එකක් තිබේ නම්, SL එක එම ශක්තිමත් මට්ටමට වඩා 0.1% ක් පහළින් තැබිය යුතුය. මෙම ආරක්ෂිත SL මට්ටම දැමූ පසු SL පරාසය Crypto සඳහා 0.85% සීමාව ඉක්මවයි නම්, එම සෙටප් එක අවලංගු කළ යුතුය.
+
+
 

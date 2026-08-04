@@ -100,7 +100,7 @@ class AIService:
         elif sym in ["BTC", "ETH", "SOL"]:
             sym = f"{sym}USDT"
             
-        candles = get_candles(sym, timeframe or "1m", limit=12)
+        candles = get_candles(sym, timeframe or "1m", limit=30)
         if candles:
             swing_low = min(c["low"] for c in candles)
             swing_high = max(c["high"] for c in candles)
@@ -2942,9 +2942,10 @@ You must strictly evaluate these 12 rules:
    - SELL Side: If the 1m trend is BEARISH -> Search for a "Sell Limit" entry at the 1m OB/FVG boundary.
    - No macro trend alignment is required; do not lockout setups due to 1H/15M trend mismatches. Let the active 1m trend determine the bias.
 2. RSI Momentum Check: Buy setup is allowed only when RSI <= 65. Sell setup is allowed only when RSI >= 35. Otherwise, invalidate the setup.
-3. Swing Extreme Stop Loss: Place Stop Loss (SL) strictly outside the swing extreme boundaries with a 0.1% buffer:
-   - Buy setup (Long): SL = swing_low * 0.999
-   - Sell setup (Short): SL = swing_high * 1.001
+3. Swing Extreme & EQL/EQH Stop Loss Protection: Place Stop Loss (SL) strictly outside the swing extreme boundaries and past any EQL (Equal Lows) or EQH (Equal Highs) liquidity pools, or past any unmitigated HTF (15m/1h) Demand/Supply zones directly underneath/above the setup, with a 0.1% safety buffer to prevent institutional stop-hunts:
+   - Buy setup (Long): SL = min(swing_low, htf_demand_low, strong_low) * 0.999. Never place the SL directly below an EQL pool, as these are swept before reversal.
+   - Sell setup (Short): SL = max(swing_high, htf_supply_high, strong_high) * 1.001. Never place the SL directly above an EQH pool, as these are swept before reversal.
+   - If the resulting SL distance exceeds the maximum allowed risk range (0.85% for Crypto, 0.15% for Forex), set is_valid = false to suppress the setup.
 
 4. FVG/OB Boundary Limit Entry (No Shallow Entries): Calculate and place the recommended Limit Order entry exactly at the outer boundary/edge where the market first contacts the zone (the top boundary/edge for Buy/Long setups, and the bottom boundary/edge for Sell/Short setups) of the deepest, most significant unmitigated FVG or OB (demand/supply zone) in the pullback leg. The entry price MUST have a minimum distance of 0.1% to 0.5% from the current market price (the last candle close) to ensure it is a true pending pullback entry, giving the user at least 5 minutes to set up and place the limit order. Do not propose immediate market execution or shallow entries close to the current price (within 0.05%).
 5. 80% Minimum Confidence Score: Calculate confidence (0-100%) based on 9 confluences: Trend alignment (20%), POI mitigation (10%), 1m rejection wick (10%), LTF Shift/MSS (10%), limit entry/pullback (10%), RSI confirmation (10%), M1 sweep (10%), displacement CHoCH (10%), FVG/OB confluence (10%). If confidence < 80%, set is_valid = false.
@@ -3157,7 +3158,7 @@ Live 200 Candles Data:
                 
                 if "BULLISH" in bias or "Buy" in epa:
                     # Buy Limit setup
-                    local_low = min(c["low"] for c in candles[-12:]) if len(candles) >= 12 else range_low
+                    local_low = min(c["low"] for c in candles[-30:]) if len(candles) >= 30 else range_low
                     safe_sl = round(local_low * 0.999, 4)
                     result["stop_loss_level"] = safe_sl
                     logger.info(f"Programmatic SL Override: Set Buy SL to tight local level {safe_sl} (below local low {local_low})")
@@ -3179,7 +3180,7 @@ Live 200 Candles Data:
                         
                 elif "BEARISH" in bias or "Sell" in epa:
                     # Sell Limit setup
-                    local_high = max(c["high"] for c in candles[-12:]) if len(candles) >= 12 else range_high
+                    local_high = max(c["high"] for c in candles[-30:]) if len(candles) >= 30 else range_high
                     safe_sl = round(local_high * 1.001, 4)
                     result["stop_loss_level"] = safe_sl
                     logger.info(f"Programmatic SL Override: Set Sell SL to tight local level {safe_sl} (above local high {local_high})")
