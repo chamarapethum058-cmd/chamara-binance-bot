@@ -3193,7 +3193,27 @@ Live 200 Candles Data:
                         result["tp3_rr"] = "1:4.0 RR"
                         result["target_reward_ratio"] = "1:3.0 RR"
 
-
+            # Enforce 10-15 Minutes High-Velocity Scalping SL Width Constraint (Rule 4)
+            # If the calculated Stop Loss is wider than the allowed threshold, it is not a high-velocity scalp setup.
+            # In this case, invalidate and lockout to protect from long holding periods or massive risk.
+            if result.get("is_valid") is True and entry_price is not None and result.get("stop_loss_level") is not None:
+                risk_pct = abs(entry_price - result["stop_loss_level"]) / entry_price
+                
+                # Determine threshold dynamically based on asset class (Crypto vs traditional Forex/Gold)
+                is_crypto = any(x in payload.get("symbol", "").upper() for x in ["USDT", "BUSD", "BTC", "ETH", "SOL"])
+                max_risk_allowed = 0.0025 if is_crypto else 0.0015  # 0.25% for crypto, 0.15% for gold/forex
+                
+                if risk_pct > max_risk_allowed:
+                    result["is_valid"] = False
+                    result["entry_price_area"] = f"No Entry (SL Range Too Wide - {risk_pct*100:.2f}%)"
+                    reason_eng = f"The setup is invalidated because the Stop Loss range ({risk_pct*100:.2f}%) exceeds the maximum {max_risk_allowed*100:.2f}% threshold required for a high-velocity scalp."
+                    reason_sin = f"Stop Loss පරාසය ({risk_pct*100:.2f}%) scalp trade එකක් සඳහා අවශ්‍ය උපරිම {max_risk_allowed*100:.2f}% සීමාව ඉක්මවා යන බැවින් මෙම සෙටප් එක අවලංගු කර ඇත."
+                    result["reasoning"] = f"{reason_eng}\n\n---\n\n**සිංහල පරිවර්තනය (Sinhala Translation):**\n{reason_sin}"
+                    result["stop_loss_level"] = None
+                    result["liquidity_target"] = None
+                    result["tp1_target"] = None
+                    result["tp2_target"] = None
+                    result["tp3_target"] = None
 
         result["news_lockout_active"] = news_lockout_active
         result["active_news_event"] = active_news_event
