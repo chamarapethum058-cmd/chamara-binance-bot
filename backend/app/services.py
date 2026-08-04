@@ -100,7 +100,7 @@ class AIService:
         elif sym in ["BTC", "ETH", "SOL"]:
             sym = f"{sym}USDT"
             
-        candles = get_candles(sym, timeframe or "1m", limit=30)
+        candles = get_candles(sym, timeframe or "1m", limit=12)
         if candles:
             swing_low = min(c["low"] for c in candles)
             swing_high = max(c["high"] for c in candles)
@@ -3157,7 +3157,7 @@ Live 200 Candles Data:
                 
                 if "BULLISH" in bias or "Buy" in epa:
                     # Buy Limit setup
-                    local_low = min(c["low"] for c in candles[-30:]) if len(candles) >= 30 else range_low
+                    local_low = min(c["low"] for c in candles[-12:]) if len(candles) >= 12 else range_low
                     safe_sl = round(local_low * 0.999, 4)
                     if current_sl is None or current_sl > safe_sl:
                         result["stop_loss_level"] = safe_sl
@@ -3177,7 +3177,7 @@ Live 200 Candles Data:
                         
                 elif "BEARISH" in bias or "Sell" in epa:
                     # Sell Limit setup
-                    local_high = max(c["high"] for c in candles[-30:]) if len(candles) >= 30 else range_high
+                    local_high = max(c["high"] for c in candles[-12:]) if len(candles) >= 12 else range_high
                     safe_sl = round(local_high * 1.001, 4)
                     if current_sl is None or current_sl < safe_sl:
                         result["stop_loss_level"] = safe_sl
