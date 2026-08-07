@@ -1401,51 +1401,65 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
             range_high = dr_high if dr_high is not None else max(c["high"] for c in candles)
             midpoint = eq_price if eq_price is not None else (range_low + range_high) / 2.0
 
-            # Scan for FVGs and OBs
+            # Scan for unmitigated FVGs and OBs
             for i in range(2, len(candles)):
                 # Bullish FVG (Low of candle i > High of candle i-2)
                 if candles[i]["low"] > candles[i-2]["high"]:
                     fvg_high = candles[i]["low"]
                     fvg_low = candles[i-2]["high"]
                     fvg_ce = (fvg_high + fvg_low) / 2.0
-                    fvgs.append({
-                        "type": "FVG_BULLISH",
-                        "high": fvg_high,
-                        "low": fvg_low,
-                        "ce": fvg_ce,
-                        "boundary": fvg_high # for limit buy order
-                    })
+                    
+                    # Check if unmitigated (no subsequent low has touched it)
+                    is_unmitigated = all(candles[j]["low"] > fvg_high for j in range(i+1, len(candles)))
+                    if is_unmitigated:
+                        fvgs.append({
+                            "type": "FVG_BULLISH",
+                            "high": fvg_high,
+                            "low": fvg_low,
+                            "ce": fvg_ce,
+                            "boundary": fvg_high # for limit buy order
+                        })
                 # Bearish FVG (High of candle i < Low of candle i-2)
                 elif candles[i]["high"] < candles[i-2]["low"]:
                     fvg_high = candles[i-2]["low"]
                     fvg_low = candles[i]["high"]
                     fvg_ce = (fvg_high + fvg_low) / 2.0
-                    fvgs.append({
-                        "type": "FVG_BEARISH",
-                        "high": fvg_high,
-                        "low": fvg_low,
-                        "ce": fvg_ce,
-                        "boundary": fvg_low # for limit sell order
-                    })
+                    
+                    # Check if unmitigated (no subsequent high has touched it)
+                    is_unmitigated = all(candles[j]["high"] < fvg_low for j in range(i+1, len(candles)))
+                    if is_unmitigated:
+                        fvgs.append({
+                            "type": "FVG_BEARISH",
+                            "high": fvg_high,
+                            "low": fvg_low,
+                            "ce": fvg_ce,
+                            "boundary": fvg_low # for limit sell order
+                        })
                 
                 # OB Check: Down-close followed by up-closes
                 if candles[i-1]["close"] < candles[i-1]["open"]:
                     ob_mean = (candles[i-1]["high"] + candles[i-1]["low"]) / 2.0
-                    obs.append({
-                        "type": "OB_BULLISH",
-                        "high": candles[i-1]["high"],
-                        "low": candles[i-1]["low"],
-                        "mean": ob_mean
-                    })
+                    # Check if unmitigated (no subsequent low has breached the OB low)
+                    is_unmitigated = all(candles[j]["low"] > candles[i-1]["low"] for j in range(i, len(candles)))
+                    if is_unmitigated:
+                        obs.append({
+                            "type": "OB_BULLISH",
+                            "high": candles[i-1]["high"],
+                            "low": candles[i-1]["low"],
+                            "mean": ob_mean
+                        })
                 # OB Check: Up-close followed by down-closes
                 elif candles[i-1]["close"] > candles[i-1]["open"]:
                     ob_mean = (candles[i-1]["high"] + candles[i-1]["low"]) / 2.0
-                    obs.append({
-                        "type": "OB_BEARISH",
-                        "high": candles[i-1]["high"],
-                        "low": candles[i-1]["low"],
-                        "mean": ob_mean
-                    })
+                    # Check if unmitigated (no subsequent high has breached the OB high)
+                    is_unmitigated = all(candles[j]["high"] < candles[i-1]["high"] for j in range(i, len(candles)))
+                    if is_unmitigated:
+                        obs.append({
+                            "type": "OB_BEARISH",
+                            "high": candles[i-1]["high"],
+                            "low": candles[i-1]["low"],
+                            "mean": ob_mean
+                        })
 
             if daily_bias == "BULLISH":
                 # Find deepest valid FVG or OB in Discount Zone (below midpoint)
