@@ -2856,7 +2856,7 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
         if timeframe == "1m":
             candles_15m, candles_1m = await asyncio.gather(
                 asyncio.to_thread(get_candles, sym, "15m", limit=100),
-                asyncio.to_thread(get_candles, sym, "1m", limit=100)
+                asyncio.to_thread(get_candles, sym, "1m", limit=200)
             )
             candles = candles_1m
         else:
