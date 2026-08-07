@@ -2881,6 +2881,11 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
             asyncio.to_thread(cls._detect_market_structure_bias, symbol, "15m", fallback_bias),
             asyncio.to_thread(cls._detect_market_structure_bias, symbol, "1m", fallback_bias)
         )
+        
+        t1h = str(trend_1h).upper().strip()
+        t15m = str(trend_15m).upper().strip()
+        t1m_val = str(trend_1m).upper().strip()
+        active_trend = t1m_val if timeframe == "1m" else t15m if timeframe == "15m" else t1h
 
         # Calculate 14-period RSI
         closes = [c["close"] for c in candles] if candles else []
@@ -3066,6 +3071,7 @@ Market Context:
 - 1-Hour Trend: {trend_1h}
 - 15-Minute Trend: {trend_15m}
 - 1-Minute Trend: {trend_1m}
+- Active Trend Bias for {timeframe}: {active_trend} (CRITICAL: You are strictly REQUIRED to analyze and output a setup matching this active trend direction. If BULLISH, you must ONLY search for and output a Buy Limit setup. If BEARISH, you must ONLY search for and output a Sell Limit setup. Do not output the wrong direction.)
 - Calculated RSI (14): {rsi_val:.2f}
 - High-Impact USD News Lockout Active: {news_lockout_active}
 - Equilibrium Price: {equilibrium}
@@ -3099,12 +3105,6 @@ Live 15-Minute Candles Data (15m):
                 result = cls._get_mock_smc_analysis(symbol, timeframe, price)
 
         # Enforce overrides programmatically on the final result before returning! (Rule 16: Timeframe Structure Check)
-        t1h = str(trend_1h).upper().strip()
-        t15m = str(trend_15m).upper().strip()
-        t1m_val = str(trend_1m).upper().strip()
-        
-        # Selected timeframe determines the trend bias
-        active_trend = t1m_val if timeframe == "1m" else t15m if timeframe == "15m" else t1h
         result["daily_bias"] = active_trend
         entry_area = str(result.get("entry_price_area") or "")
         
@@ -3115,8 +3115,8 @@ Live 15-Minute Candles Data (15m):
             result["entry_price_area"] = "No Entry (Trend Mismatch - Buy Only)"
             result["is_valid"] = False
             result["confidence"] = 0
-            reason_eng = f"The selected {tf_label} trend is BULLISH, which only allows Buy setups. Sell setups are prohibited."
-            reason_sin = f"තෝරාගත් {tf_label_sin} ප්‍රවණතාවය BULLISH වන බැවින්, ලබාගත හැක්කේ Buy setups පමණි. Sell setups ලබා ගැනීම තහනම් වේ."
+            reason_eng = f"The selected {tf_label} trend is BULLISH. Sell setups are prohibited in this trend state."
+            reason_sin = f"තෝරාගත් {tf_label_sin} ප්‍රවණතාවය BULLISH වේ. මෙම ප්‍රවණතා තත්ත්වය තුළ Sell setups ලබා ගැනීම තහනම් වේ."
             result["reasoning"] = f"{reason_eng}\n\n---\n\n**සිංහල පරිවර්තනය (Sinhala Translation):**\n{reason_sin}"
             result["invalidation"] = "N/A"
             result["risk_notes"] = "N/A"
@@ -3124,8 +3124,8 @@ Live 15-Minute Candles Data (15m):
             result["entry_price_area"] = "No Entry (Trend Mismatch - Sell Only)"
             result["is_valid"] = False
             result["confidence"] = 0
-            reason_eng = f"The selected {tf_label} trend is BEARISH, which only allows Sell setups. Buy setups are prohibited."
-            reason_sin = f"තෝරාගත් {tf_label_sin} ප්‍රවණතාවය BEARISH වන බැවින්, ලබාගත හැක්කේ Sell setups පමණි. Buy setups ලබා ගැනීම තහනම් වේ."
+            reason_eng = f"The selected {tf_label} trend is BEARISH. Buy setups are prohibited in this trend state."
+            reason_sin = f"තෝරාගත් {tf_label_sin} ප්‍රවණතාවය BEARISH වේ. මෙම ප්‍රවණතා තත්ත්වය තුළ Buy setups ලබා ගැනීම තහනම් වේ."
             result["reasoning"] = f"{reason_eng}\n\n---\n\n**සිංහල පරිවර්තනය (Sinhala Translation):**\n{reason_sin}"
             result["invalidation"] = "N/A"
             result["risk_notes"] = "N/A"
