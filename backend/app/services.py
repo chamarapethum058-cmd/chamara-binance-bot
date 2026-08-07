@@ -2852,7 +2852,17 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
         elif sym in ["BTC", "ETH", "SOL"]:
             sym = f"{sym}USDT"
             
-        candles = await asyncio.to_thread(get_candles, sym, timeframe, limit=200)
+        # Fetch both 15m and 1m candles to support the top-down 15m setup + 1m execution strategy (Rule 32)
+        if timeframe == "1m":
+            candles_15m, candles_1m = await asyncio.gather(
+                asyncio.to_thread(get_candles, sym, "15m", limit=100),
+                asyncio.to_thread(get_candles, sym, "1m", limit=100)
+            )
+            candles = candles_1m
+        else:
+            candles_15m = []
+            candles = await asyncio.to_thread(get_candles, sym, timeframe, limit=200)
+            candles_1m = candles
         
         # Calculate local technical indicators to feed to AI
         range_low = min(c["low"] for c in candles) if candles else pdl
@@ -2937,20 +2947,30 @@ You are the AI Brain of Project Falcon, a Personal AI Trading Assistant acting a
 Your core task is to analyze the provided market data and strategy rules to determine if a valid SMC setup exists.
 
 You must strictly evaluate these 12 rules:
-1. 1m Timeframe Structure Execution: Setups are analyzed and executed strictly based on the 1-minute (1m) timeframe structure.
-   - BUY Side: If the 1m trend is BULLISH -> Search for a "Buy Limit" entry at the 1m OB/FVG boundary.
-   - SELL Side: If the 1m trend is BEARISH -> Search for a "Sell Limit" entry at the 1m OB/FVG boundary.
-   - No macro trend alignment is required; do not lockout setups due to 1H/15M trend mismatches. Let the active 1m trend determine the bias.
-2. RSI Momentum Check: Buy setup is allowed only when RSI <= 65. Sell setup is allowed only when RSI >= 35. Otherwise, invalidate the setup.
-3. Swing Extreme & EQL/EQH Stop Loss Protection: Place Stop Loss (SL) strictly outside the swing extreme boundaries and past any EQL (Equal Lows) or EQH (Equal Highs) liquidity pools, or past any unmitigated HTF (15m/1h) Demand/Supply zones directly underneath/above the setup, with a 0.1% safety buffer to prevent institutional stop-hunts:
-   - Buy setup (Long): SL = min(swing_low, htf_demand_low, strong_low) * 0.999. Never place the SL directly below an EQL pool, as these are swept before reversal.
-   - Sell setup (Short): SL = max(swing_high, htf_supply_high, strong_high) * 1.001. Never place the SL directly above an EQH pool, as these are swept before reversal.
-   - If the resulting SL distance exceeds the maximum allowed risk range (0.85% for Crypto, 0.15% for Forex), set is_valid = false to suppress the setup.
-
-4. FVG/OB Boundary Limit Entry (No Shallow Entries): Calculate and place the recommended Limit Order entry exactly at the outer boundary/edge where the market first contacts the zone (the top boundary/edge for Buy/Long setups, and the bottom boundary/edge for Sell/Short setups) of the deepest, most significant unmitigated FVG or OB (demand/supply zone) in the pullback leg. The entry price MUST have a minimum distance of 0.1% to 0.5% from the current market price (the last candle close) to ensure it is a true pending pullback entry, giving the user at least 5 minutes to set up and place the limit order. Do not propose immediate market execution or shallow entries close to the current price (within 0.05%).
-5. 80% Minimum Confidence Score: Calculate confidence (0-100%) based on 9 confluences: Trend alignment (20%), POI mitigation (10%), 1m rejection wick (10%), LTF Shift/MSS (10%), limit entry/pullback (10%), RSI confirmation (10%), M1 sweep (10%), displacement CHoCH (10%), FVG/OB confluence (10%). If confidence < 80%, set is_valid = false.
-6. Economic News Lockout: If news_lockout_active is true, set is_valid = false.
-7. Risk-to-Reward Ratio & Target Duration: Ensure the Risk-to-Reward (RR) ratio is between 1:2.0 and 1:4.0 (do not target distant high-timeframe ranges if they require more than 1:4.0 RR or take too long). All setups must target close take profits (TPs) designed to hit within 20-30 minutes maximum.
+1. Market Bias & Direction Detection (15-Minute Timeframe - Rule 32): 
+   - Establish market direction strictly on the 15-minute timeframe.
+   - BULLISH BIAS (BUY ONLY): The market is making Higher Highs and Higher Lows, with structural breaks (BOS) pointing upwards. Look ONLY for Buy opportunities.
+   - BEARISH BIAS (SELL ONLY): The market is making Lower Lows and Lower Highs, with structural breaks (BOS) pointing downwards. Look ONLY for Sell opportunities.
+   - Do NOT use moving averages or indicators.
+2. 15-Minute Setup & Rejection Zone (Rule 32):
+   - Mark out recent 15-minute broken structures (BOS) and valid unmitigated FVG/OB in line with the Bias, and key swing high/low liquidity zones.
+   - Wait for the price to retrace into the 15m FVG/OB. Identify a Liquidity Sweep where the price wicks through the zone but closes inside (no body close break), showing rejection/weakness.
+   - Draw a Rectangle Zone from the closing price of that rejection candle to its absolute wick extreme (high for bearish setup, low for bullish setup).
+3. 1-Minute Execution Criteria (Rule 32):
+   - Once price interacts with the 15-Minute Rectangle Zone, scale down immediately to the 1-Minute timeframe. Monitor for confirmation: MSS/CHoCH, Engulfing/Morning Star, or Marubozu candle close.
+   - FOR A BUY ENTRY: Wait for price to enter the 15-Min Rectangle Zone. 
+     * ENTRY METHOD A (Breakout): Trigger when a 1-Minute candle breaks and CLOSES completely (body close) above the top of the Rectangle.
+     * ENTRY METHOD B (Retracement): Alternatively, wait for price to retrace to the 50% level of the 15-Min FVG and enter upon confirmation.
+   - FOR A SELL ENTRY: Wait for price to enter the 15-Min Rectangle Zone.
+     * ENTRY METHOD A (Breakout): Trigger when a 1-Minute candle breaks and CLOSES completely (body close) below the bottom of the Rectangle.
+     * ENTRY METHOD B (Retracement): Alternatively, wait for price to retrace to the 50% level of the 15-Min FVG and enter upon confirmation.
+4. Risk Management (SL & TP - Rule 32):
+   - STOP LOSS (SL): Place slightly past the nearest 1-Minute major swing extreme low (for Buy) or high (for Sell) with the programmatic 0.1% buffer (using the python override). Keep SL extremely tight (aiming for 1 to 2 pips on forex/gold).
+   - TAKE PROFIT (TP): Target other key levels or aim for a high Risk-to-Reward ratio of 3:1, 4:1, or 5:1.
+5. FVG/OB Boundary Limit Entry & Buffer Rules: The entry price MUST have a minimum distance of 0.1% to 0.5% from the current market price to ensure it is a true pending pullback limit entry (Rule 4).
+6. 80% Minimum Confidence Score: Calculate confidence based on 9 confluences: Trend alignment (20%), POI mitigation (10%), 1m rejection wick (10%), LTF Shift/MSS (10%), limit entry/pullback (10%), RSI confirmation (10%), M1 sweep (10%), displacement CHoCH (10%), FVG/OB confluence (10%). If confidence < 80%, set is_valid = false.
+7. Economic News Lockout: If news_lockout_active is true, set is_valid = false.
+8. RSI Momentum Check: Buy setup is allowed only when RSI <= 65. Sell setup is allowed only when RSI >= 35. Otherwise, invalidate the setup.
 8. Sinhala Translation: Provide English text followed by its Sinhala translation (සිංහල පරිවර්තනය) inside 'reasoning', 'invalidation', and 'risk_notes' fields.
 9. Equilibrium Matrix Bypassed: This calculation is strictly bypassed for SMC setups. Do NOT restrict, lock, or invalidate Buy/Long setups in the Premium zone, and do NOT restrict, lock, or invalidate Sell/Short setups in the Discount zone. The setup remains valid regardless of whether it is in premium or discount.
 10. Reversal Execution & Mandatory CHoCH Protocol (Rule 26): A Market Structure Shift (MSS) or Change of Character (CHoCH) is strictly MANDATORY to execute any reversal trade setup. Under no circumstances should a reversal entry be advised without a confirmed CHoCH/MSS (a clear breakout close of the recent swing high/low with a strong displacement candle body). If no validated CHoCH/MSS has occurred, the setup is considered invalid and must be locked out.
@@ -3017,6 +3037,17 @@ CRITICAL: Return ONLY raw, valid JSON. Do not include markdown code block syntax
                     c_copy[k] = v
             serializable_candles.append(c_copy)
 
+        serializable_candles_15m = []
+        if candles_15m:
+            for c in candles_15m:
+                c_copy = {}
+                for k, v in c.items():
+                    if hasattr(v, "isoformat"):
+                        c_copy[k] = v.isoformat()
+                    else:
+                        c_copy[k] = v
+                serializable_candles_15m.append(c_copy)
+
         user_prompt = f"""
 Analyze the following market context and live candles for SMC setup validation.
 
@@ -3036,8 +3067,11 @@ Market Context:
 - Dealing Range High: {range_high}
 - Dealing Range Low: {range_low}
 
-Live 200 Candles Data:
+Live 1-Minute Candles Data (1m):
 {json.dumps(serializable_candles, indent=2)}
+
+Live 15-Minute Candles Data (15m):
+{json.dumps(serializable_candles_15m, indent=2) if serializable_candles_15m else "N/A"}
 """
         active_key = db_key or settings.GEMINI_API_KEY
         if not active_key:

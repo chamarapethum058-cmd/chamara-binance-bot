@@ -248,5 +248,31 @@ The bot must strictly enforce the following high-impact news rules:
 > 3. **Maximum Risk Range Lockout:** If placing the SL past the HTF zone or Strong Low/High violates the maximum allowed risk range (0.85% for Crypto, 0.15% for traditional Forex/Gold), the setup must be immediately invalidated (`is_valid = false`) and suppressed to shield the user from entering high-risk, wide SL setups.
 > 4. **Sinhala Translation (සිංහල පරිවර්තනය):** වෙළඳ සෙටප් එකක Stop Loss (SL) එක කිසිසේත්ම Equal Lows (EQL) හෝ Equal Highs (EQH) මට්ටමකට ආසන්නව නොතැබිය යුතුය. මන්ද මාකට් එක හැමවෙලේම EQL/EQH වලට යටින් ඇති orders sweep කිරීමට නැඹුරු වේ. ඊට පහළින් Strong Low හෝ HTF Demand zone එකක් තිබේ නම්, SL එක එම ශක්තිමත් මට්ටමට වඩා 0.1% ක් පහළින් තැබිය යුතුය. මෙම ආරක්ෂිත SL මට්ටම දැමූ පසු SL පරාසය Crypto සඳහා 0.85% සීමාව ඉක්මවයි නම්, එම සෙටප් එක අවලංගු කළ යුතුය.
 
-
-
+## 32. 15-Minute to 1-Minute Multi-Timeframe Institutional Breakout & FVG Retracement Strategy (New Rule)
+> [!IMPORTANT]
+> **15M-TO-1M MULTI-TIMEFRAME SMC STRATEGY RULES:**
+> 1. **Rule 1: Market Bias / Direction Detection (15-Minute Timeframe):** Determine the bias/direction strictly on the 15-minute timeframe. Do NOT use moving averages or indicators.
+>    - BULLISH BIAS (BUY ONLY): Market is making HH/HL with upward structural breaks (BOS). Look ONLY for Buy opportunities.
+>    - BEARISH BIAS (SELL ONLY): Market is making LH/LL with downward structural breaks (BOS). Look ONLY for Sell opportunities.
+> 2. **Rule 2: Higher Timeframe Setup (15-Minute Timeframe):**
+>    - Identify unmitigated 15m broken structures (BOS), FVG, or Order Blocks (OB) in line with the Bias, and key swing high/low liquidity zones.
+>    - Wait for the price to retrace into the 15m FVG/OB. Observe a Liquidity Sweep (wick sweep without body close breakout) showing rejection/weakness.
+>    - Draw a Rectangle Zone from the closing price of that rejection candle to its absolute wick extreme (high/low).
+> 3. **Rule 3: Execution & Entry Criteria (1-Minute Timeframe):**
+>    - Once price interacts with the 15m Rectangle Zone, scale down immediately to the 1m chart. Monitor confirmation patterns (MSS, Engulfing/Morning Star, or Marubozu candle close).
+>    - **FOR A BUY ENTRY (Buy Limit):** Price must enter the 15m Rectangle Zone.
+>      * Entry Method A (Breakout): Trigger when a 1m candle breaks and CLOSES completely (body close) above the top of the Rectangle.
+>      * Entry Method B (Retracement): Wait for price to retrace to the 50% level of the 15m FVG and enter upon confirmation.
+>    - **FOR A SELL ENTRY (Sell Limit):** Price must enter the 15m Rectangle Zone.
+>      * Entry Method A (Breakout): Trigger when a 1m candle breaks and CLOSES completely (body close) below the bottom of the Rectangle.
+>      * Entry Method B (Retracement): Wait for price to retrace to the 50% level of the 15m FVG and enter upon confirmation.
+> 4. **Rule 4: Risk Management (SL & TP):**
+>    - **STOP LOSS (SL):** Place SL slightly below the nearest 1m major swing low (for BUY) or slightly above the nearest 1m major swing high (for SELL) with the 0.1% buffer (using the python override). Keep SL extremely tight (aim for 1 to 2 pips where applicable due to 1m execution).
+>    - **TAKE PROFIT (TP):** Target key structural levels or aim for high Risk-to-Reward (RR) ratios of 3:1, 4:1, or 5:1.
+> 5. **Sinhala Translation (සිංහල පරිවර්තනය):** 
+>    - Market Bias එක තීරණය කරන්නේ 15-Minute timeframe එකෙහි ව්‍යුහය (HH/HL/BOS) මඟින් පමණි. 
+>    - මිල 15m FVG/OB එකකට පැමිණ wick sweep එකක් (rejection) සිදුකළ විට, එම ඉටිපන්දමේ ශරීර වැසීමේ මට්ටමේ (body close) සිට wick extreme එක දක්වා Rectangle එකක් අඳින්න. 
+>    - ඉන්පසු 1-Minute chart එකට මාරු වී, මිල එම Rectangle කලාපයට ඇතුල් වූ විට:
+>      * Buy සෙටප් සඳහා: 1m ඉටිපන්දමක් Rectangle එකෙන් ඉහළින් body close එකක් දීමෙන් (Method A) හෝ 15m FVG එකෙහි 50% මට්ටමට pullback වීමෙන් (Method B) ඇතුල්වීම් සිදුකරයි.
+>      * Sell සෙටප් සඳහා: 1m ඉටිපන්දමක් Rectangle එකෙන් පහළින් body close එකක් දීමෙන් (Method A) හෝ 15m FVG එකෙහි 50% මට්ටමට pullback වීමෙන් (Method B) ඇතුල්වීම් සිදුකරයි.
+>    - Stop Loss එක 1m local swing low/high එකට පිටතින් ඉතාමත් තදින් (tight SL) තැබිය යුතුය. TP ඉලක්කය 3:1, 4:1, හෝ 5:1 RR විය යුතුය.
