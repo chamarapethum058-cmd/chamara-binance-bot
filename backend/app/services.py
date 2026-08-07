@@ -1476,15 +1476,22 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                 # Filter only levels above our range_low to be valid
                 valid_candidates = [c for c in valid_candidates if c[0] > range_low]
                 
-                if valid_candidates:
-                    # Deepest FVG/OB in Discount means the one closest to the range low (deepest pullback)
-                    best_candidate = min(valid_candidates, key=lambda x: x[0])
-                    # Make sure it's below current price
-                    if best_candidate[0] < current_price:
-                        return best_candidate[0], best_candidate[1]
+                # Filter candidates that are close to the current price (within 0.35%)
+                close_candidates = [c for c in valid_candidates if (current_price - c[0]) / current_price <= 0.0035 and c[0] < current_price]
                 
-                # Fallback to discount OTE if no valid arrays found
-                fallback_entry = midpoint - (midpoint - range_low) * 0.5
+                if close_candidates:
+                    # Pick the deepest among the close candidates to maximize RR
+                    best_candidate = min(close_candidates, key=lambda x: x[0])
+                    return best_candidate[0], best_candidate[1]
+                elif valid_candidates:
+                    # If all are too far, pick the closest FVG/OB to the current price
+                    best_candidate = min(valid_candidates, key=lambda x: abs(current_price - x[0]))
+                    return best_candidate[0], best_candidate[1]
+                
+                # Fallback to discount OTE or closer entry if no valid arrays found
+                fallback_entry = current_price * 0.998 # 0.2% pullback from current price
+                if fallback_entry < range_low:
+                    fallback_entry = midpoint - (midpoint - range_low) * 0.5
                 return fallback_entry, range_low - buffer
                 
             else: # BEARISH
@@ -1502,15 +1509,22 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                 # Filter only levels below our range_high to be valid
                 valid_candidates = [c for c in valid_candidates if c[0] < range_high]
                 
-                if valid_candidates:
-                    # Highest FVG/OB in Premium means the one closest to the range high (deepest pullback)
-                    best_candidate = max(valid_candidates, key=lambda x: x[0])
-                    # Make sure it's above current price
-                    if best_candidate[0] > current_price:
-                        return best_candidate[0], best_candidate[1]
+                # Filter candidates that are close to the current price (within 0.35%)
+                close_candidates = [c for c in valid_candidates if (c[0] - current_price) / current_price <= 0.0035 and c[0] > current_price]
                 
-                # Fallback to premium OTE if no valid arrays found
-                fallback_entry = midpoint + (range_high - midpoint) * 0.5
+                if close_candidates:
+                    # Pick the deepest (highest) among the close candidates to maximize RR
+                    best_candidate = max(close_candidates, key=lambda x: x[0])
+                    return best_candidate[0], best_candidate[1]
+                elif valid_candidates:
+                    # If all are too far, pick the closest FVG/OB to the current price
+                    best_candidate = min(valid_candidates, key=lambda x: abs(current_price - x[0]))
+                    return best_candidate[0], best_candidate[1]
+                
+                # Fallback to premium OTE or closer entry if no valid arrays found
+                fallback_entry = current_price * 1.002 # 0.2% pullback
+                if fallback_entry > range_high:
+                    fallback_entry = midpoint + (range_high - midpoint) * 0.5
                 return fallback_entry, range_high + buffer
 
         except Exception as e:
@@ -3219,6 +3233,11 @@ Live 15-Minute Candles Data (15m):
                 bias = result.get("daily_bias") or ""
                 current_sl = result.get("stop_loss_level")
                 
+                # Dynamic risk limit constraint of 0.1% to 0.22% max for high-velocity scalping (Rule 4)
+                # To maintain this tight SL while keeping SL outside swing extreme (candles 200),
+                # we optimize the entry price closer to the swing extreme!
+                max_risk_pct = 0.0022 # 0.22% max risk for super tight SL
+                
                 if "BULLISH" in bias or "Buy" in epa:
                     # Buy Limit setup
                     ref_price = entry_price or range_low
@@ -3226,11 +3245,30 @@ Live 15-Minute Candles Data (15m):
                     
                     safe_sl = round(range_low * 0.999, precision)
                     result["stop_loss_level"] = safe_sl
-                    logger.info(f"Programmatic SL Override: Set Buy SL to absolute range low {safe_sl} (below range low {range_low})")
+                    
+                    # Optimize Entry Price if risk is too wide:
+                    # Risk = Entry - SL. If Risk / Entry > max_risk_pct, then we set:
+                    # entry_price = safe_sl / (1 - max_risk_pct)
+                    natural_risk_pct = (entry_price - safe_sl) / entry_price if entry_price > 0 else 0
+                    if natural_risk_pct > max_risk_pct:
+                        optimized_entry = round(safe_sl / (1.0 - max_risk_pct), precision)
+                        logger.info(f"Entry Optimization: Pushed Buy Entry down from {entry_price} to {optimized_entry} to keep SL tight at {max_risk_pct*100:.2f}%")
+                        entry_price = optimized_entry
+                        result["entry_price_area"] = f"Buy Limit at {entry_price}"
+                    
+                    # Verify proximity check (Limit Entry must be within 5-8 minutes fill time, i.e., max 0.35% from current price)
+                    dist_pct = abs(price - entry_price) / price if price > 0 else 0
+                    if dist_pct > 0.0035: # 0.35% max pullback distance allowed
+                        result["is_valid"] = False
+                        result["entry_price_area"] = "No Entry (Pullback Distance Too Far)"
+                        result["confidence"] = 0
+                        reason_eng = f"The setup is locked out because the optimized entry price ({entry_price}) is too far ({dist_pct*100:.2f}%) from current market price ({price}), exceeding the 5-8 minute execution fill threshold."
+                        reason_sin = f"හඳුනාගත් ඇතුල්වීමේ මිල ({entry_price}) වත්මන් වෙළඳපල මිලට වඩා {dist_pct*100:.2f}% ක් ඈතින් පිහිටන බැවින්, විනාඩි 5-8ක් ඇතුළත එය සක්‍රීය වීමට ඇති ඉඩකඩ අවම බැවින් මෙම සෙටප් එක අවහිර කර ඇත."
+                        result["reasoning"] = f"{reason_eng}\n\n---\n\n**සිංහල පරිවර්තනය (Sinhala Translation):**\n{reason_sin}"
                     
                     # Update TP levels to maintain risk-reward structure (Rule 21)
                     risk = entry_price - result["stop_loss_level"] if entry_price is not None else 0
-                    if risk > 0:
+                    if risk > 0 and result.get("is_valid") is True:
                         result["tp1_target"] = round(entry_price + risk * 2.0, precision)
                         result["tp2_target"] = round(entry_price + risk * 3.0, precision)
                         result["tp3_target"] = round(entry_price + risk * 4.0, precision)
@@ -3239,7 +3277,7 @@ Live 15-Minute Candles Data (15m):
                         result["tp2_rr"] = "1:3.0 RR"
                         result["tp3_rr"] = "1:4.0 RR"
                         result["target_reward_ratio"] = "1:3.0 RR"
-                    else:
+                    elif result.get("is_valid") is True:
                         result["is_valid"] = False
                         result["entry_price_area"] = "No Entry (Invalid SL Configuration)"
                         
@@ -3250,11 +3288,30 @@ Live 15-Minute Candles Data (15m):
                     
                     safe_sl = round(range_high * 1.001, precision)
                     result["stop_loss_level"] = safe_sl
-                    logger.info(f"Programmatic SL Override: Set Sell SL to absolute range high {safe_sl} (above range high {range_high})")
-                        
+                    
+                    # Optimize Entry Price if risk is too wide:
+                    # Risk = SL - Entry. If Risk / Entry > max_risk_pct, then we set:
+                    # entry_price = safe_sl / (1 + max_risk_pct)
+                    natural_risk_pct = (safe_sl - entry_price) / entry_price if entry_price > 0 else 0
+                    if natural_risk_pct > max_risk_pct:
+                        optimized_entry = round(safe_sl / (1.0 + max_risk_pct), precision)
+                        logger.info(f"Entry Optimization: Pushed Sell Entry up from {entry_price} to {optimized_entry} to keep SL tight at {max_risk_pct*100:.2f}%")
+                        entry_price = optimized_entry
+                        result["entry_price_area"] = f"Sell Limit at {entry_price}"
+                    
+                    # Verify proximity check (Limit Entry must be within 5-8 minutes fill time, i.e., max 0.35% from current price)
+                    dist_pct = abs(price - entry_price) / price if price > 0 else 0
+                    if dist_pct > 0.0035: # 0.35% max pullback distance allowed
+                        result["is_valid"] = False
+                        result["entry_price_area"] = "No Entry (Pullback Distance Too Far)"
+                        result["confidence"] = 0
+                        reason_eng = f"The setup is locked out because the optimized entry price ({entry_price}) is too far ({dist_pct*100:.2f}%) from current market price ({price}), exceeding the 5-8 minute execution fill threshold."
+                        reason_sin = f"හඳුනාගත් ඇතුල්වීමේ මිල ({entry_price}) වත්මන් වෙළඳපල මිලට වඩා {dist_pct*100:.2f}% ක් ඈතින් පිහිටන බැවින්, විනාඩි 5-8ක් ඇතුළත එය සක්‍රීය වීමට ඇති ඉඩකඩ අවම බැවින් මෙම සෙටප් එක අවහිර කර ඇත."
+                        result["reasoning"] = f"{reason_eng}\n\n---\n\n**සිංහල පරිවර්තනය (Sinhala Translation):**\n{reason_sin}"
+                    
                     # Update TP levels to maintain risk-reward structure (Rule 21)
                     risk = result["stop_loss_level"] - entry_price if entry_price is not None else 0
-                    if risk > 0:
+                    if risk > 0 and result.get("is_valid") is True:
                         result["tp1_target"] = round(entry_price - risk * 2.0, precision)
                         result["tp2_target"] = round(entry_price - risk * 3.0, precision)
                         result["tp3_target"] = round(entry_price - risk * 4.0, precision)
@@ -3263,25 +3320,9 @@ Live 15-Minute Candles Data (15m):
                         result["tp2_rr"] = "1:3.0 RR"
                         result["tp3_rr"] = "1:4.0 RR"
                         result["target_reward_ratio"] = "1:3.0 RR"
-                    else:
+                    elif result.get("is_valid") is True:
                         result["is_valid"] = False
                         result["entry_price_area"] = "No Entry (Invalid SL Configuration)"
-
-            # Enforce 10-15 Minutes High-Velocity Scalping SL Width Constraint (Rule 4)
-            # If the calculated Stop Loss is wider than the allowed threshold, it is not a high-velocity scalp setup.
-            # In this case, invalidate and lockout to protect from long holding periods or massive risk.
-            if result.get("is_valid") is True and entry_price is not None and result.get("stop_loss_level") is not None:
-                risk_pct = abs(entry_price - result["stop_loss_level"]) / entry_price
-                
-                # Determine threshold dynamically based on asset class (Crypto vs traditional Forex/Gold)
-                is_crypto = any(x in payload.get("symbol", "").upper() for x in ["USDT", "BUSD", "BTC", "ETH", "SOL", "DOGE"])
-                max_risk_allowed = 0.0085 if is_crypto else 0.0015  # 0.85% for crypto, 0.15% for gold/forex
-                
-                if risk_pct > max_risk_allowed:
-                    result["is_valid"] = False
-                    result["entry_price_area"] = f"No Entry (SL Range Too Wide - {risk_pct*100:.2f}%)"
-                    reason_eng = f"The setup is invalidated because the Stop Loss range ({risk_pct*100:.2f}%) exceeds the maximum {max_risk_allowed*100:.2f}% threshold required for a high-velocity scalp."
-                    reason_sin = f"Stop Loss පරාසය ({risk_pct*100:.2f}%) scalp trade එකක් සඳහා අවශ්‍ය උපරිම {max_risk_allowed*100:.2f}% සීමාව ඉක්මවා යන බැවින් මෙම සෙටප් එක අවලංගු කර ඇත."
                     result["reasoning"] = f"{reason_eng}\n\n---\n\n**සිංහල පරිවර්තනය (Sinhala Translation):**\n{reason_sin}"
                     result["stop_loss_level"] = None
                     result["liquidity_target"] = None
