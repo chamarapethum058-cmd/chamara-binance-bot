@@ -1539,42 +1539,46 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
 
             # Dynamically analyze broad visible range of the last 200 candles (Rule 13)
             candles = get_candles(sym, timeframe, limit=200)
-            if not candles or len(candles) < 50:
+            if not candles or len(candles) < 30:
                 return fallback_bias
 
+            highs = [c["high"] for c in candles]
+            lows = [c["low"] for c in candles]
             closes = [c["close"] for c in candles]
-            sma_50 = sum(closes[-50:]) / 50.0
-            last_close = closes[-1]
-
-            # Swing High and Low break detection on last 200 candles
-            # Use middle range (candles 40 to 180) to identify the major swing highs and lows
-            mid_candles = candles[40:180]
-            lowest_pdl = min(c["low"] for c in mid_candles)
-            highest_pdh = max(c["high"] for c in mid_candles)
-
-            # Check if any of the recent 10 candles closed below lowest_pdl (Bearish MSS)
-            bearish_mss = any(c["close"] < lowest_pdl for c in candles[-10:])
-            # Check if any of the recent 10 candles closed above highest_pdh (Bullish MSS)
-            bullish_mss = any(c["close"] > highest_pdh for c in candles[-10:])
-
-            # Count of consecutive down/up closes in recent 20 candles
-            down_closes = sum(1 for c in candles[-20:] if c["close"] < c["open"])
-            up_closes = sum(1 for c in candles[-20:] if c["close"] > c["open"])
-
-            if bearish_mss and not bullish_mss:
-                logger.info(f"Dynamic structure detection for {sym}: BEARISH MSS detected.")
-                return "BEARISH"
-            elif bullish_mss and not bearish_mss:
-                logger.info(f"Dynamic structure detection for {sym}: BULLISH MSS detected.")
-                return "BULLISH"
+            n = len(candles)
             
-            # Fallback to SMA & Momentum closes
-            if last_close < sma_50 and down_closes > up_closes:
-                logger.info(f"Dynamic structure detection for {sym}: BEARISH SMA & Momentum trend.")
-                return "BEARISH"
-            elif last_close > sma_50 and up_closes > down_closes:
-                logger.info(f"Dynamic structure detection for {sym}: BULLISH SMA & Momentum trend.")
-                return "BULLISH"
+            # Find swing highs and lows with a 3-candle wing width
+            swing_highs = []
+            swing_lows = []
+            for i in range(3, n - 3):
+                if highs[i] == max(highs[i-3:i+4]):
+                    swing_highs.append((i, highs[i]))
+                if lows[i] == min(lows[i-3:i+4]):
+                    swing_lows.append((i, lows[i]))
+
+            # Track structure bias forward
+            bias_state = fallback_bias
+            last_swing_high = None
+            last_swing_low = None
+            
+            # Walk through the candles in chronological order to track state breaks
+            for i in range(3, n):
+                active_highs = [val for idx, val in swing_highs if idx < i]
+                active_lows = [val for idx, val in swing_lows if idx < i]
+                
+                if active_highs:
+                    last_swing_high = active_highs[-1]
+                if active_lows:
+                    last_swing_low = active_lows[-1]
+                    
+                # Check for structural body close breaks
+                if last_swing_high is not None and closes[i] > last_swing_high:
+                    bias_state = "BULLISH"
+                elif last_swing_low is not None and closes[i] < last_swing_low:
+                    bias_state = "BEARISH"
+
+            logger.info(f"Dynamic structure detection for {sym}: State tracks to {bias_state}.")
+            return bias_state
 
         except Exception as e:
             logger.error(f"Error detecting market structure bias dynamically: {e}")
