@@ -2965,7 +2965,7 @@ You must strictly evaluate these 12 rules:
      * ENTRY METHOD A (Breakout): Trigger when a candle breaks and CLOSES completely (body close) below the bottom of the Rectangle.
      * ENTRY METHOD B (Retracement): Alternatively, wait for price to retrace to the 50% level of the FVG and enter upon confirmation.
 4. Risk Management (SL & TP - Rule 32):
-   - STOP LOSS (SL): Place slightly past the nearest major swing extreme low (for Buy) or high (for Sell) with the programmatic 0.1% buffer (using the python override). Keep SL extremely tight.
+   - STOP LOSS (SL): Place the Stop Loss strictly past the absolute swing low extreme (for Buy/Long setups) or absolute swing high extreme (for Sell/Short setups) of the entire 200-candle visible range (representing the Strong Low / Strong High of the session) with a 0.1% safety buffer. Never place the SL within local retracements or inside retail stop-hunt zones.
    - TAKE PROFIT (TP): Target other key levels or aim for a high Risk-to-Reward ratio of 3:1, 4:1, or 5:1.
 5. FVG/OB Boundary Limit Entry & Buffer Rules: The entry price MUST have a minimum distance of 0.1% to 0.5% from the current market price to ensure it is a true pending pullback limit entry (Rule 4).
 6. 80% Minimum Confidence Score: Calculate confidence based on 9 confluences: Trend alignment (20%), POI mitigation (10%), 1m rejection wick (10%), LTF Shift/MSS (10%), limit entry/pullback (10%), RSI confirmation (10%), M1 sweep (10%), displacement CHoCH (10%), FVG/OB confluence (10%). If confidence < 80%, set is_valid = false.
