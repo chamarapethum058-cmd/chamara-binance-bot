@@ -276,3 +276,16 @@ The bot must strictly enforce the following high-impact news rules:
 >      * Buy සෙටප් සඳහා: ඉටිපන්දමක් Rectangle එකෙන් ඉහළින් body close එකක් දීමෙන් (Method A) හෝ FVG එකෙහි 50% මට්ටමට pullback වීමෙන් (Method B) ඇතුල්වීම් සිදුකරයි.
 >      * Sell සෙටප් සඳහා: ඉටිපන්දමක් Rectangle එකෙන් පහළින් body close එකක් දීමෙන් (Method A) හෝ FVG එකෙහි 50% මට්ටමට pullback වීමෙන් (Method B) ඇතුල්වීම් සිදුකරයි.
 >    - Stop Loss එක local swing low/high එකට පිටතින් ඉතාමත් තදින් (tight SL) තැබිය යුතුය. TP ඉලක්කය 3:1, 4:1, හෝ 5:1 RR විය යුතුය.
+
+## 33. LuxAlgo Smart Money Concepts (SMC) Indicator Alignment Protocol (New Rule)
+> [!IMPORTANT]
+> **LUXALGO SMC INDICATOR ALIGNMENT RULES:**
+> 1. **Visual Indicator Matching:** The bot's background scan, local programmatics, and Gemini AI analysis must strictly model and emulate the LuxAlgo Smart Money Concepts indicator settings shown on the TradingView screen.
+> 2. **Structural Element Checks:** Detect and trace:
+>    - Break of Structure (BOS) and Change of Character (CHoCH / MSS) shifts.
+>    - Order Blocks (OB) - Demand (Bullish) and Supply (Bearish) zones.
+>    - Equal Highs (EQH) and Equal Lows (EQL) retail liquidity pools.
+>    - Strong Highs / Strong Lows and Weak Highs / Weak Lows swing extremes.
+>    - Fair Value Gaps (FVG) and Liquidity Voids.
+> 3. **Bilingual Requirement:** Ensure that all analytical confluences and setups clearly mention LuxAlgo SMC alignment in reasoning text and Sinhala translations.
+> 4. **Sinhala Translation (සිංහල පරිවර්තනය):** පද්ධතියේ SMC විශ්ලේෂණය TradingView හි ඇති **LuxAlgo Smart Money Concepts** indicator එකෙහි රටාවන්ට (BOS, CHoCH/MSS, EQL, EQH, Order Blocks, FVGs, Strong/Weak Highs/Lows) 100% ක්ම අනුකූලව සිදු විය යුතුය. එමඟින් බොට් එකෙහි trade setups චාර්ට් එකෙහි ඇසට පෙනෙන මට්ටම් සමඟ සම්පූර්ණයෙන්ම ගැලපේ.
