@@ -2868,9 +2868,10 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
             candles = await asyncio.to_thread(get_candles, sym, timeframe, limit=200)
             candles_1m = candles
         
-        # Calculate local technical indicators to feed to AI
-        range_low = min(c["low"] for c in candles) if candles else pdl
-        range_high = max(c["high"] for c in candles) if candles else pdh
+        # Calculate local technical indicators to feed to AI (using last 40 candles for tight SL / immediate dealing range)
+        local_candles = candles[-40:] if candles else []
+        range_low = min(c["low"] for c in local_candles) if local_candles else pdl
+        range_high = max(c["high"] for c in local_candles) if local_candles else pdh
         equilibrium = (range_high + range_low) / 2.0
         is_discount = price < equilibrium
 
