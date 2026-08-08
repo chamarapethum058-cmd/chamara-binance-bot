@@ -896,7 +896,7 @@ export default function Dashboard() {
         po3_phase: smcPo3Phase
       };
 
-      const resSMC = await fetch(`${API_BASE}/smc/analyze`, {
+      const resSMC = await fetch(`${API_BASE}/smc/analyze`, { // Cache-busting recompile trigger
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
