@@ -1482,14 +1482,17 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                 if close_candidates:
                     # Pick the deepest among the close candidates to maximize RR
                     best_candidate = min(close_candidates, key=lambda x: x[0])
-                    return best_candidate[0], best_candidate[1]
+                    # Apply 0.04% spread buffer (closer to current price / upwards) (Rule 34)
+                    buffered_entry = best_candidate[0] * 1.0004
+                    return buffered_entry, best_candidate[1]
                 elif valid_candidates:
                     # If all are too far, pick the closest FVG/OB to the current price
                     best_candidate = min(valid_candidates, key=lambda x: abs(current_price - x[0]))
-                    return best_candidate[0], best_candidate[1]
+                    buffered_entry = best_candidate[0] * 1.0004
+                    return buffered_entry, best_candidate[1]
                 
                 # Fallback to discount OTE or closer entry if no valid arrays found
-                fallback_entry = current_price * 0.998 # 0.2% pullback from current price
+                fallback_entry = (current_price * 0.998) * 1.0004
                 if fallback_entry < range_low:
                     fallback_entry = midpoint - (midpoint - range_low) * 0.5
                 return fallback_entry, range_low - buffer
@@ -1515,14 +1518,17 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                 if close_candidates:
                     # Pick the deepest (highest) among the close candidates to maximize RR
                     best_candidate = max(close_candidates, key=lambda x: x[0])
-                    return best_candidate[0], best_candidate[1]
+                    # Apply 0.04% spread buffer (closer to current price / downwards) (Rule 34)
+                    buffered_entry = best_candidate[0] * 0.9996
+                    return buffered_entry, best_candidate[1]
                 elif valid_candidates:
                     # If all are too far, pick the closest FVG/OB to the current price
                     best_candidate = min(valid_candidates, key=lambda x: abs(current_price - x[0]))
-                    return best_candidate[0], best_candidate[1]
+                    buffered_entry = best_candidate[0] * 0.9996
+                    return buffered_entry, best_candidate[1]
                 
                 # Fallback to premium OTE or closer entry if no valid arrays found
-                fallback_entry = current_price * 1.002 # 0.2% pullback
+                fallback_entry = (current_price * 1.002) * 0.9996
                 if fallback_entry > range_high:
                     fallback_entry = midpoint + (range_high - midpoint) * 0.5
                 return fallback_entry, range_high + buffer
@@ -3004,7 +3010,7 @@ You must strictly evaluate these 12 rules:
 4. Risk Management (SL & TP - Rule 32):
    - STOP LOSS (SL): Place the Stop Loss strictly past the absolute swing low extreme (for Buy/Long setups) or absolute swing high extreme (for Sell/Short setups) of the entire 200-candle visible range (representing the Strong Low / Strong High of the session) with a 0.1% safety buffer. Never place the SL within local retracements or inside retail stop-hunt zones.
    - TAKE PROFIT (TP): Target other key levels or aim for a high Risk-to-Reward ratio of 3:1, 4:1, or 5:1.
-5. FVG/OB Boundary Limit Entry & Buffer Rules: The entry price MUST have a minimum distance of 0.1% to 0.5% from the current market price to ensure it is a true pending pullback limit entry (Rule 4).
+5. FVG/OB Boundary Limit Entry & Buffer Rules: The entry price MUST have a minimum distance of 0.1% to 0.5% from the current market price to ensure it is a true pending pullback limit entry (Rule 4). To prevent missing entries by a fraction of a pip/cent due to front-running and spread, the final Limit Entry price must incorporate a 0.04% proximity spread buffer (Buy Limit is adjusted upwards by 0.04% closer to current price, and Sell Limit is adjusted downwards by 0.04% closer to current price). (Rule 34 - Proximity Spread Buffer Protocol).
 6. 80% Minimum Confidence Score: Calculate confidence based on 9 confluences: Trend alignment (20%), POI mitigation (10%), 1m rejection wick (10%), LTF Shift/MSS (10%), limit entry/pullback (10%), RSI confirmation (10%), M1 sweep (10%), displacement CHoCH (10%), FVG/OB confluence (10%). If confidence < 80%, set is_valid = false.
 7. Economic News Lockout: If news_lockout_active is true, set is_valid = false.
 8. RSI Momentum Check: Buy setup is allowed only when RSI <= 65. Sell setup is allowed only when RSI >= 35. Otherwise, invalidate the setup.

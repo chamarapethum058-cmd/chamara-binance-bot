@@ -289,3 +289,15 @@ The bot must strictly enforce the following high-impact news rules:
 >    - Fair Value Gaps (FVG) and Liquidity Voids.
 > 3. **Bilingual Requirement:** Ensure that all analytical confluences and setups clearly mention LuxAlgo SMC alignment in reasoning text and Sinhala translations.
 > 4. **Sinhala Translation (සිංහල පරිවර්තනය):** පද්ධතියේ SMC විශ්ලේෂණය TradingView හි ඇති **LuxAlgo Smart Money Concepts** indicator එකෙහි රටාවන්ට (BOS, CHoCH/MSS, EQL, EQH, Order Blocks, FVGs, Strong/Weak Highs/Lows) 100% ක්ම අනුකූලව සිදු විය යුතුය. එමඟින් බොට් එකෙහි trade setups චාර්ට් එකෙහි ඇසට පෙනෙන මට්ටම් සමඟ සම්පූර්ණයෙන්ම ගැලපේ.
+
+## 34. Proximity Spread Buffer Protocol (New Rule)
+> [!IMPORTANT]
+> **PROXIMITY SPREAD BUFFER RULES:**
+> 1. **Entry Spread Buffer Adjustment:** To prevent missing limit entry orders by a fraction of a pip/cent due to spread and institutional front-running near FVG/OB boundaries, the calculated Limit Entry price must be adjusted slightly closer to the current market price by adding a **0.04% proximity spread buffer**.
+> 2. **Buffer Calculations**:
+>    - **Buy Limit (Long Setup):** The Limit Entry price must be adjusted upwards: `entry_price = entry_price * 1.0004`.
+>    - **Sell Limit (Short Setup):** The Limit Entry price must be adjusted downwards: `entry_price = entry_price * 0.9996`.
+> 3. **Rule Enforcement:** This buffer must be programmatically applied to all calculated/fallback limit entries, ensuring higher execution fill rates on shallow pullbacks.
+> 4. **Sinhala Translation (සිංහල පරිවර්තනය):** FVG/OB සීමාවන්ට මිල ළඟා වී, spread එක හෝ front-running හේතුවෙන් ලිමිට් ඇණවුම් ක්‍රියාත්මක නොවී හැරී යාම (missed entries) වැළැක්වීම සඳහා, ගණනය කරන ලද Limit Entry මිල සැමවිටම වත්මන් මිලට 0.04% ක් ආසන්න වන සේ බෆරයක් (Spread Buffer) තබා සැකසිය යුතුය:
+>    - Buy Limit: ඇතුල්වීමේ මිල 0.04% ක් ඉහළට සකසයි (`entry * 1.0004`).
+>    - Sell Limit: ඇතුල්වීමේ මිල 0.04% ක් පහළට සකසයි (`entry * 0.9996`).
