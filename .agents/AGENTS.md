@@ -301,3 +301,10 @@ The bot must strictly enforce the following high-impact news rules:
 > 4. **Sinhala Translation (සිංහල පරිවර්තනය):** FVG/OB සීමාවන්ට මිල ළඟා වී, spread එක හෝ front-running හේතුවෙන් ලිමිට් ඇණවුම් ක්‍රියාත්මක නොවී හැරී යාම (missed entries) වැළැක්වීම සඳහා, ගණනය කරන ලද Limit Entry මිල සැමවිටම වත්මන් මිලට 0.04% ක් ආසන්න වන සේ බෆරයක් (Spread Buffer) තබා සැකසිය යුතුය:
 >    - Buy Limit: ඇතුල්වීමේ මිල 0.04% ක් ඉහළට සකසයි (`entry * 1.0004`).
 >    - Sell Limit: ඇතුල්වීමේ මිල 0.04% ක් පහළට සකසයි (`entry * 0.9996`).
+
+## 35. Proactive Console Error & Server Maintenance Protocol (New Rule)
+> [!IMPORTANT]
+> **PROACTIVE ERROR RESOLUTION & SERVER MONITORING:**
+> 1. **Zero Console Errors Policy:** The bot must ensure the frontend dashboard displays zero console errors, hydration mismatches, or network fetch errors. 
+> 2. **Auto-Resolution of Server Conflicts:** If any port conflicts, webpack build cache corruption, or server dropouts occur, the bot must proactively detect them, kill competing tasks (such as duplicate Node.js or Uvicorn processes), clear stale caches (`.next`), and restart the server environment to ensure 100% online availability.
+> 3. **Bilingual Requirement (සිංහල පරිවර්තනය):** බ්‍රවුසරයෙහි කිසිදු console error එකක්, hydration mismatch එකක් හෝ fetch error එකක් පෙන්වීමට ඉඩ නොතැබිය යුතුය. යම් හෙයකින් සර්වර් එකෙහි port conflict එකක් හෝ cache බිඳ වැටීමක් සිදු වුවහොත්, වහාම පැරණි ක්‍රියාවලීන් (processes) kill කර, `.next` cache එක මකා දමා සර්වර් එක නැවත පණ ගැන්විය යුතුය.
