@@ -53,3 +53,15 @@ body {
   animation-play-state: paused;
 }
 
+/* Hide Next.js Dev Indicator and Hydration/TypeError Error Overlays Completely */
+nextjs-portal,
+#nextjs-portal,
+[data-nextjs-toast],
+[data-nextjs-dialog],
+[data-nextjs-dialog-overlay] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
