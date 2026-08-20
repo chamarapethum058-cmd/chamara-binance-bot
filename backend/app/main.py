@@ -918,7 +918,7 @@ async def fetch_yahoo_finance(yahoo_symbol: str):
         }
 
 @app.get("/api/market/price")
-async def get_market_price(symbol: str):
+async def get_market_price(symbol: str, include_trends: bool = True):
     original_symbol = symbol.strip().upper()
     symbol_upper = original_symbol
     if symbol_upper.endswith(".P"):
@@ -932,14 +932,19 @@ async def get_market_price(symbol: str):
     if yahoo_symbol:
         try:
             res_data = await fetch_yahoo_finance(yahoo_symbol)
-            trend_1h, trend_15m, trend_1m = await asyncio.gather(
-                asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "1h", "BULLISH"),
-                asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "15m", "BULLISH"),
-                asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "1m", "BULLISH")
-            )
-            daily_bias = trend_1m
+            if include_trends:
+                trend_1h, trend_15m, trend_5m, trend_1m = await asyncio.gather(
+                    asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "1h", "BULLISH"),
+                    asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "15m", "BULLISH"),
+                    asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "5m", "BULLISH"),
+                    asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "1m", "BULLISH")
+                )
+            else:
+                trend_1h, trend_15m, trend_5m, trend_1m = "PENDING", "PENDING", "PENDING", "PENDING"
+            daily_bias = trend_1m if include_trends else "PENDING"
             res_data["daily_bias"] = daily_bias
             res_data["trend_1m"] = trend_1m
+            res_data["trend_5m"] = trend_5m
             res_data["trend_15m"] = trend_15m
             res_data["trend_1h"] = trend_1h
             res_data["symbol"] = original_symbol
@@ -953,47 +958,71 @@ async def get_market_price(symbol: str):
         binance_symbol = f"{binance_symbol}USDT"
         
     async with httpx.AsyncClient() as client:
-        try:
-            url = f"https://api.binance.com/api/v3/klines?symbol={binance_symbol}&interval=1d&limit=2"
-            res = await client.get(url, timeout=5.0)
-            if res.status_code == 200:
-                data = res.json()
-                if len(data) >= 2:
-                    prev_candle = data[0]
-                    curr_candle = data[1]
-                    fallback_bias = "BULLISH" if float(curr_candle[4]) >= float(prev_candle[1]) else "BEARISH"
-                    trend_1h, trend_15m, trend_1m = await asyncio.gather(
-                        asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "1h", fallback_bias),
-                        asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "15m", fallback_bias),
-                        asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "1m", fallback_bias)
-                    )
-                    daily_bias = trend_1m
-                    return {
-                        "symbol": original_symbol,
-                        "pdh": float(prev_candle[2]),
-                        "pdl": float(prev_candle[3]),
-                        "open": float(prev_candle[1]),
-                        "close": float(prev_candle[4]),
-                        "current_price": float(curr_candle[4]),
-                        "daily_bias": daily_bias,
-                        "trend_1m": trend_1m,
-                        "trend_15m": trend_15m,
-                        "trend_1h": trend_1h
-                    }
-        except Exception:
-            pass
+        # Try Binance Spot first, then fallback to Binance Futures
+        apis = [
+            {"name": "Binance Spot", "url": f"https://api.binance.com/api/v3/klines?symbol={binance_symbol}&interval=1d&limit=2"},
+            {"name": "Binance Futures", "url": f"https://fapi.binance.com/fapi/v1/klines?symbol={binance_symbol}&interval=1d&limit=2"}
+        ]
+        
+        data = None
+        for api in apis:
+            try:
+                res = await client.get(api["url"], timeout=5.0)
+                if res.status_code == 200:
+                    data = res.json()
+                    break
+            except Exception:
+                pass
+                
+        if data is not None and len(data) >= 2:
+            prev_candle = data[0]
+            curr_candle = data[1]
+            fallback_bias = "BULLISH" if float(curr_candle[4]) >= float(prev_candle[1]) else "BEARISH"
+            if include_trends:
+                trend_1h, trend_15m, trend_5m, trend_1m = await asyncio.gather(
+                    asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "1h", fallback_bias),
+                    asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "15m", fallback_bias),
+                    asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "5m", fallback_bias),
+                    asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "1m", fallback_bias)
+                )
+            else:
+                trend_1h, trend_15m, trend_5m, trend_1m = "PENDING", "PENDING", "PENDING", "PENDING"
+            daily_bias = trend_1m if include_trends else "PENDING"
+            return {
+                "symbol": original_symbol,
+                "pdh": float(prev_candle[2]),
+                "pdl": float(prev_candle[3]),
+                "open": float(prev_candle[1]),
+                "close": float(prev_candle[4]),
+                "current_price": float(curr_candle[4]),
+                "daily_bias": daily_bias,
+                "trend_1m": trend_1m,
+                "trend_5m": trend_5m,
+                "trend_15m": trend_15m,
+                "trend_1h": trend_1h
+            }
             
         # 3. Fallback: try Yahoo Finance as {symbol}-USD
         try:
-            res_data = await fetch_yahoo_finance(f"{symbol_upper}-USD")
-            trend_1h, trend_15m, trend_1m = await asyncio.gather(
-                asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "1h", "BULLISH"),
-                asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "15m", "BULLISH"),
-                asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "1m", "BULLISH")
-            )
-            daily_bias = trend_1m
+            yf_symbol = symbol_upper
+            if yf_symbol.endswith("USDT"):
+                yf_symbol = yf_symbol[:-4]
+            elif yf_symbol.endswith("USD"):
+                yf_symbol = yf_symbol[:-3]
+            res_data = await fetch_yahoo_finance(f"{yf_symbol}-USD")
+            if include_trends:
+                trend_1h, trend_15m, trend_5m, trend_1m = await asyncio.gather(
+                    asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "1h", "BULLISH"),
+                    asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "15m", "BULLISH"),
+                    asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "5m", "BULLISH"),
+                    asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "1m", "BULLISH")
+                )
+            else:
+                trend_1h, trend_15m, trend_5m, trend_1m = "PENDING", "PENDING", "PENDING", "PENDING"
+            daily_bias = trend_1m if include_trends else "PENDING"
             res_data["daily_bias"] = daily_bias
             res_data["trend_1m"] = trend_1m
+            res_data["trend_5m"] = trend_5m
             res_data["trend_15m"] = trend_15m
             res_data["trend_1h"] = trend_1h
             res_data["symbol"] = original_symbol
@@ -1001,19 +1030,25 @@ async def get_market_price(symbol: str):
         except Exception:
             try:
                 res_data = await fetch_yahoo_finance(symbol_upper)
-                trend_1h, trend_15m, trend_1m = await asyncio.gather(
-                    asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "1h", "BULLISH"),
-                    asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "15m", "BULLISH"),
-                    asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "1m", "BULLISH")
-                )
-                if trend_1h == "BULLISH" and trend_15m == "BULLISH":
-                    daily_bias = "BULLISH"
-                elif trend_1h == "BEARISH" and trend_15m == "BEARISH":
-                    daily_bias = "BEARISH"
+                if include_trends:
+                    trend_1h, trend_15m, trend_5m, trend_1m = await asyncio.gather(
+                        asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "1h", "BULLISH"),
+                        asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "15m", "BULLISH"),
+                        asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "5m", "BULLISH"),
+                        asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "1m", "BULLISH")
+                    )
+                    if trend_1h == "BULLISH" and trend_15m == "BULLISH":
+                        daily_bias = "BULLISH"
+                    elif trend_1h == "BEARISH" and trend_15m == "BEARISH":
+                        daily_bias = "BEARISH"
+                    else:
+                        daily_bias = "NEUTRAL"
                 else:
-                    daily_bias = "NEUTRAL"
+                    trend_1h, trend_15m, trend_5m, trend_1m = "PENDING", "PENDING", "PENDING", "PENDING"
+                    daily_bias = "PENDING"
                 res_data["daily_bias"] = daily_bias
                 res_data["trend_1m"] = trend_1m
+                res_data["trend_5m"] = trend_5m
                 res_data["trend_15m"] = trend_15m
                 res_data["trend_1h"] = trend_1h
                 res_data["symbol"] = original_symbol
@@ -1055,6 +1090,60 @@ async def fetch_current_price_for_symbol(symbol: str) -> float:
 
 @app.post("/api/trades/log", response_model=LoggedTradeResponse)
 async def log_trade(trade: LoggedTradeCreate, db: Session = Depends(get_db)):
+    # Verify the setup using Gemini AI before logging (Rule 9 and User request)
+    from app.tracker import get_current_price, standardize_symbol
+    from app.market import get_candles
+    
+    price = get_current_price(trade.symbol)
+    if price is None or price <= 0:
+        price = trade.entry_price
+        
+    daily_open = price
+    pdh = price * 1.01
+    pdl = price * 0.99
+    try:
+        sym = standardize_symbol(trade.symbol)
+        daily_candles = get_candles(sym, "1d", limit=2)
+        if daily_candles:
+            daily_open = daily_candles[-1]["open"]
+        if len(daily_candles) >= 2:
+            pdh = daily_candles[-2]["high"]
+            pdl = daily_candles[-2]["low"]
+    except Exception:
+        pass
+
+    payload = {
+        "symbol": trade.symbol,
+        "timeframe": trade.timeframe or "1m",
+        "current_price": price,
+        "pdh": pdh,
+        "pdl": pdl,
+        "daily_open": daily_open,
+        "strategy_model": "double_mitigation"
+    }
+    
+    try:
+        ai_result = await AIService.calculate_programmatic_smc(payload)
+        is_valid = ai_result.get("is_valid", False)
+        confidence = ai_result.get("confidence", 0)
+        
+        if not is_valid:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Gemini AI rejected this setup: {ai_result.get('entry_price_area', 'No Entry')}. (Gemini AI විසින් මෙම setup එක ප්‍රතික්ෂේප කර ඇත.)"
+            )
+        if confidence < 90:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Gemini AI confidence is {confidence}%, which is below the mandatory 90% threshold. (Gemini AI විශ්වාසනීයත්වය 90% ට වඩා අඩු බැවින් ඇතුළත් කළ නොහැක.)"
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Gemini verification failed during logging: {e}. Falling back to local validation.")
+        pass
+
     try:
         import asyncio
         await asyncio.to_thread(
@@ -1081,6 +1170,52 @@ async def log_trade(trade: LoggedTradeCreate, db: Session = Depends(get_db)):
     db.add(db_trade)
     db.commit()
     db.refresh(db_trade)
+
+    # Phase 2: Auto-Trading Execution
+    try:
+        from app.models import PreferenceModel
+        from app.execution_module import BinanceExecutor
+        import asyncio
+
+        auto_trade_pref = db.query(PreferenceModel).filter(PreferenceModel.key == "auto_trade_enabled").first()
+        is_auto_trade = auto_trade_pref.value.lower() == "true" if auto_trade_pref else False
+
+        if is_auto_trade:
+            # Get API credentials
+            from app.config import settings
+            api_key = settings.BINANCE_API_KEY
+            api_secret = settings.BINANCE_API_SECRET
+            
+            # Get Risk Percentage (Default to 1.0%)
+            risk_pref = db.query(PreferenceModel).filter(PreferenceModel.key == "risk_percentage").first()
+            risk_pct = float(risk_pref.value) if risk_pref else 1.0
+
+            # Get mock account balance for now (Could fetch live from Binance)
+            account_balance = 1000.0  
+            
+            qty = BinanceExecutor.calculate_lot_size(
+                account_balance=account_balance,
+                risk_percentage=risk_pct,
+                entry_price=trade.entry_price,
+                stop_loss=trade.stop_loss
+            )
+
+            if qty > 0 and api_key and api_secret:
+                executor = BinanceExecutor(api_key, api_secret)
+                side = "BUY" if trade.direction == "BULLISH" else "SELL"
+                
+                # Execute asynchronously without blocking the response
+                asyncio.create_task(executor.place_limit_order(
+                    symbol=trade.symbol,
+                    side=side,
+                    quantity=qty,
+                    price=trade.entry_price,
+                    stop_loss=trade.stop_loss,
+                    take_profit=trade.take_profit
+                ))
+    except Exception as e:
+        logger.error(f"Failed to trigger auto-execution: {e}")
+
     return db_trade
 
 @app.get("/api/trades/history", response_model=List[LoggedTradeResponse])

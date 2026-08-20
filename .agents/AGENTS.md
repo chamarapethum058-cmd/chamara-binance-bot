@@ -308,3 +308,138 @@ The bot must strictly enforce the following high-impact news rules:
 > 1. **Zero Console Errors Policy:** The bot must ensure the frontend dashboard displays zero console errors, hydration mismatches, or network fetch errors. 
 > 2. **Auto-Resolution of Server Conflicts:** If any port conflicts, webpack build cache corruption, or server dropouts occur, the bot must proactively detect them, kill competing tasks (such as duplicate Node.js or Uvicorn processes), clear stale caches (`.next`), and restart the server environment to ensure 100% online availability.
 > 3. **Bilingual Requirement (සිංහල පරිවර්තනය):** බ්‍රවුසරයෙහි කිසිදු console error එකක්, hydration mismatch එකක් හෝ fetch error එකක් පෙන්වීමට ඉඩ නොතැබිය යුතුය. යම් හෙයකින් සර්වර් එකෙහි port conflict එකක් හෝ cache බිඳ වැටීමක් සිදු වුවහොත්, වහාම පැරණි ක්‍රියාවලීන් (processes) kill කර, `.next` cache එක මකා දමා සර්වර් එක නැවත පණ ගැන්විය යුතුය.
+
+## 36. Closest Valid FVG/OB Zone Selection Protocol (New Rule)
+> [!IMPORTANT]
+> **CLOSEST VALID ZONE SELECTION RULES:**
+> 1. **Closest Zone Selection Over Deepest:** Within the 0.35% threshold distance filter, when multiple valid unmitigated Fair Value Gaps (FVG) or Order Blocks (OB) are identified below/above the midpoint, the bot must strictly select the candidate zone **closest to the current market price** (the highest price for Buy setups, and the lowest price for Sell setups). This overrides the deepest zone/pullback selection logic to maximize order trigger probability on high-momentum trends.
+> 2. **Rule Enforcement:**
+>    - **Bullish (Buy Limit Setup):** Select the candidate with the maximum price within the close candidates: `max(close_candidates, key=lambda x: x[0])`.
+>    - **Bearish (Sell Limit Setup):** Select the candidate with the minimum price within the close candidates: `min(close_candidates, key=lambda x: x[0])`.
+> 3. **Bilingual Requirement (සිංහල පරිවර්තනය):** වත්මන් මිලට ආසන්නතම වලංගු කලාපය (closest FVG/OB zone) තෝරා ගැනීමේ ඇල්ගොරිතමය අනිවාර්යයෙන්ම ක්‍රියාත්මක කළ යුතුය. වත්මන් මිලට 0.35% සීමාව තුළ වලංගු කලාප කිහිපයක් ඇති විට, ගැඹුරුම කලාපය වෙනුවට සැමවිටම වත්මන් මිලට ආසන්නතම කලාපය (Buy setups සඳහා වැඩිම මිල සහිත සහ Sell setups සඳහා අවම මිල සහිත) තෝරාගත යුතුය.
+
+## 37. Strict 15m Trend Alignment Filter (New Rule)
+> [!IMPORTANT]
+> **STRICT 15M TREND ALIGNMENT RULES:**
+> 1. **Anti-Counter-Trend Lockout:** To eliminate high-risk counter-trend losses on the 1-minute chart, when the active execution timeframe is set to 1m, any generated trade setups must strictly align with the 15-minute timeframe trend. 
+> 2. **Rule Enforcement:**
+>    - A **Buy Limit Setup** is allowed ONLY if the active 15m trend is `BULLISH`. If the 15m trend is `BEARISH`, the setup must be immediately invalidated (`No Entry (15m Trend Mismatch Lockout)`).
+>    - A **Sell Limit Setup** is allowed ONLY if the active 15m trend is `BEARISH`. If the 15m trend is `BULLISH`, the setup must be immediately invalidated (`No Entry (15m Trend Mismatch Lockout)`).
+> 3. **Bilingual Requirement (සිංහල පරිවර්තනය):** 1m කාලරාමුවෙහි සිදුවන පාඩු අවම කරගැනීම සඳහා, වත්මන් 1m setup දිශාව 15m කාලරාමුවේ ප්‍රධාන ප්‍රවණතාවය (trend) සමඟ 100% ක්ම ගැලපිය යුතුය. 15m trend එක Bearish නම් Buy setups ද, 15m trend එක Bullish නම් Sell setups ද සම්පූර්ණයෙන්ම අවහිර කර lockout කළ යුතුය.
+
+## 38. 90% Minimum Confidence Score Limit (New Rule)
+> [!IMPORTANT]
+> **90% MINIMUM CONFIDENCE LIMIT RULES:**
+> 1. **Confidence Score Threshold Increase:** The minimum strategy confidence score required to validate and execute any trade setup is increased from 80% to **90%**.
+> 2. **Rule Enforcement:** If the programmatically calculated confluence rating is less than 90%, the bot must suppress the setup and return `No Entry (Confidence < 90%)` to prevent execution of lower-probability setups.
+> 3. **Bilingual Requirement (සිංහල පරිවර්තනය):** වෙළඳ සෙටප් එකක් වලංගු කිරීම සඳහා අවශ්‍ය අවම Confluence අගය 80% සිට **90%** දක්වා ඉහළ නංවා ඇත. Confluence අගය 90% ට වඩා අඩු සෙටප්ස් ඩෑෂ්බෝඩ් එකෙහි `No Entry (Confidence < 90%)` ලෙස අවහිර කළ යුතුය.
+
+## 39. Major Structural Swing Stop Loss Protocol (New Rule)
+> [!IMPORTANT]
+> **MAJOR STRUCTURAL SWING STOP-LOSS RULES:**
+> 1. **Major Swing Selection Over Minor Wicks:** When timeframe is set to 1m (scalping mode), the Stop Loss must strictly be placed past the true Major Structural Swing Extreme, not a minor inner wick. The system automatically scans for a major extreme by requiring a minimum of a 15-candle window on BOTH sides of the peak/valley (e.g., the highest point in a 31-candle window). This filters out weak inner pullbacks during dumps/pumps.
+> 2. **Tight Safety Buffer (0.05%):** Place the SL past this major swing extreme at major_swing_low * 0.9995 (for Buys) or major_swing_high * 1.0005 (for Sells) to keep risk range extremely tight while protecting from stop-hunts.
+> 3. **0.25% Risk Capping:** Max allowed risk range is capped strictly at 0.25% to force the optimized entry price closer to the SL level, generating a high-probability close-proximity 1:3/1:4 RR Take Profit target.
+> 4. **Bilingual Requirement (සිංහල පරිවර්තනය):** 1m කාලරාමුවෙහි Scalp setups සඳහා, Stop Loss (SL) එක තබන්නේ කුඩා Wicks වලට නොව 15-candle window එකක් මඟින් තහවුරු කරන ලද **ප්‍රධාන Structural Swing Extreme** සීමාවට 0.05% ක කුඩා බෆරයක් සහිතවය. තවද, උපරිම අවදානම (Risk Range) 0.25% දක්වා සීමා කිරීම මඟින් එන්ට්‍රිය SL එකට ආසන්න කර TP ඉලක්කය ඉතා ආසන්නයට රැගෙන එයි.
+
+## 40. 1500-Candle Multi-Timeframe Key Level Scanner (New Rule)
+> [!IMPORTANT]
+> **1500-CANDLE KEY LEVEL SCANNER RULES:**
+> 1. **1500-Candle Lookback Scan:** When analyzing any trade setup on the selected timeframe, the system must scan up to the last 1500 historical candles (මෑතකදී දිස්වන පුළුල් ඉටිදැම් 1500 ක පරාසයක්) chronologically to map structure, swings (highs/lows), equal extremes (EQH/EQL), and unmitigated FVG/OB zones.
+> 2. **Proximity Alignment Check:** Reconfirm that the entry price aligns with the closest valid FVG or OB zone (Rule 36) or major structural level within this deep historical lookback, with the stop loss set safely outside the local/HTF swing extreme to produce a high-precision sniper setup.
+> 3. **Expected Fill Time:** Ensure the entry price is configured close enough to the current price so that it is filled within 5 to 8 minutes.
+> 4. **Bilingual Requirement (සිංහල පරිවර්තනය):** මෙම රීතිය මඟින් සක්‍රීය කාලරාමුවේ පසුගිය ඉටිපන්දම් 1500 ක පරාසයක් විශ්ලේෂණය කර, එහි ඇති සියලුම Swing High/Low, OB, FVG, සහ EQH/EQL මට්ටම් හඳුනාගෙන, ඇතුල්වීමේ මිලට ආසන්නතම මට්ටම ගලපනු ලබයි.
+
+## 41. Opposing HTF POI Dynamic RR Lockout Protocol (New Rule)
+> [!IMPORTANT]
+> **OPPOSING HTF POI DYNAMIC RR RULES:**
+> 1. **Opposing POI Check:** For any 1m scalp setup, the system must automatically scan the 15m and 1h timeframes for unmitigated opposing POIs (Demand zones/OB/FVG for Bearish Sell setups, or Supply zones/OB/FVG for Bullish Buy setups).
+> 2. **Dynamic Risk-to-Reward (RR) Filter (1:2.0 Threshold):** If a major opposing HTF POI is located near the entry price, the system must measure the Risk-to-Reward (RR) distance from the Entry Price to the opposing POI against the Stop Loss. If this space provides a 1:2.0 RR or higher, the setup is VALID, and the Take Profit must be dynamically placed directly before the opposing POI.
+> 3. **Lockout Condition:** Only if the available space to the opposing POI yields less than a 1:2.0 RR should the setup be invalidated (No Entry (Opposing HTF POI Lock)).
+> 4. **Bilingual Requirement (සිංහල පරිවර්තනය):** 1m scalp setups වලදී, ප්‍රතිවිරුද්ධ HTF කලාපයක් (Demand/Supply zone) පිහිටා ඇති දුර ප්‍රමාණය Stop Loss එකට සාපේක්ෂව 1:2.0 (Risk-to-Reward) අගයකට වඩා අඩුවෙන් පවතී නම් පමණක් මිල හැරී යාමේ අවදානම ඉහළ බැවින් එම setup එක වහාම අවලංගු කර No Entry (Opposing HTF POI Lock) ලෙස සටහන් කළ යුතුය. RR එක 1:2.0 ට වඩා වැඩි නම්, Take Profit එක අදාළ කලාපයට පෙර සකසා Entry එක ලබා දිය යුතුය.
+
+## 42. 15m Confirmation / Rejection Block Entry (New Rule)
+> [!IMPORTANT]
+> **15M CONFIRMATION ENTRY RULES:**
+> 1. **2nd Entry Model Enforcement:** When timeframe is set to 15m, the entry calculation must strictly follow the 2nd Entry Model (Confirmation Entry) rather than placing early limit orders.
+> 2. **Rejection Block Entry Level:** Place the Limit Entry exactly at the Rejection Block sweep boundary (Buy at `recent_sl_low * 1.0004` (sweep low + 0.04% buffer); Sell at `recent_sl_high * 0.9996` (sweep high - 0.04% buffer)) to catch the retest of the swept zone.
+> 3. **Tight Safety Buffer (0.05%):** Place the SL strictly past the new swing extreme with a tight 0.05% buffer (Buy SL is `recent_sl_low * 0.9995`; Sell SL is `recent_sl_high * 1.0005`) to prevent stop-hunts after the sweep.
+> 4. **Bilingual Requirement (සිංහල පරිවර්තනය):** 15m setups වලදී, ඇතුල්වීම සිදු කරන්නේ 2nd Entry Model (Confirmation Entry) ක්‍රමයටය. එනම්, එන්ට්‍රිය තබන්නේ Rejection Block (රීතියානුකූලව සිදුවන wick sweep කෙළවර) සීමාවෙහි වන අතර, Stop Loss (SL) එක තබන්නේ 0.05% ක ඉතා තද බෆරයක් සහිතව නවතම sweep සීමාවට එපිටිනි.
+
+## 43. Minimum Stop-Loss Distance Protocol (New Rule)
+> [!IMPORTANT]
+> **MINIMUM STOP-LOSS DISTANCE RULES:**
+> 1. **Minimum Distance Cap (0.10%):** To prevent stop-hunts caused by spreads or micro-wicks on ultra-narrow structures, the calculated Stop Loss level must strictly be placed at a minimum distance of **0.10%** from the entry price.
+> 2. **Buffer Adjustment:** If the swing extreme is closer than 0.10% of the asset price (e.g. 0.029% risk), the Stop Loss is dynamically adjusted to this minimum safe distance (Buy SL <= `entry_price * 0.9990`; Sell SL >= `entry_price * 1.0010`).
+> 3. **Bilingual Requirement (සිංහල පරිවර්තනය):** ඉතාමත් කුඩා පරාසයන්හිදී සිදුවන spread stop-hunts වැළැක්වීම සඳහා, Stop Loss (SL) එක සැමවිටම ඇතුල්වීමේ මිලට වඩා අවම වශයෙන් **0.10%** ක දුරකින් (Buy SL: `entry_price * 0.9990` හෝ ඊට අඩු; Sell SL: `entry_price * 1.0010` හෝ ඊට වැඩි) පිහිටිය යුතුය.## 44. Deepest Unmitigated Zone Stop-Loss Coverage Protocol (New Rule)
+> [!IMPORTANT]
+> **DEEPEST UNMITIGATED ZONE STOP-LOSS COVERAGE RULES:**
+> 1. **Complete Pullback Leg Scan:** When scanning for unmitigated FVG/OB zones to determine the safe Stop Loss boundary, the scanner search range is expanded to **1.5%** of the entry price to detect any active unmitigated zones in the deep pullback leg.
+> 2. **Deepest Zone Protection:** The Stop Loss must be calculated safely below/above the deepest unmitigated boundary detected in this 1.5% range (Buy SL is `min(swing_low, deepest_zone_bottom) * 0.9995`; Sell SL is `max(swing_high, deepest_zone_top) * 1.0005`).
+> 3. **Dynamic Entry Optimization:** If this safe Stop Loss yields a risk distance greater than the strict **0.25%** max risk cap, the engine must dynamically push the Entry Price down/up to cap the risk distance strictly at **0.25%** relative to that deep Stop Loss.
+> 4. **Lockout Enforcement:** If the optimized entry price exceeds the strict **0.35%** limit distance from the current price, the trade setup is immediately blocked as `No Entry (Pullback Distance Too Far)` to prevent stop-hunts on deep pullbacks.
+> 5. **Bilingual Requirement (සිංහල පරිවර්තනය):** මෙම රීතිය මඟින් ඇතුල්වීමේ මිලෙහි සිට 1.5% ක් ගැඹුරට යන තෙක් ඇති සියලුම unmitigated FVG/OB මට්ටම් පරිලෝකනය කර, සැබෑ ගැඹුරුම සීමාවට එපිටින් Stop Loss (SL) එක තබයි. එහිදී අවදානම (risk) 0.25% සීමාව ඉක්මවන්නේ නම්, ඇතුල්වීමේ මිල ස්වයංක්‍රීයව වෙනස් කරන අතර, එය වත්මන් මිලට වඩා 0.35% සීමාව ඉක්මවා ඈත් වන්නේ නම් සෙටප් එක සම්පූර්ණයෙන්ම අවහිර (lockout) කරයි.
+
+
+## 45. Multi-Timeframe POI Reversal & 5m Confirmation Protocol (New Rule)
+> [!IMPORTANT]
+> **MTF POI REVERSAL & 5M CONFIRMATION RULES:**
+> 1. **Bypass 15m Trend Alignment:** The requirement that the 15-minute trend must align in the same direction is completely removed. Reversals off key levels are permitted regardless of the macro 15m trend.
+> 2. **15m POI Mitigation Verification:** The setup must reside inside or have mitigated a valid 15-minute Order Block/FVG zone (or swept daily liquidity PDL/SSL or PDH/BSL).
+> 3. **5m Trend/Momentum Alignment:** 
+>    - **Buy setup (Long):** 1m trend must be BULLISH, and the 5m trend must be BULLISH (confirming reversal structure shift inside the zone).
+>    - **Sell setup (Short):** 1m trend must be BEARISH, and the 5m trend must be BEARISH.
+> 4. **5m Mismatch Lockout:** If the 5m trend/momentum does not align with the 1m setup direction, the setup is suppressed and locked out, returning `No Entry (5m Trend Mismatch)`.
+> 5. **Bilingual Requirement (සිංහල පරිවර්තනය):** 15-Minute ප්‍රවණතාවය (trend) සමපාත වීමේ අවශ්‍යතාවය සම්පූර්ණයෙන්ම ඉවත් කර ඇත. 1m එන්ට්‍රියක් ගැනීමට නම්, මිල 15m Order Block/FVG කලාපයක් ස්පර්ශ කර තිබීම (mitigation) සහ 5-Minute ප්‍රවණතාවය (trend) 1m සෙටප් එකේ දිශාවටම (Buy සඳහා BULLISH, Sell සඳහා BEARISH) සමපාත වීම අනිවාර්ය වේ. 5m ප්‍රවණතාවය පටහැනි වුවහොත්, සෙටප් එක වහාම අවහිර කර `No Entry (5m Trend Mismatch)` ලෙස සටහන් කරයි.
+
+## 46. Ultra-Tight 1m Stop-Loss Optimization Protocol (New Rule)
+> [!IMPORTANT]
+> **TIGHT SL FIX RULES:**
+> 1. **0.15% Local Boundary Restraint:** When calculating the Stop Loss for 1-minute (1m) scalp setups, the system must NOT scan for deep historical unmitigated FVG/OB zones (like 1.5% away). It must ONLY consider local FVG/OB boundaries that reside within **0.15%** of the entry price (`0.0015` distance threshold) to ensure the Stop Loss remains tightly coupled to the local 1m structure.
+> 2. **Protection Against Wide SL Rejection:** By keeping the Stop Loss incredibly tight, the calculated Risk Percentage remains extremely low, preventing the Entry Price from being artificially pushed away (optimized) and preventing the setup from being locked out by the 5-8 minute proximity threshold.
+> 3. **Bilingual Requirement (සිංහල පරිවර්තනය):** 1m scalp එන්ට්‍රි සඳහා Stop Loss (SL) එක ගණනය කිරීමේදී ඈතින් පවතින ගැඹුරු කලාප සෙවීම වෙනුවට, ඇතුල්වීමේ මිලට 0.15% ක් පමණ ආසන්නයෙන් ඇති (local) 1m Swing ලක්ෂ්‍යය හෝ FVG එක පමණක් සැලකිල්ලට ගනී.
+
+## 47. Dynamic Market Execution Upgrade Protocol (New Rule)
+> [!IMPORTANT]
+> **MARKET EXECUTION UPGRADE RULES:**
+> 1. **Dynamic Risk-Based Market Entry:** If all 9 confluences are met, the system calculates the immediate natural risk percentage from the **Current Market Price** to the **Safe Stop Loss** (`|Current Price - SL| / Current Price`).
+> 2. **Instant Execution Bypass (Bypass Rule 12):** If this immediate risk percentage is less than or equal to the maximum allowed risk cap (0.25% for 1m, 0.22% for other timeframes), the system must instantly upgrade the setup to a **Market Execution** (`Market Buy at {price}` or `Market Sell at {price}`).
+> 3. **Pullback Distance Lock Bypass:** If the risk from the current price exceeds the maximum 0.25% cap, the system optimizes the Limit Order entry price. If this optimized Limit Order falls > 0.50% away from the current market price, the system must NOT lock out the trade with `No Entry (Pullback Distance Too Far)`. Instead, it must revert the setup to a **Market Execution** at the current market price, provided that a **1:2 Risk-to-Reward (RR)** ratio is still structurally achievable before hitting any opposing HTF POI.
+> 4. **Bilingual Requirement (සිංහල පරිවර්තනය):** වත්මන් වෙළඳපල මිලේ සිට Stop Loss එක දක්වා ඇති අවදානම (Risk) 0.25% ක උපරිම සීමාවට වඩා අඩු නම්, Limit එන්ට්‍රියක් ලැබෙන තෙක් බලා නොසිට වහාම Market Execution එකක් ලබා දෙයි. එසේම, ගණනය කළ Limit එන්ට්‍රිය 0.50% කට වඩා ඈතින් පිහිටයි නම්, සෙටප් එක අවහිර නොකර, වත්මන් මිලේ සිට 1:2 RR එකක් ලබාගත හැකිදැයි පරීක්ෂා කර Market Execution එකක් ලබා දීමට පද්ධතිය ක්‍රියා කරයි.
+
+## 48. Inducement & EQH/EQL Sweep Filter Protocol (New Rule)
+> [!IMPORTANT]
+> **INDUCEMENT & LIQUIDITY TRAP PREVENTION RULES:**
+> 1. **Mandatory HTF POI Mitigation:** The AI and background scanners must NEVER validate a 1-minute (1m) CHoCH (Market Structure Shift) if the price has not recently tapped into or mitigated a strong 15-minute (15m) or 1-Hour (1H) Order Block / Fair Value Gap (POI). Any 1m CHoCH forming in the middle of a range without HTF support must be classified as an "Inducement Trap" and ignored.
+> 2. **EQH / EQL Avoidance:** Before validating a setup, the system must check for nearby Equal Highs (EQH) or Equal Lows (EQL). If the calculated Stop Loss resides exactly at or just inside an un-swept EQH/EQL liquidity pool, the setup must be locked out to prevent stop-hunts.
+> 3. **Sweep Execution Requirement:** The system must wait for the EQH/EQL to be cleanly swept. The entry should only be taken from the very first valid 1m CHoCH that forms *after* the sweep, ensuring the Stop Loss is placed safely outside the newly formed extreme (which has already taken the liquidity).
+> 4. **Bilingual Requirement (සිංහල පරිවර්තනය):** 1m චාර්ට් එකේ හැදෙන CHoCH එකක් පිළිගත යුත්තේ එය 15m/1H කලාපයක් ස්පර්ශ කිරීමෙන් පසුව හැදුනොත් පමණි. එසේම, Stop Loss එක ආසන්නයේ EQH (Equal Highs) හෝ EQL (Equal Lows) ඇත්නම්, එම සෙටප් එක ප්‍රතික්ෂේප කර, මිල විසින් එම EQH/EQL ලක්ෂ්‍යය කඩාගෙන ගොස් (Sweep කර) හැදෙන ඊළඟ CHoCH එකෙන් පමණක් එන්ට්‍රිය ලබා දිය යුතුය.
+
+## 49. Watchlist Sync & Race-Condition Prevention Protocol (New Rule)
+> [!IMPORTANT]
+> **RACE-CONDITION PREVENTION RULES:**
+> 1. **No Automatic Sync Loop:** The frontend must never automatically sync the watchlist back to the database backend upon every periodic polling update. The automatic React `useEffect` synchronization on monitored array changes is strictly forbidden.
+> 2. **Direct Manual-Only Sync:** List updates to backend SQLite databases (POST `/api/watchlist/smc` and `/api/watchlist/tcs`) must ONLY be triggered by manual user actions (clicking the track button or manual removal).
+> 3. **Bilingual Requirement (සිංහල පරිවර්තනය):** Polling loop එක මඟින් දත්ත ලබා ගන්නා විට (GET), වෙබ් පිටුව මඟින් නැවත database එකට POST කිරීම (sync කිරීම) සම්පූර්ණයෙන්ම තහනම් වේ. Database එක යාවත්කාලීන විය යුත්තේ මැනුවල් ලෙස කාසියක් එකතු කරන විට හෝ මකන විට පමණි.
+
+## 50. Programmatic Local Scanner Verification Protocol (New Rule)
+> [!IMPORTANT]
+> **PROGRAMMATIC SCANNER RULES:**
+> 1. **No Mock Fallback Data:** The background live scanner loop must run actual programmatic indicator validations (RSI, news, swing extremes, Fibonacci Golden ratio, and Rule 41 opposing POI checks) locally in Python. Returning mock data or fixed confluences when `local_only=True` is passed is strictly prohibited.
+> 2. **Exact Sync Alignment:** The local programmatic results must evaluate the exact same parameters as manual scans to ensure 100% agreement between manual searches and watchlist monitoring status.
+> 3. **Bilingual Requirement (සිංහල පරිවර්තනය):** පසුබිම් ස්කෑනරය ක්‍රියාත්මක වන විට කිසිදු විටෙක ව්‍යාජ උපස්ථ දත්ත (mock data) ලෝඩ් නොකළ යුතුය. එය මැනුවල් සර්ච් එකෙහිදී සිදුවන සියලුම Python ගණනය කිරීම් එලෙසින්ම සිදු කළ යුතුය.
+
+## 51. Instant Watchlist Deletion upon Telegram Alert Confirmation (New Rule)
+> [!IMPORTANT]
+> **TELEGRAM ALERT WATCHLIST DELETION RULES:**
+> 1. **Instant Removal:** Once a watchlist setup is confirmed ($\ge 90\%$ confidence) and the Telegram alert is sent, the backend scanner must immediately remove the coin from the SQLite database preferences.
+> 2. **Anti-Spam Restriction:** Deleting the coin instantly from the active list prevents the bot from generating multiple duplicate Telegram alerts when the price oscillates.
+> 3. **Bilingual Requirement (සිංහල පරිවර්තනය):** සෙටප් එක තහවුරු වී ටෙලිග්‍රෑම් පණිවිඩය ගිය සැනින්, නැවත නැවත ඇලර්ට් යෑම වැළැක්වීම සඳහා අදාළ කාසිය වහාම database එකෙන් සහ ඩෑෂ්බෝඩ් එකෙන් ඉවත් කළ යුතුය.
+
+## 52. Closest Unmitigated Zone Entry Protocol (New Rule)
+> [!IMPORTANT]
+> **CLOSEST ZONE PRIORITIZATION RULES:**
+> 1. **Prioritize Closest Zone:** When determining the structural limit entry price, the system must scan visible candles for unmitigated FVG or OB zones. If multiple zones exist, it must strictly prioritize the unmitigated zone (whether FVG or OB) that is closest to the current market price.
+> 2. **Mitigation Retest Level:** The entry price should be placed at the boundary of this closest unmitigated zone (the top edge for Buy setups, or bottom edge for Sell setups) rather than forcing entries at the deepest swing extremes, preventing missed trades.
+> 3. **Bilingual Requirement (සිංහල පරිවර්තනය):** ලිමිට් ඇණවුමක් තැබීමේදී, වත්මන් මිලට ආසන්නයෙන්ම පවතින unmitigated FVG හෝ OB සීමාව හඳුනාගෙන, ඇතුල්වීමේ මිල (Entry price) සැමවිටම එම ආසන්නතම සීමාවෙහි සැකසිය යුතුය. වෙළඳපල හැරී යාමකදී (pullback) සාමාන්‍යයෙන් ආසන්නතම Fair Value Gap (FVG) එක ස්පර්ශ කරන බැවින්, දුරින් ඇති මට්ටම් වෙනුවට ළඟම ඇති කලාපයට ප්‍රමුඛතාවය දිය යුතුය.
+

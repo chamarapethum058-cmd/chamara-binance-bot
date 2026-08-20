@@ -72,7 +72,8 @@ async def run_tracker_loop():
                 try:
                     result = await AIService.calculate_programmatic_silver_bullet(
                         tracker["req_payload"],
-                        current_price=(new_price or tracker["req_payload"].get("current_price") or 0.0)
+                        current_price=(new_price or tracker["req_payload"].get("current_price") or 0.0),
+                        local_only=True
                     )
                     tracker["last_result"] = result
                     
@@ -190,7 +191,11 @@ async def run_smc_tracker_loop():
                     del notified_symbols[key]
 
             if monitored_coins:
-                for coin in monitored_coins:
+                computed_results = {}
+                coins_to_delete = set()
+                updated_any = False
+                
+                for coin in list(monitored_coins):
                     symbol = coin.get("symbol")
                     if not symbol:
                         continue
@@ -203,7 +208,6 @@ async def run_smc_tracker_loop():
                     # Fetch daily open, pdh, pdl to pass into payload
                     try:
                         sym = standardize_symbol(symbol)
-                            
                         daily_candles = get_candles(sym, "1d", limit=2)
                         daily_open = daily_candles[-1]["open"] if daily_candles else price
                         pdh = daily_candles[-2]["high"] if len(daily_candles) >= 2 else price * 1.01
@@ -232,10 +236,11 @@ async def run_smc_tracker_loop():
                         stop_loss = result.get("stop_loss_level")
                         take_profit = result.get("tp2_target")
                         
+                        coin_key = f"{symbol}_{coin.get('timeframe')}"
+                        
                         # Determine if we should notify
-                        key = f"{symbol}_{coin.get('timeframe')}"
-                        if is_valid and confidence >= 80:
-                            if not notified_symbols.get(key):
+                        if is_valid and confidence >= 90:
+                            if not notified_symbols.get(coin_key):
                                 from app.telegram_service import TelegramService
                                 direction_str = "Buy Limit" if "Buy" in entry_price else "Sell Limit"
                                 msg = (
@@ -252,14 +257,56 @@ async def run_smc_tracker_loop():
                                     f"SMC එන්ට්‍රිය තහවුරු කර ඇත! {symbol} සඳහා {direction_str} ඕඩරය සූදානම්. කරුණාකර ඔබගේ ටර්මිනලය පරීක්ෂා කරන්න."
                                 )
                                 asyncio.create_task(TelegramService.send_message(msg))
-                                notified_symbols[key] = True
+                                notified_symbols[coin_key] = True
+                                coins_to_delete.add(coin_key)
+                                updated_any = True
                         else:
-                            # Do not reset notification state to False immediately
-                            # This prevents duplicate notification spam when price oscillates
-                            pass
+                            # Keep coin but update parameters
+                            computed_results[coin_key] = {
+                                "confidence": confidence,
+                                "is_valid": is_valid,
+                                "entryPrice": entry_price,
+                                "stopLoss": stop_loss,
+                                "takeProfit": take_profit,
+                                "currentPrice": price
+                            }
+                            updated_any = True
                             
                     except Exception as ae:
                         logger.error(f"Error calculating programmatic SMC in tracker for {symbol}: {ae}")
+                
+                # Write updated watchlist back to SQLite preferences safely (fetching latest DB state first)
+                if updated_any:
+                    db = SessionLocal()
+                    try:
+                        pref = db.query(PreferenceModel).filter(PreferenceModel.key == "smc_monitored_coins").first()
+                        if pref and pref.value:
+                            current_db_coins = json.loads(pref.value)
+                            updated_list = []
+                            db_changed = False
+                            for db_coin in current_db_coins:
+                                k = f"{db_coin.get('symbol')}_{db_coin.get('timeframe')}"
+                                if k in coins_to_delete:
+                                    db_changed = True
+                                    continue # Delete from DB
+                                if k in computed_results:
+                                    res = computed_results[k]
+                                    db_coin["confidence"] = res["confidence"]
+                                    db_coin["is_valid"] = res["is_valid"]
+                                    db_coin["entryPrice"] = res["entryPrice"]
+                                    db_coin["stopLoss"] = res["stopLoss"]
+                                    db_coin["takeProfit"] = res["takeProfit"]
+                                    db_coin["currentPrice"] = res["currentPrice"]
+                                    db_changed = True
+                                updated_list.append(db_coin)
+                                
+                            if db_changed:
+                                pref.value = json.dumps(updated_list)
+                                db.commit()
+                    except Exception as se:
+                        logger.error(f"Error saving updated smc_monitored_coins in tracker: {se}")
+                    finally:
+                        db.close()
                         
         except Exception as e:
             logger.error(f"Error in SMC tracker loop: {e}")
@@ -280,22 +327,23 @@ async def run_tcs_tracker_loop():
     from app.telegram_service import TelegramService
     
     while True:
+        # Read monitored coins from DB preferences
         db = SessionLocal()
         try:
             from app.models import PreferenceModel
             pref = db.query(PreferenceModel).filter(PreferenceModel.key == "tcs_monitored_coins").first()
-            if not pref or not pref.value:
-                db.close()
-                await asyncio.sleep(10)
-                continue
-                
-            watchlist = json.loads(pref.value)
-            if not watchlist:
-                db.close()
-                await asyncio.sleep(10)
-                continue
-                
-            for coin in watchlist:
+            watchlist = json.loads(pref.value) if pref and pref.value else []
+        except Exception as pe:
+            logger.error(f"Error reading tcs_monitored_coins preference: {pe}")
+            watchlist = []
+        finally:
+            db.close()
+            
+        if watchlist:
+            coins_to_delete = set()
+            updated_any = False
+            
+            for coin in list(watchlist):
                 symbol = coin.get("symbol", "").upper()
                 if not symbol:
                     continue
@@ -349,12 +397,35 @@ async def run_tcs_tracker_loop():
                     )
                     asyncio.create_task(TelegramService.send_message(msg))
                     tcs_notified_symbols[key] = True
+                    coins_to_delete.add(f"{symbol}_{entry_price}")
+                    updated_any = True
                     
-        except Exception as e:
-            logger.error(f"Error in TCS tracker loop: {e}")
-        finally:
-            db.close()
-            
+            # Write updated watchlist back to SQLite preferences safely (fetching latest DB state first)
+            if updated_any:
+                db = SessionLocal()
+                try:
+                    pref = db.query(PreferenceModel).filter(PreferenceModel.key == "tcs_monitored_coins").first()
+                    if pref and pref.value:
+                        current_db_coins = json.loads(pref.value)
+                        updated_list = []
+                        db_changed = False
+                        for db_coin in current_db_coins:
+                            coin_sym = db_coin.get("symbol", "").upper()
+                            coin_entry = db_coin.get("entryPrice")
+                            del_key = f"{coin_sym}_{coin_entry}"
+                            if del_key in coins_to_delete:
+                                db_changed = True
+                                continue # Delete from DB
+                            updated_list.append(db_coin)
+                            
+                        if db_changed:
+                            pref.value = json.dumps(updated_list)
+                            db.commit()
+                except Exception as se:
+                    logger.error(f"Error saving updated tcs_monitored_coins in tracker: {se}")
+                finally:
+                    db.close()
+                    
         await asyncio.sleep(10)
 
 def start_tcs_tracker():

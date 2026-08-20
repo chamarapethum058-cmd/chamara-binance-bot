@@ -2782,10 +2782,10 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
             }
 
     @classmethod
-    def _get_mock_smc_analysis(cls, symbol: str, timeframe: str, price: float) -> Dict[str, Any]:
+    def _get_mock_smc_analysis(cls, symbol: str, timeframe: str, price: float, direction: Optional[str] = None) -> Dict[str, Any]:
         """Provides a structured real-time programmatic fallback analysis for SMC method."""
         symbol_upper = symbol.upper()
-        daily_bias = "BULLISH" if timeframe in ["1m", "3m", "5m"] else "BEARISH"
+        daily_bias = direction or ("BULLISH" if timeframe in ["1m", "3m", "5m"] else "BEARISH")
         
         if daily_bias == "BULLISH":
             entry_val = price * 0.9985
@@ -2872,9 +2872,6 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
         timeframe = str(payload.get("timeframe") or "15m")
         price = float(current_price or payload.get("current_price") or 64100.0)
         
-        if local_only:
-            # Return local/mock analysis directly to save credits and prevent API calls in background trackers
-            return cls._get_mock_smc_analysis(symbol, timeframe, price)
         pdh = float(payload.get("pdh") or price * 1.01)
         pdl = float(payload.get("pdl") or price * 0.99)
         daily_open = float(payload.get("daily_open") or price)
@@ -2893,13 +2890,13 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
         # Fetch both 15m and 1m candles to support the top-down 15m setup + 1m execution strategy (Rule 32)
         if timeframe == "1m":
             candles_15m, candles_1m = await asyncio.gather(
-                asyncio.to_thread(get_candles, sym, "15m", limit=100),
-                asyncio.to_thread(get_candles, sym, "1m", limit=200)
+                asyncio.to_thread(get_candles, sym, "15m", limit=500),
+                asyncio.to_thread(get_candles, sym, "1m", limit=1000)
             )
             candles = candles_1m
         else:
             candles_15m = []
-            candles = await asyncio.to_thread(get_candles, sym, timeframe, limit=200)
+            candles = await asyncio.to_thread(get_candles, sym, timeframe, limit=1000)
             candles_1m = candles
         
         # Calculate local technical indicators to feed to AI (using full 200 candles visible range for Stop Loss protection)
@@ -3119,9 +3116,10 @@ Live 15-Minute Candles Data (15m):
 {json.dumps(serializable_candles_15m, indent=2) if serializable_candles_15m else "N/A"}
 """
         active_key = db_key or settings.GEMINI_API_KEY
-        if not active_key:
-            logger.warning("GEMINI_API_KEY not configured. Falling back to mock technical analysis.")
-            result = cls._get_mock_smc_analysis(symbol, timeframe, price)
+        if local_only or not active_key:
+            if not active_key and not local_only:
+                logger.warning("GEMINI_API_KEY not configured. Falling back to mock technical analysis.")
+            result = cls._get_mock_smc_analysis(symbol, timeframe, price, direction=active_trend)
         else:
             try:
                 client = genai.Client(api_key=active_key)
@@ -3136,7 +3134,7 @@ Live 15-Minute Candles Data (15m):
                 result = json.loads(response.text.strip())
             except Exception as e:
                 logger.error(f"Gemini SMC analysis failed: {e}. Falling back to mock analysis.")
-                result = cls._get_mock_smc_analysis(symbol, timeframe, price)
+                result = cls._get_mock_smc_analysis(symbol, timeframe, price, direction=active_trend)
 
         # Enforce overrides programmatically on the final result before returning! (Rule 16: Timeframe Structure Check)
         result["daily_bias"] = active_trend
@@ -3245,11 +3243,38 @@ Live 15-Minute Candles Data (15m):
                 max_risk_pct = 0.0022 # 0.22% max risk for super tight SL
                 
                 if "BULLISH" in bias or "Buy" in epa:
-                    # Buy Limit setup
+                    # Buy Limit setup - Use recent_sl_low (LuxAlgo swing extreme) (Rule 39/40)
                     ref_price = entry_price or range_low
                     precision = 6 if ref_price < 1.0 else 4 if ref_price < 10.0 else 2
                     
-                    safe_sl = round(range_low * 0.999, precision)
+                    # Scan last 150 candles for any UNMITIGATED FVG or OB low boundaries to ensure safe SL placement (Rule 25 / Rule 40)
+                    ob_fvg_lows = []
+                    if candles:
+                        n_c = len(candles)
+                        start_idx = max(2, n_c - 150)
+                        for k in range(start_idx, n_c):
+                            # FVG Bullish boundary check (Unmitigated)
+                            if candles[k]["low"] > candles[k-2]["high"]:
+                                f_high = candles[k]["low"]
+                                f_low = candles[k-2]["high"]
+                                if all(candles[j]["low"] > f_low for j in range(k+1, n_c)):
+                                    ob_fvg_lows.append(f_low)
+                            # OB Bullish boundary check (Unmitigated)
+                            if candles[k-1]["close"] < candles[k-1]["open"]:
+                                o_low = candles[k-1]["low"]
+                                if all(candles[j]["low"] > o_low for j in range(k, n_c)):
+                                    ob_fvg_lows.append(o_low)
+                                
+                    # Enforce No Inner-Range Stop Losses (Rule 19) by placing SL outside the 150-candle swing extreme
+                    local_min = min(c["low"] for c in candles[-150:]) if len(candles) >= 150 else range_low
+                    swing_low = local_min
+                    
+                    # Stop Loss buffer calculation past FVG/OB outer boundary (Rule 25)
+                    lowest_ob_fvg = min(ob_fvg_lows) if ob_fvg_lows else swing_low
+                    true_ref_low = min(swing_low, lowest_ob_fvg)
+                    
+                    # Safe SL is strictly 0.1% below the lowest boundary (Rule 25)
+                    safe_sl = round(true_ref_low * 0.9990, precision)
                     result["stop_loss_level"] = safe_sl
                     
                     # Optimize Entry Price if risk is too wide:
@@ -3260,18 +3285,32 @@ Live 15-Minute Candles Data (15m):
                         optimized_entry = round(safe_sl / (1.0 - max_risk_pct), precision)
                         logger.info(f"Entry Optimization: Pushed Buy Entry down from {entry_price} to {optimized_entry} to keep SL tight at {max_risk_pct*100:.2f}%")
                         entry_price = optimized_entry
-                        result["entry_price_area"] = f"Buy Limit at {entry_price}"
+                        
+                    result["entry_price_area"] = f"Buy Limit at {entry_price}"
                     
-                    # Verify proximity check (Limit Entry must be within 5-8 minutes fill time, i.e., max 0.35% from current price)
-                    dist_pct = abs(price - entry_price) / price if price > 0 else 0
-                    if dist_pct > 0.0035: # 0.35% max pullback distance allowed
+                    # Limit entry must be at or below current price (Rule 12/Wait for Pullback)
+                    if entry_price >= price:
+                        # If entry is above current price, the current market risk is too wide to buy safely
+                        logger.info(f"Market risk too wide. Invalidate.")
                         result["is_valid"] = False
-                        result["entry_price_area"] = "No Entry (Pullback Distance Too Far)"
-                        result["confidence"] = 0
-                        reason_eng = f"The setup is locked out because the optimized entry price ({entry_price}) is too far ({dist_pct*100:.2f}%) from current market price ({price}), exceeding the 5-8 minute execution fill threshold."
-                        reason_sin = f"හඳුනාගත් ඇතුල්වීමේ මිල ({entry_price}) වත්මන් වෙළඳපල මිලට වඩා {dist_pct*100:.2f}% ක් ඈතින් පිහිටන බැවින්, විනාඩි 5-8ක් ඇතුළත එය සක්‍රීය වීමට ඇති ඉඩකඩ අවම බැවින් මෙම සෙටප් එක අවහිර කර ඇත."
+                        result["entry_price_area"] = "No Entry (SL Range Too Wide)"
+                        reason_eng = f"The stop-loss risk range is too wide. The required stop loss level ({safe_sl}) exceeds the maximum allowed 0.25% risk limit from the current price."
+                        reason_sin = f"නවත්වන පාඩු (SL) සීමාව ඉතා පුළුල් වේ. වත්මන් මිලෙහි සිට ගණනය කළවිට රීති 39 (Rule 39) හි අනිවාර්ය 0.25% අවදානම් සීමාව ඉක්මවා යයි."
                         result["reasoning"] = f"{reason_eng}\n\n---\n\n**සිංහල පරිවර්තනය (Sinhala Translation):**\n{reason_sin}"
-                    
+                        result["confidence"] = 0
+                    else:
+                        # Verify proximity check (Limit Entry must be within 5-8 minutes fill time, i.e., max 0.50% from current price) (Rule 21)
+                        dist_pct = abs(price - entry_price) / price if price > 0 else 0
+                        if dist_pct > 0.0050:
+                            # Pullback too far, invalidate setup
+                            logger.info(f"Pullback distance too far ({dist_pct*100:.2f}%). Invalidating setup.")
+                            result["is_valid"] = False
+                            result["entry_price_area"] = "No Entry (Pullback Too Far)"
+                            reason_eng = f"The pullback distance to the limit price is too far ({dist_pct*100:.2f}%). Reversal entry is suppressed to avoid chase risk."
+                            reason_sin = f"Limit මිලට ඇති Pullback දුර ඉතා වැඩි බැවින් ({dist_pct*100:.2f}%), අවදානම අවම කිරීම සඳහා මෙම සෙටප් එක අවලංගු කර ඇත."
+                            result["reasoning"] = f"{reason_eng}\n\n---\n\n**සිංහල පරිවර්තනය (Sinhala Translation):**\n{reason_sin}"
+                            result["confidence"] = 0
+                            
                     # Update TP levels to maintain risk-reward structure (Rule 21)
                     risk = entry_price - result["stop_loss_level"] if entry_price is not None else 0
                     if risk > 0 and result.get("is_valid") is True:
@@ -3292,7 +3331,34 @@ Live 15-Minute Candles Data (15m):
                     ref_price = entry_price or range_high
                     precision = 6 if ref_price < 1.0 else 4 if ref_price < 10.0 else 2
                     
-                    safe_sl = round(range_high * 1.001, precision)
+                    # Scan last 150 candles for any UNMITIGATED FVG or OB high boundaries to ensure safe SL placement (Rule 25 / Rule 40)
+                    ob_fvg_highs = []
+                    if candles:
+                        n_c = len(candles)
+                        start_idx = max(2, n_c - 150)
+                        for k in range(start_idx, n_c):
+                            # FVG Bearish boundary check (Unmitigated)
+                            if candles[k]["high"] < candles[k-2]["low"]:
+                                f_high = candles[k-2]["low"]
+                                f_low = candles[k]["high"]
+                                if all(candles[j]["high"] < f_high for j in range(k+1, n_c)):
+                                    ob_fvg_highs.append(f_high)
+                            # OB Bearish boundary check (Unmitigated)
+                            if candles[k-1]["close"] > candles[k-1]["open"]:
+                                o_high = candles[k-1]["high"]
+                                if all(candles[j]["high"] < o_high for j in range(k, n_c)):
+                                    ob_fvg_highs.append(o_high)
+                                
+                    # Enforce No Inner-Range Stop Losses (Rule 19) by placing SL outside the 150-candle swing extreme
+                    local_max = max(c["high"] for c in candles[-150:]) if len(candles) >= 150 else range_high
+                    swing_high = local_max
+                    
+                    # Stop Loss buffer calculation past FVG/OB outer boundary (Rule 25)
+                    highest_ob_fvg = max(ob_fvg_highs) if ob_fvg_highs else swing_high
+                    true_ref_high = max(swing_high, highest_ob_fvg)
+                    
+                    # Safe SL is strictly 0.1% above the highest boundary (Rule 25)
+                    safe_sl = round(true_ref_high * 1.0010, precision)
                     result["stop_loss_level"] = safe_sl
                     
                     # Optimize Entry Price if risk is too wide:
@@ -3303,18 +3369,32 @@ Live 15-Minute Candles Data (15m):
                         optimized_entry = round(safe_sl / (1.0 + max_risk_pct), precision)
                         logger.info(f"Entry Optimization: Pushed Sell Entry up from {entry_price} to {optimized_entry} to keep SL tight at {max_risk_pct*100:.2f}%")
                         entry_price = optimized_entry
-                        result["entry_price_area"] = f"Sell Limit at {entry_price}"
+                        
+                    result["entry_price_area"] = f"Sell Limit at {entry_price}"
                     
-                    # Verify proximity check (Limit Entry must be within 5-8 minutes fill time, i.e., max 0.35% from current price)
-                    dist_pct = abs(price - entry_price) / price if price > 0 else 0
-                    if dist_pct > 0.0035: # 0.35% max pullback distance allowed
+                    # Limit entry must be at or above current price (Rule 12/Wait for Pullback)
+                    if entry_price <= price:
+                        # If entry is below current price, the current market risk is too wide to sell safely
+                        logger.info(f"Market risk too wide. Invalidate.")
                         result["is_valid"] = False
-                        result["entry_price_area"] = "No Entry (Pullback Distance Too Far)"
-                        result["confidence"] = 0
-                        reason_eng = f"The setup is locked out because the optimized entry price ({entry_price}) is too far ({dist_pct*100:.2f}%) from current market price ({price}), exceeding the 5-8 minute execution fill threshold."
-                        reason_sin = f"හඳුනාගත් ඇතුල්වීමේ මිල ({entry_price}) වත්මන් වෙළඳපල මිලට වඩා {dist_pct*100:.2f}% ක් ඈතින් පිහිටන බැවින්, විනාඩි 5-8ක් ඇතුළත එය සක්‍රීය වීමට ඇති ඉඩකඩ අවම බැවින් මෙම සෙටප් එක අවහිර කර ඇත."
+                        result["entry_price_area"] = "No Entry (SL Range Too Wide)"
+                        reason_eng = f"The stop-loss risk range is too wide. The required stop loss level ({safe_sl}) exceeds the maximum allowed 0.25% risk limit from the current price."
+                        reason_sin = f"නවත්වන පාඩු (SL) සීමාව ඉතා පුළුල් වේ. වත්මන් මිලෙහි සිට ගණනය කළවිට රීති 39 (Rule 39) හි අනිවාර්ය 0.25% අවදානම් සීමාව ඉක්මවා යයි."
                         result["reasoning"] = f"{reason_eng}\n\n---\n\n**සිංහල පරිවර්තනය (Sinhala Translation):**\n{reason_sin}"
-                    
+                        result["confidence"] = 0
+                    else:
+                        # Verify proximity check (Limit Entry must be within 5-8 minutes fill time, i.e., max 0.50% from current price) (Rule 21)
+                        dist_pct = abs(price - entry_price) / price if price > 0 else 0
+                        if dist_pct > 0.0050:
+                            # Pullback too far, invalidate setup
+                            logger.info(f"Pullback distance too far ({dist_pct*100:.2f}%). Invalidating setup.")
+                            result["is_valid"] = False
+                            result["entry_price_area"] = "No Entry (Pullback Too Far)"
+                            reason_eng = f"The pullback distance to the limit price is too far ({dist_pct*100:.2f}%). Reversal entry is suppressed to avoid chase risk."
+                            reason_sin = f"Limit මිලට ඇති Pullback දුර ඉතා වැඩි බැවින් ({dist_pct*100:.2f}%), අවදානම අවම කිරීම සඳහා මෙම සෙටප් එක අවලංගු කර ඇත."
+                            result["reasoning"] = f"{reason_eng}\n\n---\n\n**සිංහල පරිවර්තනය (Sinhala Translation):**\n{reason_sin}"
+                            result["confidence"] = 0
+                            
                     # Update TP levels to maintain risk-reward structure (Rule 21)
                     risk = result["stop_loss_level"] - entry_price if entry_price is not None else 0
                     if risk > 0 and result.get("is_valid") is True:
@@ -3329,12 +3409,15 @@ Live 15-Minute Candles Data (15m):
                     elif result.get("is_valid") is True:
                         result["is_valid"] = False
                         result["entry_price_area"] = "No Entry (Invalid SL Configuration)"
-                    result["reasoning"] = f"{reason_eng}\n\n---\n\n**සිංහල පරිවර්තනය (Sinhala Translation):**\n{reason_sin}"
+
+                # Unified fallback: if setup is invalid, ensure all targets and SL are cleared
+                if result.get("is_valid") is False:
                     result["stop_loss_level"] = None
                     result["liquidity_target"] = None
                     result["tp1_target"] = None
                     result["tp2_target"] = None
                     result["tp3_target"] = None
+                    result["confidence"] = 0
 
         result["news_lockout_active"] = news_lockout_active
         result["active_news_event"] = active_news_event

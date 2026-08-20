@@ -54,6 +54,11 @@ export default function Dashboard() {
   // Settings & preferences states
   const [geminiApiKey, setGeminiApiKey] = useState("");
   const [tempApiKey, setTempApiKey] = useState("");
+  const [binanceKey, setBinanceKey] = useState("");
+  const [binanceSecret, setBinanceSecret] = useState("");
+  const [autoTrade, setAutoTrade] = useState(false);
+  const [riskPercent, setRiskPercent] = useState("1.0");
+  const [minConfidence, setMinConfidence] = useState("90");
   const [geminiStatus, setGeminiStatus] = useState<{ status: string; details: string; provider?: string }>({ status: "UNKNOWN", details: "Checking key status..." });
   const [showSettings, setShowSettings] = useState(false);
 
@@ -413,6 +418,7 @@ export default function Dashboard() {
   const [smcOpen, setSmcOpen] = useState<number | "">("");
   const [smcCurrentPrice, setSmcCurrentPrice] = useState<number | "">("");
   const [smcTrend1m, setSmcTrend1m] = useState<string>("");
+  const [smcTrend5m, setSmcTrend5m] = useState<string>("");
   const [smcTrend15m, setSmcTrend15m] = useState<string>("");
   const [smcTrend1h, setSmcTrend1h] = useState<string>("");
   const [smcResult, setSmcResult] = useState<any | null>(null);
@@ -432,6 +438,7 @@ export default function Dashboard() {
   const [tcsOpen, setTcsOpen] = useState<number | "">("");
   const [tcsCurrentPrice, setTcsCurrentPrice] = useState<number | "">("");
   const [tcsTrend1m, setTcsTrend1m] = useState<string>("");
+  const [tcsTrend5m, setTcsTrend5m] = useState<string>("");
   const [tcsTrend15m, setTcsTrend15m] = useState<string>("");
   const [tcsTrend1h, setTcsTrend1h] = useState<string>("");
   const [tcsResult, setTcsResult] = useState<any | null>(null);
@@ -451,8 +458,6 @@ export default function Dashboard() {
   const [tcsManualSl, setTcsManualSl] = useState<string>("");
   const [tcsManualTp, setTcsManualTp] = useState<string>("");
   const [livePrices, setLivePrices] = useState<Record<string, number>>({});
-  const isInitialMount = useRef(true);
-
   // Sync watchlist to backend SQLite preferences
   const syncWatchlistToBackend = async (coins: any[]) => {
     try {
@@ -494,18 +499,6 @@ export default function Dashboard() {
     };
     loadWatchlist();
   }, []);
-
-  // Save monitoredCoins to localStorage and backend when they change
-  useEffect(() => {
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      return;
-    }
-    if (typeof window !== "undefined") {
-      localStorage.setItem("smc_monitored_coins", JSON.stringify(monitoredCoins));
-    }
-    syncWatchlistToBackend(monitoredCoins);
-  }, [monitoredCoins]);
 
   // Sync TCS watchlist to backend SQLite preferences
   const syncTcsWatchlistToBackend = async (coins: any[]) => {
@@ -549,14 +542,6 @@ export default function Dashboard() {
     loadTcsWatchlist();
   }, []);
 
-  // Save tcsMonitoredCoins to localStorage and backend when they change
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("tcs_monitored_coins", JSON.stringify(tcsMonitoredCoins));
-    }
-    syncTcsWatchlistToBackend(tcsMonitoredCoins);
-  }, [tcsMonitoredCoins]);
-
   // Watchlist Local Strategy Recalculators
   const calculateCoinConfidence = (coin: any) => {
     const isBullish = coin.htfTrend === "BULLISH";
@@ -576,12 +561,34 @@ export default function Dashboard() {
 
     return {
       confidence: conf,
-      is_valid: conf >= 80,
+      is_valid: conf >= 90,
       zone_ok: true,
       open_ok: true,
       is_discount: false,
       is_below_open: false
     };
+  };
+
+  const handleRemoveSmcCoin = (coinId: string) => {
+    setMonitoredCoins(prevCoins => {
+      const updatedList = prevCoins.filter(c => c.id !== coinId);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("smc_monitored_coins", JSON.stringify(updatedList));
+      }
+      syncWatchlistToBackend(updatedList);
+      return updatedList;
+    });
+  };
+
+  const handleRemoveTcsCoin = (coinId: string) => {
+    setTcsMonitoredCoins(prevCoins => {
+      const updatedList = prevCoins.filter(c => c.id !== coinId);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("tcs_monitored_coins", JSON.stringify(updatedList));
+      }
+      syncTcsWatchlistToBackend(updatedList);
+      return updatedList;
+    });
   };
 
   const getCoinParameters = (coin: any) => {
@@ -627,147 +634,38 @@ export default function Dashboard() {
     if (monitoredCoins.length === 0) return;
 
     const intervalId = setInterval(async () => {
-      const currentCoins = [...monitoredCoins];
-      if (currentCoins.length === 0) return;
-
-      const updated = await Promise.all(
-        currentCoins.map(async (coin) => {
-          try {
-            const sym = getTradingViewSymbol(coin.symbol);
-            const cleanSym = sym.includes(":") ? sym.split(":")[1] : sym;
-            
-            // 1. Fetch live market price & daily levels (100% Free yfinance/Binance local call)
-            const resPrice = await fetch(`http://127.0.0.1:8000/api/market/price?symbol=${encodeURIComponent(cleanSym)}&t=${Date.now()}`);
-            if (resPrice.ok) {
-              const priceData = await resPrice.json();
-              const currentPrice = priceData.current_price || coin.currentPrice;
-              const pdh = priceData.pdh || coin.pdh;
-              const pdl = priceData.pdl || coin.pdl;
-              const open = priceData.open || coin.open;
-              const htfTrend = priceData.daily_bias || coin.htfTrend;
-
-              // 2. Perform 100% local programmatic confluences and confidence calculation
-              const localCoin = {
-                ...coin,
-                currentPrice: currentPrice,
-                pdh: pdh,
-                pdl: pdl,
-                open: open,
-                htfTrend: htfTrend
-              };
-              
-              const localParams = getCoinParameters(localCoin);
-
-              return {
-                ...localCoin,
-                currentPrice: currentPrice,
-                pdh: pdh,
-                pdl: pdl,
-                open: open,
-                htfTrend: htfTrend,
-                confidence: localParams.confidence,
-                is_valid: localParams.is_valid,
-                entryPrice: localParams.entry_price,
-                stopLoss: localParams.stop_loss,
-                takeProfit: localParams.take_profit,
-                liquidityPoolsSwept: coin.liquidityPoolsSwept,
-                swingValidated: coin.swingValidated,
-                ltfChoch: coin.ltfChoch
-              };
-            }
-          } catch (e) {
-            console.error("Error refreshing monitored coin programmatically:", coin.symbol, e);
-          }
-          return coin;
-        })
-      );
-
-      setMonitoredCoins(prevCoins => {
-        return prevCoins.map(prevCoin => {
-          const match = updated.find(u => u.symbol === prevCoin.symbol);
-          return match ? {
-            ...prevCoin,
-            ...match
-          } : prevCoin;
-        });
-      });
+      try {
+        const res = await fetch(`http://127.0.0.1:8000/api/watchlist/smc?t=${Date.now()}`);
+        if (res.ok) {
+          const data = await res.json();
+          setMonitoredCoins(data);
+        }
+      } catch (err) {
+        console.error("Error refreshing monitored coins from backend database:", err);
+      }
     }, 5000);
 
     return () => clearInterval(intervalId);
-  }, [monitoredCoins]);
+  }, [monitoredCoins.length]);
 
   // 5-Second Local API TCS Watchlist Polling Loop
   useEffect(() => {
     if (tcsMonitoredCoins.length === 0) return;
 
     const intervalId = setInterval(async () => {
-      const currentCoins = [...tcsMonitoredCoins];
-      if (currentCoins.length === 0) return;
-
-      const updated = await Promise.all(
-        currentCoins.map(async (coin) => {
-          try {
-            const sym = getTradingViewSymbol(coin.symbol);
-            const cleanSym = sym.includes(":") ? sym.split(":")[1] : sym;
-
-            // 1. Fetch live market price & daily levels (100% Free yfinance/Binance local call)
-            const resPrice = await fetch(`http://127.0.0.1:8000/api/market/price?symbol=${encodeURIComponent(cleanSym)}&t=${Date.now()}`);
-            if (resPrice.ok) {
-              const priceData = await resPrice.json();
-              const currentPrice = priceData.current_price || coin.currentPrice;
-              const pdh = priceData.pdh || coin.pdh;
-              const pdl = priceData.pdl || coin.pdl;
-              const open = priceData.open || coin.open;
-              const htfTrend = priceData.daily_bias || coin.htfTrend;
-
-              // 2. Perform 100% local programmatic confluences and confidence calculation
-              const localCoin = {
-                ...coin,
-                currentPrice: currentPrice,
-                pdh: pdh,
-                pdl: pdl,
-                open: open,
-                htfTrend: htfTrend
-              };
-              
-              const localParams = getCoinParameters(localCoin);
-
-              return {
-                ...localCoin,
-                currentPrice: currentPrice,
-                pdh: pdh,
-                pdl: pdl,
-                open: open,
-                htfTrend: htfTrend,
-                confidence: localParams.confidence,
-                is_valid: localParams.is_valid,
-                entryPrice: localParams.entry_price,
-                stopLoss: localParams.stop_loss,
-                takeProfit: localParams.take_profit,
-                smaAligned: coin.smaAligned,
-                rsiAligned: coin.rsiAligned
-              };
-            }
-          } catch (e) {
-            console.error("Error refreshing TCS monitored coin programmatically:", coin.symbol, e);
-          }
-          return coin;
-        })
-      );
-
-      setTcsMonitoredCoins(prevCoins => {
-        return prevCoins.map(prevCoin => {
-          const match = updated.find(u => u.symbol === prevCoin.symbol);
-          return match ? {
-            ...prevCoin,
-            ...match
-          } : prevCoin;
-        });
-      });
+      try {
+        const res = await fetch(`http://127.0.0.1:8000/api/watchlist/tcs?t=${Date.now()}`);
+        if (res.ok) {
+          const data = await res.json();
+          setTcsMonitoredCoins(data);
+        }
+      } catch (err) {
+        console.error("Error refreshing TCS monitored coins from backend database:", err);
+      }
     }, 5000);
 
     return () => clearInterval(intervalId);
-  }, [tcsMonitoredCoins]);
+  }, [tcsMonitoredCoins.length]);
 
   // 5-Second Journal Trades Price Polling Loop
   useEffect(() => {
@@ -852,6 +750,7 @@ export default function Dashboard() {
         setSmcPdl("");
         setSmcOpen("");
         setSmcTrend1m("");
+        setSmcTrend5m("");
         setSmcTrend15m("");
         setSmcTrend1h("");
         setSmcLoading(false);
@@ -871,13 +770,26 @@ export default function Dashboard() {
         activeHtfTrend = data.daily_bias;
       }
       const tempTrend1m = data.trend_1m || "";
+      const tempTrend5m = data.trend_5m || "";
       const tempTrend15m = data.trend_15m || "";
       const tempTrend1h = data.trend_1h || "";
+
+      // Instantly update price and trend states in the UI so the user does not see "PENDING"
+      setSmcCurrentPrice(fetchedPrice);
+      setSmcPdh(fetchedPdh);
+      setSmcPdl(fetchedPdl);
+      setSmcOpen(fetchedOpen);
+      setSmcHtfTrend(tempDailyBias);
+      setSmcTrend1m(tempTrend1m);
+      setSmcTrend5m(tempTrend5m);
+      setSmcTrend15m(tempTrend15m);
+      setSmcTrend1h(tempTrend1h);
 
       // Fetch SMC analysis from the backend API endpoint
       const payload = {
         symbol: searchSymbol,
         timeframe: smcTimeframe,
+        strategy_model: smcStrategyModel,
         current_price: fetchedPrice || null,
         pdh: fetchedPdh || null,
         pdl: fetchedPdl || null,
@@ -914,6 +826,7 @@ export default function Dashboard() {
         setSmcOpen(fetchedOpen);
         setSmcHtfTrend(tempDailyBias);
         setSmcTrend1m(tempTrend1m);
+        setSmcTrend5m(tempTrend5m);
         setSmcTrend15m(tempTrend15m);
         setSmcTrend1h(tempTrend1h);
         
@@ -951,13 +864,19 @@ export default function Dashboard() {
               takeProfit: smcData.liquidity_target
             };
 
+            let updatedList;
             if (existingIdx >= 0) {
               const copy = [...prevCoins];
               copy[existingIdx] = newMonitoredCoin;
-              return copy;
+              updatedList = copy;
             } else {
-              return [...prevCoins, newMonitoredCoin];
+              updatedList = [...prevCoins, newMonitoredCoin];
             }
+            if (typeof window !== "undefined") {
+              localStorage.setItem("smc_monitored_coins", JSON.stringify(updatedList));
+            }
+            syncWatchlistToBackend(updatedList);
+            return updatedList;
           });
         }
       } else {
@@ -980,6 +899,7 @@ export default function Dashboard() {
     setSmcPdl("");
     setSmcOpen("");
     setSmcTrend1m("");
+    setSmcTrend5m("");
     setSmcTrend15m("");
     setSmcTrend1h("");
     setSmcResult(null);
@@ -1032,6 +952,7 @@ export default function Dashboard() {
         setTcsPdl("");
         setTcsOpen("");
         setTcsTrend1m("");
+        setTcsTrend5m("");
         setTcsTrend15m("");
         setTcsTrend1h("");
         return;
@@ -1050,6 +971,7 @@ export default function Dashboard() {
         setTcsPdl("");
         setTcsOpen("");
         setTcsTrend1m("");
+        setTcsTrend5m("");
         setTcsTrend15m("");
         setTcsTrend1h("");
         return;
@@ -1066,6 +988,7 @@ export default function Dashboard() {
         activeHtfTrend = data.daily_bias;
       }
       if (data.trend_1m) setTcsTrend1m(data.trend_1m);
+      if (data.trend_5m) setTcsTrend5m(data.trend_5m);
       if (data.trend_15m) setTcsTrend15m(data.trend_15m);
       if (data.trend_1h) setTcsTrend1h(data.trend_1h);
 
@@ -1123,13 +1046,19 @@ export default function Dashboard() {
               rsiAligned: tcsData.double_mitigation_ok || false
             };
 
+            let updatedList;
             if (existingIdx >= 0) {
               const copy = [...prevCoins];
               copy[existingIdx] = newMonitoredCoin;
-              return copy;
+              updatedList = copy;
             } else {
-              return [...prevCoins, newMonitoredCoin];
+              updatedList = [...prevCoins, newMonitoredCoin];
             }
+            if (typeof window !== "undefined") {
+              localStorage.setItem("tcs_monitored_coins", JSON.stringify(updatedList));
+            }
+            syncTcsWatchlistToBackend(updatedList);
+            return updatedList;
           });
         }
       } else {
@@ -1151,6 +1080,7 @@ export default function Dashboard() {
     setTcsPdl("");
     setTcsOpen("");
     setTcsTrend1m("");
+    setTcsTrend5m("");
     setTcsTrend15m("");
     setTcsTrend1h("");
     setTcsResult(null);
@@ -1209,13 +1139,19 @@ export default function Dashboard() {
         rsiAligned: tcsRule3
       };
 
+      let updatedList;
       if (existingIdx >= 0) {
         const copy = [...prevCoins];
         copy[existingIdx] = newMonitoredCoin;
-        return copy;
+        updatedList = copy;
       } else {
-        return [...prevCoins, newMonitoredCoin];
+        updatedList = [...prevCoins, newMonitoredCoin];
       }
+      if (typeof window !== "undefined") {
+        localStorage.setItem("tcs_monitored_coins", JSON.stringify(updatedList));
+      }
+      syncTcsWatchlistToBackend(updatedList);
+      return updatedList;
     });
     alert(`${tcsSymbol} added/updated in the TCS active watchlist! 📡`);
   };
@@ -1555,11 +1491,19 @@ export default function Dashboard() {
       const res = await fetch(`${API_BASE}/preferences`);
       if (res.ok) {
         const data = await res.json();
-        const apiKeyPref = data.find((p: any) => p.key === "gemini_api_key");
-        if (apiKeyPref) {
-          setGeminiApiKey(apiKeyPref.value);
-          setTempApiKey(apiKeyPref.value);
+        const getPref = (k: string) => data.find((p: any) => p.key === k)?.value || "";
+        
+        const gKey = getPref("gemini_api_key");
+        if (gKey) {
+          setGeminiApiKey(gKey);
+          setTempApiKey(gKey);
         }
+        
+        setBinanceKey(getPref("binance_api_key"));
+        setBinanceSecret(getPref("binance_api_secret"));
+        setAutoTrade(getPref("auto_trade_enabled") === "true");
+        setRiskPercent(getPref("risk_percentage") || "1.0");
+        setMinConfidence(getPref("min_confidence") || "90");
       }
     } catch (e) {
       console.error("Error fetching preferences:", e);
@@ -1569,20 +1513,33 @@ export default function Dashboard() {
   const saveApiKey = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch(`${API_BASE}/preferences`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ key: "gemini_api_key", value: tempApiKey }),
-      });
+      const prefs = [
+        { key: "gemini_api_key", value: tempApiKey },
+        { key: "binance_api_key", value: binanceKey },
+        { key: "binance_api_secret", value: binanceSecret },
+        { key: "auto_trade_enabled", value: autoTrade ? "true" : "false" },
+        { key: "risk_percentage", value: riskPercent },
+        { key: "min_confidence", value: minConfidence }
+      ];
+      
+      let allOk = true;
+      for (const pref of prefs) {
+          const res = await fetch(`${API_BASE}/preferences`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(pref),
+          });
+          if (!res.ok) allOk = false;
+      }
 
-      if (res.ok) {
+      if (allOk) {
         setGeminiApiKey(tempApiKey);
         setShowSettings(false);
         alert("Configuration saved successfully! | සැකසුම් සාර්ථකව සුරකින ලදී!");
         checkHealth();
         fetchGeminiStatus();
       } else {
-        alert("Failed to save configuration.");
+        alert("Failed to save some configurations.");
       }
     } catch (e) {
       console.error("Error saving configurations:", e);
@@ -2884,9 +2841,9 @@ export default function Dashboard() {
                             <div className="flex justify-between items-center text-[10px] border-t border-[#1E2235]/40 pt-1.5 mt-1 font-mono">
                               <span className="text-gray-400">Confidence:</span>
                               <span className={`font-bold ${
-                                (tracker.confidence || 0) >= 80 ? "text-emerald-400 font-extrabold" : "text-gray-400"
+                                (tracker.confidence || 0) >= 90 ? "text-emerald-400 font-extrabold" : "text-gray-400"
                               }`}>
-                                {tracker.confidence || 0}% {(tracker.confidence || 0) >= 80 ? "🔥 (READY)" : ""}
+                                {tracker.confidence || 0}% {(tracker.confidence || 0) >= 90 ? "🔥 (READY)" : ""}
                               </span>
                             </div>
                           </div>
@@ -3094,7 +3051,7 @@ export default function Dashboard() {
                           <div className={`bg-[#141626]/40 border rounded-xl p-4 flex flex-col gap-2.5 transition-all md:col-span-2 ${
                             sbResult.news_lockout_active 
                               ? "border-rose-500/50 shadow-md shadow-rose-500/5"
-                              : sbResult.confidence && sbResult.confidence >= 80 
+                              : sbResult.confidence && sbResult.confidence >= 90 
                                 ? "border-indigo-500/50 shadow-md shadow-indigo-500/5" 
                                 : "border-[#1E2235]/60"
                           }`}>
@@ -3113,9 +3070,9 @@ export default function Dashboard() {
                                   </span>
                                 ) : sbResult.confidence !== undefined && sbResult.confidence !== null && (
                                   <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded font-mono flex items-center gap-1 ${
-                                    sbResult.confidence >= 80 ? "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20" : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                                    sbResult.confidence >= 90 ? "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20" : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
                                   }`}>
-                                    <span className={`w-1.5 h-1.5 rounded-full ${sbResult.confidence >= 80 ? "bg-indigo-400 animate-pulse" : "bg-rose-400"}`} />
+                                    <span className={`w-1.5 h-1.5 rounded-full ${sbResult.confidence >= 90 ? "bg-indigo-400 animate-pulse" : "bg-rose-400"}`} />
                                     {sbResult.confidence}% CONFIRMED
                                   </span>
                                 )}
@@ -4402,7 +4359,7 @@ export default function Dashboard() {
                       <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider font-mono flex items-center gap-1.5">
                         <span>📊</span> Timeframe Trend Details ({smcSymbol || "No Coin Selected"})
                       </div>
-                      <div className="grid grid-cols-3 gap-2">
+                      <div className="grid grid-cols-4 gap-2">
                         <div className={`flex flex-col items-center justify-center p-2 rounded-lg border ${
                           smcTrend1m === "BULLISH" 
                             ? "bg-emerald-500/5 border-emerald-500/25 text-emerald-400" 
@@ -4413,6 +4370,18 @@ export default function Dashboard() {
                           <span className="text-[10px] font-bold font-mono text-gray-400">1m</span>
                           <span className="text-xs font-black tracking-wider mt-0.5 flex items-center gap-1 font-mono">
                             {smcTrend1m === "BULLISH" ? "🟢 BUY" : smcTrend1m === "BEARISH" ? "🔴 SELL" : "⏳ PENDING"}
+                          </span>
+                        </div>
+                        <div className={`flex flex-col items-center justify-center p-2 rounded-lg border ${
+                          smcTrend5m === "BULLISH" 
+                            ? "bg-emerald-500/5 border-emerald-500/25 text-emerald-400" 
+                            : smcTrend5m === "BEARISH"
+                            ? "bg-rose-500/5 border-rose-500/25 text-rose-400"
+                            : "bg-[#11131F] border-[#1E2235] text-gray-500"
+                        }`}>
+                          <span className="text-[10px] font-bold font-mono text-gray-400">5m</span>
+                          <span className="text-xs font-black tracking-wider mt-0.5 flex items-center gap-1 font-mono">
+                            {smcTrend5m === "BULLISH" ? "🟢 BUY" : smcTrend5m === "BEARISH" ? "🔴 SELL" : "⏳ PENDING"}
                           </span>
                         </div>
                         <div className={`flex flex-col items-center justify-center p-2 rounded-lg border ${
@@ -4453,6 +4422,7 @@ export default function Dashboard() {
                       >
                         <option value="double_mitigation">PO3 Double Mitigation Reversal Model (Crypto Roots)</option>
                         <option value="sniper_entry">1m Sniper Entry Model (The Trading Geek)</option>
+                        <option value="poi_reversal">MTF POI Reversal & 5m Confirmation Model</option>
                       </select>
                     </div>
 
@@ -4664,7 +4634,7 @@ export default function Dashboard() {
                         <div className="bg-[#11131F]/90 border border-[#1E2235] rounded-xl p-5 flex flex-col gap-3">
                           <h4 className="text-xs font-bold text-white uppercase tracking-wider font-mono flex justify-between items-center">
                             <span>📊 Live Confluences & Confidence Tracker ({smcSymbol})</span>
-                            <span className={`px-2 py-0.5 rounded text-[10px] ${smcResult.confidence >= 80 ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-rose-500/10 text-rose-400 border border-rose-500/20"}`}>
+                            <span className={`px-2 py-0.5 rounded text-[10px] ${smcResult.confidence >= 90 ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-rose-500/10 text-rose-400 border border-rose-500/20"}`}>
                               {smcResult.confidence}% Confirmed
                             </span>
                           </h4>
@@ -4672,7 +4642,7 @@ export default function Dashboard() {
                           {/* Progress Bar */}
                           <div className="w-full bg-[#141626] rounded-full h-2.5 overflow-hidden border border-[#1E2235]">
                             <div 
-                              className={`h-full transition-all duration-300 ${smcResult.confidence >= 80 ? "bg-emerald-500" : "bg-indigo-500"}`}
+                              className={`h-full transition-all duration-300 ${smcResult.confidence >= 90 ? "bg-emerald-500" : "bg-indigo-500"}`}
                               style={{ width: `${smcResult.confidence}%` }}
                             />
                           </div>
@@ -4765,9 +4735,9 @@ export default function Dashboard() {
                                   </>
                                 ) : (
                                   <>
-                                    <strong>SMC Setup Locked:</strong> Confirmation rate is {smcResult.confidence}% (less than the mandatory 80% threshold). Entry parameters are suppressed from active logging.
+                                    <strong>SMC Setup Locked:</strong> Confirmation rate is {smcResult.confidence}% (less than the mandatory 90% threshold). Entry parameters are suppressed from active logging.
                                     <br />
-                                    <span className="text-[10px] text-rose-300/80">සිංහල පරිවර්තනය: උපාය මාර්ගික අනුකූලතාවය {smcResult.confidence}% ක් වන බැවින් (අවම 80% ට වඩා අඩු) ඇතුල්වීම් අවහිර කර ඇත.</span>
+                                    <span className="text-[10px] text-rose-300/80">සිංහල පරිවර්තනය: උපාය මාර්ගික අනුකූලතාවය {smcResult.confidence}% ක් වන බැවින් (අවම 90% ට වඩා අඩු) ඇතුල්වීම් අවහිර කර ඇත.</span>
                                   </>
                                 )}
                               </span>
@@ -4779,9 +4749,9 @@ export default function Dashboard() {
                           <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl p-3.5 text-xs font-mono flex items-center gap-2 animate-pulse">
                             <span>✅</span>
                             <span>
-                              <strong>SMC Setup Active:</strong> 80% minimum confirmation reached ({smcResult.confidence}%). Limit order is ready!
+                              <strong>SMC Setup Active:</strong> 90% minimum confirmation reached ({smcResult.confidence}%). Limit order is ready!
                               <br />
-                              <span className="text-[10px] text-emerald-300/80">සිංහල පරිවර්තනය: අවම 80% සීමාව පසු කර ඇති බැවින් (තහවුරු කිරීම: {smcResult.confidence}%) ඇතුල්වීම වලංගු වේ!</span>
+                              <span className="text-[10px] text-emerald-300/80">සිංහල පරිවර්තනය: අවම 90% සීමාව පසු කර ඇති බැවින් (තහවුරු කිරීම: {smcResult.confidence}%) ඇතුල්වීම වලංගු වේ!</span>
                             </span>
                           </div>
                         )}
@@ -4800,7 +4770,7 @@ export default function Dashboard() {
 
                           <div className="bg-[#11131F]/90 border border-[#1E2235] rounded-xl p-4 flex flex-col gap-1.5">
                             <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wider font-mono">Confidence Rating</span>
-                            <span className={`text-sm font-bold font-mono ${smcResult.confidence >= 70 ? "text-emerald-400" : "text-rose-400"}`}>
+                            <span className={`text-sm font-bold font-mono ${smcResult.confidence >= 90 ? "text-emerald-400" : "text-rose-400"}`}>
                               {smcResult.confidence}% CONFIRMED
                             </span>
                           </div>
@@ -4906,7 +4876,7 @@ export default function Dashboard() {
                                     </span>
                                   </div>
                                   <button 
-                                    onClick={() => setMonitoredCoins(monitoredCoins.filter(c => c.id !== coin.id))}
+                                    onClick={() => handleRemoveSmcCoin(coin.id)}
                                     className="text-gray-500 hover:text-rose-400 font-bold text-xs p-1 cursor-pointer transition-colors"
                                     title="Remove from monitoring"
                                   >
@@ -5004,7 +4974,7 @@ export default function Dashboard() {
                                       });
                                       if (res.ok) {
                                         alert(`🎯 SMC trade for ${coin.symbol.toUpperCase()} executed/logged successfully!`);
-                                        setMonitoredCoins(monitoredCoins.filter(c => c.id !== coin.id));
+                                        handleRemoveSmcCoin(coin.id);
                                         const resHist = await fetch(`${API_BASE}/trades/history`);
                                         if (resHist.ok) {
                                           const histData = await resHist.json();
@@ -5023,7 +4993,7 @@ export default function Dashboard() {
                                       : "bg-gray-800 text-gray-500 border border-gray-700 disabled:opacity-50"
                                   }`}
                                 >
-                                  {params.is_valid ? "🎯 Execute Limit Entry ⚡" : "🔒 Locked (<80% Confirmed)"}
+                                  {params.is_valid ? "🎯 Execute Limit Entry ⚡" : "🔒 Locked (<90% Confirmed)"}
                                 </button>
                               </div>
                             );
@@ -5331,12 +5301,12 @@ export default function Dashboard() {
                       </span>
                       <span className="text-[10px] text-emerald-300 font-mono">All 6 checklist items are READY. Setup is safe to place Limit order!</span>
                     </div>
-                  ) : tcsResult && tcsResult.confidence >= 80 ? (
+                  ) : tcsResult && tcsResult.confidence >= 90 ? (
                     <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-3.5 text-center flex flex-col items-center justify-center gap-1.5 animate-pulse">
                       <span className="text-emerald-400 text-xs font-black font-mono tracking-wider flex items-center gap-1">
                         ⚡ {tcsResult.confidence}% CONFIRMED ({tcsResult.confidence}% තහවුරුයි)
                       </span>
-                      <span className="text-[10px] text-gray-300 font-mono">80%+ mandatory rules met. Setup is safe for fast execution!</span>
+                      <span className="text-[10px] text-gray-300 font-mono">90%+ mandatory rules met. Setup is safe for fast execution!</span>
                     </div>
                   ) : (
                     <div className="bg-[#1C1F37]/30 border border-[#2E355E]/30 rounded-xl p-3.5 text-center flex flex-col items-center justify-center gap-1">
@@ -5687,10 +5657,10 @@ export default function Dashboard() {
                   ) : (
                     <div className="bg-rose-500/5 border border-rose-500/20 rounded-xl p-6 text-center flex flex-col items-center justify-center gap-2 font-mono">
                       <span className="text-rose-400 text-xs font-bold uppercase tracking-wider font-mono">
-                        {"⚠️ ENTRY BLOCKED (CONFIDENCE < 80%) / ඇතුල්වීමක් නොමැත (විශ්වාසනීයත්වය < 80%)"}
+                        {"⚠️ ENTRY BLOCKED (CONFIDENCE < 90%) / ඇතුල්වීමක් නොමැත (විශ්වාසනීයත්වය < 90%)"}
                       </span>
                       <p className="text-[10px] text-gray-400 max-w-md leading-relaxed">
-                        TCS 90% Win-Rate Scalper strategy mandates a minimum confidence score of 80% to reveal trading parameters.
+                        TCS 90% Win-Rate Scalper strategy mandates a minimum confidence score of 90% to reveal trading parameters.
                       </p>
                     </div>
                   )}
@@ -5766,7 +5736,7 @@ export default function Dashboard() {
                             <td className="py-3.5 px-4 text-right">
                               <button
                                 onClick={() => {
-                                  setTcsMonitoredCoins(prev => prev.filter(c => c.symbol !== coin.symbol));
+                                  handleRemoveTcsCoin(coin.id);
                                 }}
                                 className="text-rose-500 hover:text-rose-400 transition-colors hover:scale-105"
                                 title="Remove Tracker"
@@ -6357,7 +6327,84 @@ export default function Dashboard() {
                 </div>
               </div>
               
-              <div className="flex justify-end gap-3 mt-2 border-t border-[#1E2235] pt-4">
+              <div className="h-px bg-[#1E2235] my-2 w-full"></div>
+
+              {/* --- BINANCE SETTINGS --- */}
+              <h4 className="text-sm font-bold text-white mt-1 mb-2">Binance Auto-Execution</h4>
+              
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs text-gray-400 font-semibold uppercase tracking-wider">Binance API Key</label>
+                <input
+                  type="password"
+                  placeholder="Binance API Key"
+                  value={binanceKey}
+                  onChange={(e) => setBinanceKey(e.target.value)}
+                  className="w-full bg-[#141626] border border-[#1E2235] rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#6366F1] font-mono"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5 mt-2">
+                <label className="text-xs text-gray-400 font-semibold uppercase tracking-wider">Binance Secret Key</label>
+                <input
+                  type="password"
+                  placeholder="Binance API Secret"
+                  value={binanceSecret}
+                  onChange={(e) => setBinanceSecret(e.target.value)}
+                  className="w-full bg-[#141626] border border-[#1E2235] rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#6366F1] font-mono"
+                />
+              </div>
+
+              <div className="flex items-center justify-between mt-4 p-3 bg-[#141626] border border-[#1E2235] rounded-xl">
+                <div className="flex flex-col">
+                  <span className="text-sm font-bold text-white">Enable Auto-Trading</span>
+                  <span className="text-[10px] text-gray-500 leading-tight mt-1">
+                    Automatically execute valid setups on Binance futures.
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAutoTrade(!autoTrade)}
+                  className={`w-12 h-6 rounded-full p-1 transition-colors duration-200 ease-in-out flex ${autoTrade ? 'bg-emerald-500' : 'bg-[#1E2235]'}`}
+                >
+                  <div className={`w-4 h-4 rounded-full bg-white shadow-sm transform transition-transform duration-200 ease-in-out ${autoTrade ? 'translate-x-6' : 'translate-x-0'}`} />
+                </button>
+              </div>
+
+              <div className="flex flex-col gap-1.5 mt-4">
+                <label className="text-xs text-gray-400 font-semibold uppercase tracking-wider flex justify-between">
+                  <span>Risk Percentage</span>
+                  <span className="text-indigo-400">{riskPercent}%</span>
+                </label>
+                <input
+                  type="range"
+                  min="0.1"
+                  max="5.0"
+                  step="0.1"
+                  value={riskPercent}
+                  onChange={(e) => setRiskPercent(e.target.value)}
+                  className="w-full accent-indigo-500"
+                />
+                <span className="text-[10px] text-gray-500">Account risk taken per trade. Recommended: 0.5% - 1.0%.</span>
+              </div>
+
+              <div className="flex flex-col gap-1.5 mt-4">
+                <label className="text-xs text-gray-400 font-semibold uppercase tracking-wider flex justify-between">
+                  <span>Minimum Confidence</span>
+                  <span className="text-indigo-400">{minConfidence}%</span>
+                </label>
+                <input
+                  type="range"
+                  min="50"
+                  max="100"
+                  step="1"
+                  value={minConfidence}
+                  onChange={(e) => setMinConfidence(e.target.value)}
+                  className="w-full accent-indigo-500"
+                />
+                <span className="text-[10px] text-gray-500">Only signals above this score will trigger auto-execution.</span>
+              </div>
+              
+              <div className="flex justify-end gap-3 mt-4 border-t border-[#1E2235] pt-4">
                 <button
                   type="button"
                   onClick={() => setShowSettings(false)}
