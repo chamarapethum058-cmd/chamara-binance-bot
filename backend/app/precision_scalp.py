@@ -21,51 +21,51 @@ logger = logging.getLogger("precision_scalp")
 PRECISION_SCALP_STEPS_CATALOGUE = [
     {
         "step_no": 0,
-        "title": "Gate 0: Market Regime & Consolidation Filter",
-        "title_si": "පියවර 0: වෙළඳපල කලාපය සහ තදවීම පෙරහන (ADX >= 20 & Bollinger Squeeze Lock)",
-        "description": "ADX(14) < 20 or Bollinger Bands Squeeze detected -> Pipeline 100% Locked. Zero entries in choppy sideways markets."
+        "title": "Gate 0: Choppiness & Consolidation Filter",
+        "title_si": "පියවර 0: වෙළඳපල කලාපය සහ තදවීම පෙරහන (ADX >= 22 & Bollinger Squeeze Lock)",
+        "description": "ADX(14) < 22 or Bollinger Bands Squeeze detected -> Pipeline 100% Locked. Zero entries in choppy sideways markets."
     },
     {
         "step_no": 1,
-        "title": "Gate 1: Macro Anchor 15M & News Armor",
+        "title": "Gate 1: 15M Macro Trend Anchor & News Armor",
         "title_si": "පියවර 1: 15M සාර්ව නැංගුරම සහ ආර්ථික පුවත් ආවරණය (15M Macro Anchor & News Armor)",
         "description": "USD High-Impact News Window (+/- 60 min) Active -> Signal Engine 100% OFF. 15M Trend: Bullish = BUY ONLY, Bearish = SELL ONLY. Counter-trend setups 100% Blocked."
     },
     {
         "step_no": 2,
-        "title": "Gate 2: 3-Tier Cascade Retracement Engine & Wave Counter",
-        "title_si": "පියවර 2: 3-Tier Cascade Retracement එන්ජිම (FVG -> Breaker -> Golden Pocket Fib 0.50-0.786 & Wave 1-4)",
-        "description": "Waterfall order: Tier 1 (FVG Mitigation top/bottom 25%), Tier 2 (Breaker Re-test), Tier 3 (Golden Pocket Fib 0.50-0.786). Mid-range floating setups 100% blocked. Wave >= 5 hard exhaustion lockout."
+        "title": "Gate 2: Mathematical Wave 1-4 Counter Engine",
+        "title_si": "පියවර 2: ගණිතමය Wave 1-4 ගණක එන්ජිම (Wave 1-4 Allowed / Wave >= 5 Blocked)",
+        "description": "Detects Swing Extrema and BOS Expansion impulses. Wave count strictly 1 to 4 allowed. If current_wave > 4 (Wave 5+ exhaustion blow-off), setups are 100% Hard-Blocked."
     },
     {
         "step_no": 3,
-        "title": "Gate 3: 3M Candle Body Displacement & RVOL",
-        "title_si": "පියවර 3: 3M ඉටිපන්දම් කඳ බිඳීම සහ සාපේක්ෂ පරිමාව (3M Body Close CHoCH & RVOL >= 1.35x)",
-        "description": "Wicks alone are NOT CHoCH. 3M Candle Body Close required beyond prior High/Low. RVOL >= 1.35x mandatory with fresh unmitigated 3M FVG."
+        "title": "Gate 3: 3-Tier Cascade Retracement & Fib Equilibrium",
+        "title_si": "පියවර 3: 3-Tier Cascade Retracement සහ Fib Equilibrium (Tier 1-3 & Discount/Premium)",
+        "description": "Equilibrium: Long strictly in Discount (< 50% Fib), Short strictly in Premium (> 50% Fib). Pullback must tap Tier 1 (FVG top/bot 25%), Tier 2 (Breaker), or Tier 3 (Golden Pocket 0.50-0.786). Mid-range floating locked."
     },
     {
         "step_no": 4,
-        "title": "Gate 4: Absolute Reversal Candle Color & Next Body Close Shift",
-        "title_si": "පියවර 4: නිරපේක්ෂ ප්‍රතිවර්තන ඉටිපන්දම් වර්ණය සහ ඊළඟ Body Close Shift තහවුරු කිරීම",
-        "description": "BUY: Current 3M candle MUST NOT be Red. 3M Green Rejection Candle (Lower Wick >= 35%) + Next 3M Body Close > High mandatory. SELL: Current 3M candle MUST NOT be Green. 3M Red Rejection Candle (Upper Wick >= 35%) + Next 3M Body Close < Low mandatory."
+        "title": "Gate 4: Volume & Relative Momentum Engine",
+        "title_si": "පියවර 4: සාපේක්ෂ පරිමාව සහ මොමෙන්ටම් එන්ජිම (RVOL >= 1.35x)",
+        "description": "Relative Volume (RVOL) of displacement over 20-period 3M average must be >= 1.35x upon rebound from key zone."
     },
     {
         "step_no": 5,
-        "title": "Gate 5: Confirmation-First Instant Market Order Engine",
-        "title_si": "පියවර 5: තහවුරු කළ සැණින් ක්‍රියාත්මක වන Instant Market Order එන්ජිම (No Limit Orders)",
-        "description": "Limit Orders completely removed. The moment Gate 4 2-candle micro-shift confirms, INSTANT MARKET BUY or INSTANT MARKET SELL triggers at current market price. Clearance >= 1.5R."
+        "title": "Gate 5: 2-Candle Closed State Machine (Strict Reversal Confirmation)",
+        "title_si": "පියවර 5: ඉටිපන්දම් 2 ක වැසුණු රාජ්‍ය යන්ත්‍රය (Wick >= 35% & Next Body Close Shift)",
+        "description": "No touch-triggers. Candle 1: Closed 3M with Rejection Wick >= 35% (Lower Wick for Long, Upper Wick for Short). Candle 2: Subsequent 3M Candle Body Close shifts beyond Candle 1 (C2_Close > C1_High for Long, C2_Close < C1_Low for Short). Color Guard active."
     },
     {
         "step_no": 6,
         "title": "Gate 6: Micro-Wick Stop Loss & 0.25%-0.65% Hard-Cap",
-        "title_si": "පියවර 6: ක්ෂුද්‍ර වික් බෆර් Stop Loss සහ 0.25%-0.65% Hard-Cap සීමාව (0.15% Wick Buffer)",
-        "description": "SL anchored strictly to Local HL Wick (-0.15% for Long) or Local LH Wick (+0.15% for Short). Risk hard-capped between 0.25% and 0.65%. If risk exceeds 0.65%, trade is cancelled."
+        "title_si": "පියවර 6: ක්ෂුද්‍ර වික් බෆර් Stop Loss සහ 0.25%-0.65% Hard-Cap සීමාව (0.15% Buffer)",
+        "description": "SL anchored strictly to Candle 1 Low Wick (-0.15% for Long) or Candle 1 High Wick (+0.15% for Short). Risk hard-capped between 0.25% and 0.65%. If risk exceeds 0.65%, trade is cancelled."
     },
     {
         "step_no": 7,
-        "title": "Gate 7: Rapid Scalp Exit Delivery (15-20 Min)",
-        "title_si": "පියවර 7: විනාඩි 15-20 අධිවේගී පිටවීමේ සැලැස්ම (BE +0.80R, TP1 1:1.50R, TP2 1:2.0R Fixed Target)",
-        "description": "Break-Even at +0.80R. TP1 (60% Close) at 1:1.50R. TP2 (40% Final Exit) at 1:2.0R Fixed Target within 15-20 minutes holding limit."
+        "title": "Gate 7: Execution, Targets & Telegram Alert",
+        "title_si": "පියවර 7: ක්‍රියාත්මක කිරීම සහ ඉලක්ක (Instant Market Execution, BE +0.80R, Fixed 1:2.0R TP)",
+        "description": "Instant Market Order at close of Candle 2. Break-Even at +0.80R. Take Profit strictly at Fixed 1:2.0R target."
     }
 ]
 
@@ -126,29 +126,29 @@ class PrecisionScalpPipeline:
         evaluations: List[Dict[str, Any]] = []
 
         # =========================================================================
-        # GATE 0: Market Regime & Consolidation Filter
+        # GATE 0: Choppiness & Consolidation Filter (ARKM Fix)
         # =========================================================================
         adx_candles = candles_15m if len(candles_15m) >= 28 else candles_5m
         adx_val = cls._calculate_adx_14(adx_candles)
         sq_candles = candles_15m if len(candles_15m) >= 20 else candles_5m
         is_bb_sq, current_bw = cls._check_bb_squeeze(sq_candles)
 
-        gate_0_passed = bool(adx_val >= 20.0 and not is_bb_sq)
+        gate_0_passed = bool(adx_val >= 22.0 and not is_bb_sq)
         market_regime = "TRENDING EXPANSION ✅" if gate_0_passed else "CHOPPY / SQUEEZE (LOCKED)"
 
         if not gate_0_passed:
-            gate_0_detail_en = f"Gate 0 Blocked: ADX({adx_val:.1f}) < 20 or BB Squeeze active (Bandwidth={current_bw*100:.2f}%). Choppy sideways market locked out."
-            gate_0_detail_si = f"Gate 0 අවහිරයි: ADX({adx_val:.1f}) < 20 හෝ Bollinger Squeeze (Bandwidth={current_bw*100:.2f}%). Choppy / Sideways කලාපය තුළ Trade කිරීම 100% තහනම්."
+            gate_0_detail_en = f"Gate 0: Market Choppy / Range Blocked 🛑 (ADX={adx_val:.1f} < 22 or BB Squeeze active {current_bw*100:.2f}%)."
+            gate_0_detail_si = f"Gate 0: Market Choppy / Range Blocked 🛑 (ADX={adx_val:.1f} < 22 හෝ BB Squeeze {current_bw*100:.2f}%). Choppy sideways market සම්පූර්ණයෙන්ම අවහිරයි."
         else:
-            gate_0_detail_en = f"Gate 0 Verified: Trending Volatility confirmed (ADX={adx_val:.1f} >= 20, BB Bandwidth={current_bw*100:.2f}% Expansion active)."
-            gate_0_detail_si = f"Gate 0 තහවුරුයි: ප්‍රමාණවත් වෙළඳපල චලනයක් පවතී (ADX={adx_val:.1f} >= 20). Trend Expansion සක්‍රීයයි."
+            gate_0_detail_en = f"Gate 0 Verified: Trending Volatility confirmed (ADX={adx_val:.1f} >= 22, BB Expansion active)."
+            gate_0_detail_si = f"Gate 0 තහවුරුයි: ප්‍රමාණවත් වෙළඳපල චලනයක් පවතී (ADX={adx_val:.1f} >= 22). Trend Expansion සක්‍රීයයි."
 
         evaluations.append({
             "step_no": 0,
             "rule_no": 0,
             "gate_no": 0,
-            "title": "Gate 0: Market Regime & Consolidation Filter",
-            "title_si": "පියවර 0: වෙළඳපල කලාපය සහ තදවීම පෙරහන (ADX >= 20 & Bollinger Squeeze Lock)",
+            "title": "Gate 0: Choppiness & Consolidation Filter",
+            "title_si": "පියවර 0: වෙළඳපල කලාපය සහ තදවීම පෙරහන (ADX >= 22 & Bollinger Squeeze Lock)",
             "passed": gate_0_passed,
             "status": "PASS" if gate_0_passed else "LOCKED",
             "detail": gate_0_detail_en,
@@ -197,290 +197,194 @@ class PrecisionScalpPipeline:
         is_sell_setup = (active_direction == "BEARISH")
 
         # =========================================================================
+        # GATE 2: Mathematical Wave 1-4 Counter Engine (INJ Blow-off Top Fix)
         # =========================================================================
-        # GATE 2: Adaptive Dual-Retracement Engine + Wave Counter (Sequential Hard-Lock)
-        # =========================================================================
-        sweep_ok = False
-        sweep_pool_name = ""
-        mss_5m_ok = False
-        mss_5m_candle_idx = -1
-        mss_5m_level = 0.0
-
-        base_5m_found = False
-        base_5m_top = 0.0
-        base_5m_bot = 0.0
-        base_5m_tapped = False
-
-        eq_ok = False
-        eq_price = price
-        fib_val = 0.50
-        r_hi = price
-        r_lo = price
         wave_count = 1
         wave_ok = True
-        retrace_mode = "Mode B (Standard SMC)"
-
         gate_2_passed = False
         gate_2_detail_en = ""
         gate_2_detail_si = ""
 
         if gate_1_passed:
-            sweep_ok, sweep_pool_name = cls._check_liquidity_sweep_5m(
-                candles_5m=candles_5m,
-                is_buy=is_buy_setup,
-                pdh=pdh,
-                pdl=pdl,
-                asian_high=asian_high,
-                asian_low=asian_low
-            )
-            mss_5m_ok, mss_5m_candle_idx, mss_5m_level = cls._check_5m_mss(
-                candles_5m=candles_5m,
-                is_buy=is_buy_setup
-            )
-            if sweep_ok and mss_5m_ok:
-                base_5m_found, base_5m_top, base_5m_bot = cls._identify_5m_base(
-                    candles_5m=candles_5m,
-                    mss_idx=mss_5m_candle_idx,
-                    is_buy=is_buy_setup
-                )
-                if base_5m_found:
-                    base_5m_tapped = cls._check_base_retrace_tap(
-                        candles_5m=candles_5m,
-                        mss_idx=mss_5m_candle_idx,
-                        base_top=base_5m_top,
-                        base_bot=base_5m_bot,
-                        is_buy=is_buy_setup,
-                        current_price=price
-                    )
-
-                # Wave counter check on 3M (Waves 1 to 4 active, Wave >= 5 locked)
-                wave_count = cls._count_pullback_waves(candles_3m, is_buy=is_buy_setup)
-                wave_ok = bool(wave_count < 5)
-
-                # =====================================================================
-                # 3-TIER CASCADE RETRACEMENT (GATE 2 - BUY & SELL SYMMETRIC)
-                # =====================================================================
-                active_tier = "None"
-                active_tier_level = 0.0
-                tier_passed = False
-
-                # Tier 1: 3M FVG Mitigation (Top 25% for Buy, Bottom 25% for Sell)
-                fvg_3m_found, fvg_3m_top, fvg_3m_bot = cls._find_fresh_3m_fvg(candles_3m, is_buy=is_buy_setup)
-                tier_1_tap = False
-                tier_1_level = 0.0
-                if fvg_3m_found:
-                    if is_buy_setup:
-                        tier_1_level = fvg_3m_top - (0.25 * (fvg_3m_top - fvg_3m_bot))
-                        tier_1_tap = bool(
-                            (price <= tier_1_level * 1.0008 and price >= fvg_3m_bot * 0.9992) or
-                            any(float(c["low"]) <= tier_1_level * 1.0008 and float(c["high"]) >= fvg_3m_bot * 0.9992 for c in candles_3m[-6:])
-                        )
-                    else:
-                        tier_1_level = fvg_3m_bot + (0.25 * (fvg_3m_top - fvg_3m_bot))
-                        tier_1_tap = bool(
-                            (price >= tier_1_level * 0.9992 and price <= fvg_3m_top * 1.0008) or
-                            any(float(c["high"]) >= tier_1_level * 0.9992 and float(c["low"]) <= fvg_3m_top * 1.0008 for c in candles_3m[-6:])
-                        )
-
-                # Tier 2: Breaker Re-test (Prior 3M Resistance as Support for Buy, Prior Support as Resistance for Sell)
-                _, _, breaker_level = cls._check_3m_choch_body_close(candles_3m, is_buy=is_buy_setup, base_top=0.0, base_bot=0.0)
-                tier_2_tap = False
-                if breaker_level > 0:
-                    if is_buy_setup:
-                        tier_2_tap = bool(
-                            (abs(price - breaker_level) / breaker_level <= 0.0018) or
-                            any(abs(float(c["low"]) - breaker_level) / breaker_level <= 0.0020 for c in candles_3m[-6:])
-                        )
-                    else:
-                        tier_2_tap = bool(
-                            (abs(price - breaker_level) / breaker_level <= 0.0018) or
-                            any(abs(float(c["high"]) - breaker_level) / breaker_level <= 0.0020 for c in candles_3m[-6:])
-                        )
-
-                # Tier 3: Golden Pocket 0.50 - 0.786 (Discount for Buy, Premium for Sell)
-                eq_ok, eq_price, fib_val, r_hi, r_lo = cls._check_dealing_range_equilibrium(
-                    candles_5m=candles_5m,
-                    current_price=price,
-                    base_top=base_5m_top,
-                    base_bot=base_5m_bot,
-                    is_buy=is_buy_setup
-                )
-                tier_3_tap = False
-                if is_buy_setup:
-                    tier_3_tap = bool(
-                        eq_ok and (
-                            (0.20 <= fib_val <= 0.505) or
-                            base_5m_tapped or
-                            (price <= eq_price * 1.0010 and price >= r_lo * 0.9990) or
-                            any(float(c["low"]) <= eq_price * 1.0010 and float(c["low"]) >= r_lo * 0.9990 for c in candles_3m[-6:])
-                        )
-                    )
-                else:
-                    tier_3_tap = bool(
-                        eq_ok and (
-                            (0.495 <= fib_val <= 0.80) or
-                            base_5m_tapped or
-                            (price >= eq_price * 0.9990 and price <= r_hi * 1.0010) or
-                            any(float(c["high"]) >= eq_price * 0.9990 and float(c["high"]) <= r_hi * 1.0010 for c in candles_3m[-6:])
-                        )
-                    )
-
-                # Waterfall Priority: Tier 1 -> Tier 2 -> Tier 3
-                if tier_1_tap:
-                    active_tier = "Tier 1: 3M FVG Mitigation"
-                    active_tier_level = tier_1_level
-                    tier_passed = True
-                elif tier_2_tap:
-                    active_tier = "Tier 2: 3M Breaker Re-test"
-                    active_tier_level = breaker_level
-                    tier_passed = True
-                elif tier_3_tap:
-                    active_tier = f"Tier 3: Golden Pocket ({'Discount' if is_buy_setup else 'Premium'} Fib {fib_val:.2f})"
-                    active_tier_level = eq_price
-                    tier_passed = True
-                else:
-                    active_tier = "Mid-Range Floating (Locked)"
-                    active_tier_level = 0.0
-                    tier_passed = False
-
-        if not gate_1_passed:
+            wave_count = cls._get_current_wave_count(candles_3m, is_buy=is_buy_setup)
+            wave_ok = bool(wave_count <= 4)
+            if not wave_ok:
+                gate_2_passed = False
+                gate_2_detail_en = f"Gate 2: Wave {wave_count} Exhaustion - Blocked 🛑"
+                gate_2_detail_si = f"Gate 2: Wave {wave_count} Exhaustion - Blocked 🛑 (Wave 5 හෝ ඊට වැඩි බැවින් සියලුම Long සහ Short entries 100% ක් Hard-Block කර ඇත)."
+            else:
+                gate_2_passed = True
+                gate_2_detail_en = f"Gate 2 Verified: Wave {wave_count} active (Strictly within Wave 1-4 boundary). Trend blow-off exhaustion cleared."
+                gate_2_detail_si = f"Gate 2 තහවුරුයි: Wave {wave_count} සක්‍රීයයි (Wave 1-4 සීමාව තුළයි). Trend Exhaustion අවදානමක් නැත."
+        else:
             gate_2_detail_en = "Gate 2 Locked: Waiting for Gate 1 Macro Anchor confirmation."
             gate_2_detail_si = "Gate 2 අක්‍රියයි: Gate 1 Macro Anchor තහවුරු වන තෙක් බලා සිටී."
-        elif not sweep_ok:
-            gate_2_detail_en = f"Gate 2 Pending: Awaiting {'Asian Low / PDL / 5M EQL' if is_buy_setup else 'Asian High / PDH / 5M EQH'} Liquidity Sweep."
-            gate_2_detail_si = f"Gate 2 රැඳී සිටී: {'Asian Low / PDL / 5M EQL' if is_buy_setup else 'Asian High / PDH / 5M EQH'} ද්‍රවශීලතාවය Sweep වන තෙක් බලා සිටී."
-        elif not mss_5m_ok:
-            gate_2_detail_en = "Gate 2 Pending: Liquidity swept, but awaiting confirmed 5M Candle Body Close MSS shift."
-            gate_2_detail_si = "Gate 2 රැඳී සිටී: Liquidity sweep විය. 5M Candle Body Close MSS එකක් තහවුරු වන තෙක් බලා සිටී."
-        elif not wave_ok:
-            active_tier = "Wave 5 Exhaustion - Locked"
-            gate_2_detail_en = f"Gate 2 Blocked: Wave 5 Exhaustion - Locked (Wave {wave_count} >= 5). All 3 Tier pathways deactivated."
-            gate_2_detail_si = f"Gate 2 අවහිරයි: Wave 5 Exhaustion - Locked (Wave {wave_count} >= 5). Pathways 3 ම අක්‍රීය කර නව Entries සම්පූර්ණයෙන්ම Lock කර ඇත."
-        elif not tier_passed:
-            gate_2_detail_en = f"Gate 2 Locked: Price is floating mid-range without tapping Tier 1 (FVG), Tier 2 (Breaker), or Tier 3 (Golden Pocket 0.50-0.786). Mid-range entries strictly forbidden | Wave {wave_count}."
-            gate_2_detail_si = f"Gate 2 අවහිරයි: මිල Tier 1 (FVG), Tier 2 (Breaker), හෝ Tier 3 (Golden Pocket Fib 0.50-0.786) කලාපයකට නොපැමිණ Range එක මැද පාවෙමින් පවතී. Entries 100% තහනම් | Wave {wave_count}."
-        else:
-            gate_2_passed = True
-            gate_2_detail_en = f"Gate 2 Verified ({active_tier}): Retracement tap confirmed at ${active_tier_level:.{precision}f}. Wave {wave_count} valid in Wave 1-4."
-            gate_2_detail_si = f"Gate 2 තහවුරුයි ({active_tier}): Retracement ස්පර්ශය (${active_tier_level:.{precision}f}) තහවුරුයි. Wave {wave_count} වලංගුයි (Wave 1-4 සක්‍රීයයි)."
 
         evaluations.append({
             "step_no": 2,
             "rule_no": 2,
             "gate_no": 2,
-            "title": "Gate 2: 3-Tier Cascade Retracement Engine & Wave Counter",
-            "title_si": "පියවර 2: 3-Tier Cascade Retracement එන්ජිම (FVG -> Breaker -> Golden Pocket Fib 0.50-0.786 & Wave 1-4)",
+            "title": "Gate 2: Mathematical Wave 1-4 Counter Engine",
+            "title_si": "පියවර 2: ගණිතමය Wave 1-4 ගණක එන්ජිම (Wave 1-4 Allowed / Wave >= 5 Blocked)",
             "passed": gate_2_passed,
-            "status": "PASS" if gate_2_passed else ("LOCKED" if (not gate_1_passed or not wave_ok or not tier_passed) else "PENDING"),
+            "status": "PASS" if gate_2_passed else ("LOCKED" if (not gate_1_passed or not wave_ok) else "PENDING"),
             "detail": gate_2_detail_en,
             "detail_si": gate_2_detail_si
         })
 
         # =========================================================================
-        # GATE 3: 3M Candle Body Displacement & RVOL
+        # GATE 3: 3-Tier Cascade Retracement & Fib Equilibrium (Buy & Sell)
         # =========================================================================
-        choch_3m_ok = False
-        rvol_val = 1.0
-        rvol_ok = False
-        fvg_3m_found = False
-        fvg_3m_top = 0.0
-        fvg_3m_bot = 0.0
-        sweep_3m_wick_extreme = 0.0
-        breaker_3m_level = 0.0
-
+        eq_ok = False
+        eq_price = price
+        fib_val = 0.50
+        r_hi = price
+        r_lo = price
+        active_tier = "None"
+        active_tier_level = 0.0
+        tier_passed = False
         gate_3_passed = False
         gate_3_detail_en = ""
         gate_3_detail_si = ""
 
         if gate_2_passed:
-            choch_3m_ok, sweep_3m_wick_extreme, breaker_3m_level = cls._check_3m_choch_body_close(
-                candles_3m=candles_3m,
-                is_buy=is_buy_setup,
-                base_top=base_5m_top,
-                base_bot=base_5m_bot
-            )
-            rvol_val = cls._calculate_3m_rvol(candles_3m)
-            rvol_ok = (rvol_val >= 1.35)
-            fvg_3m_found, fvg_3m_top, fvg_3m_bot = cls._find_fresh_3m_fvg(
-                candles_3m=candles_3m,
+            # Check Dealing Range Equilibrium between recent Swing High and Swing Low
+            eq_ok, eq_price, fib_val, r_hi, r_lo = cls._check_dealing_range_equilibrium(
+                candles_5m=candles_5m,
+                current_price=price,
+                base_top=0.0,
+                base_bot=0.0,
                 is_buy=is_buy_setup
             )
-            gate_3_passed = bool(choch_3m_ok and rvol_ok and fvg_3m_found)
 
-        if not gate_2_passed:
-            gate_3_detail_en = "Gate 3 Locked: Waiting for Gate 2 5M Base Tap in Discount/Premium & Wave 1/2."
-            gate_3_detail_si = "Gate 3 අක්‍රියයි: Gate 2 5M Base Tap සහ Wave 1/2 තහවුරු වන තෙක් බලා සිටී."
-        elif not choch_3m_ok:
-            gate_3_detail_en = "Gate 3 Pending: Price tapped 5M Zone. Waiting for 3M Candle BODY CLOSE CHoCH/MSS (Wick breaks blocked)."
-            gate_3_detail_si = "Gate 3 රැඳී සිටී: 5M Zone ස්පර්ශ විය. 3M Candle Body Close CHoCH/MSS බිඳීමක් බලාපොරොත්තුවෙන් සිටී."
-        elif not rvol_ok:
-            gate_3_detail_en = f"Gate 3 Pending: 3M CHoCH detected but RVOL ({rvol_val:.2f}x) is below 1.35x institutional threshold."
-            gate_3_detail_si = f"Gate 3 රැඳී සිටී: 3M CHoCH සිදුවුවද RVOL ({rvol_val:.2f}x) අවම 1.35x සීමාවට වඩා අඩුය."
-        elif not fvg_3m_found:
-            gate_3_detail_en = "Gate 3 Pending: 3M CHoCH confirmed with RVOL, but awaiting fresh unmitigated 3M FVG formation."
-            gate_3_detail_si = "Gate 3 රැඳී සිටී: 3M CHoCH තහවුරුයි, නමුත් ඊට පසු අලුත්ම 3M FVG එකක් සෑදෙන තෙක් බලා සිටී."
+            # Tier 1: 3M FVG Mitigation (Top 25% for Long / Bottom 25% for Short)
+            fvg_3m_found, fvg_3m_top, fvg_3m_bot = cls._find_fresh_3m_fvg(candles_3m, is_buy=is_buy_setup)
+            tier_1_tap = False
+            tier_1_level = 0.0
+            if fvg_3m_found:
+                if is_buy_setup:
+                    tier_1_level = fvg_3m_top - (0.25 * (fvg_3m_top - fvg_3m_bot))
+                    tier_1_tap = bool(
+                        (price <= tier_1_level * 1.0008 and price >= fvg_3m_bot * 0.9992) or
+                        any(float(c["low"]) <= tier_1_level * 1.0008 and float(c["high"]) >= fvg_3m_bot * 0.9992 for c in candles_3m[-6:])
+                    )
+                else:
+                    tier_1_level = fvg_3m_bot + (0.25 * (fvg_3m_top - fvg_3m_bot))
+                    tier_1_tap = bool(
+                        (price >= tier_1_level * 0.9992 and price <= fvg_3m_top * 1.0008) or
+                        any(float(c["high"]) >= tier_1_level * 0.9992 and float(c["low"]) <= fvg_3m_top * 1.0008 for c in candles_3m[-6:])
+                    )
+
+            # Tier 2: Breaker Block (Previous broken 3M Resistance/Support Re-test)
+            _, _, breaker_level = cls._check_3m_choch_body_close(candles_3m, is_buy=is_buy_setup, base_top=0.0, base_bot=0.0)
+            tier_2_tap = False
+            if breaker_level > 0:
+                if is_buy_setup:
+                    tier_2_tap = bool(
+                        (abs(price - breaker_level) / breaker_level <= 0.0018) or
+                        any(abs(float(c["low"]) - breaker_level) / breaker_level <= 0.0020 for c in candles_3m[-6:])
+                    )
+                else:
+                    tier_2_tap = bool(
+                        (abs(price - breaker_level) / breaker_level <= 0.0018) or
+                        any(abs(float(c["high"]) - breaker_level) / breaker_level <= 0.0020 for c in candles_3m[-6:])
+                    )
+
+            # Tier 3: Golden Pocket 0.50 - 0.786 Deep Retracement
+            tier_3_tap = False
+            if is_buy_setup:
+                tier_3_tap = bool(
+                    eq_ok and (
+                        (0.20 <= fib_val <= 0.505) or
+                        (price <= eq_price * 1.0010 and price >= r_lo * 0.9990) or
+                        any(float(c["low"]) <= eq_price * 1.0010 and float(c["low"]) >= r_lo * 0.9990 for c in candles_3m[-6:])
+                    )
+                )
+            else:
+                tier_3_tap = bool(
+                    eq_ok and (
+                        (0.495 <= fib_val <= 0.80) or
+                        (price >= eq_price * 0.9990 and price <= r_hi * 1.0010) or
+                        any(float(c["high"]) >= eq_price * 0.9990 and float(c["high"]) <= r_hi * 1.0010 for c in candles_3m[-6:])
+                    )
+                )
+
+            # Waterfall Priority: Tier 1 -> Tier 2 -> Tier 3
+            if tier_1_tap:
+                active_tier = "Tier 1: 3M FVG Mitigation"
+                active_tier_level = tier_1_level
+                tier_passed = True
+            elif tier_2_tap:
+                active_tier = "Tier 2: 3M Breaker Re-test"
+                active_tier_level = breaker_level
+                tier_passed = True
+            elif tier_3_tap:
+                active_tier = f"Tier 3: Golden Pocket ({'Discount' if is_buy_setup else 'Premium'} Fib {fib_val:.2f})"
+                active_tier_level = eq_price
+                tier_passed = True
+            else:
+                active_tier = "Mid-Range Floating (Locked)"
+                active_tier_level = 0.0
+                tier_passed = False
+
+            if not eq_ok:
+                gate_3_passed = False
+                gate_3_detail_en = f"Gate 3 Blocked: Equilibrium Violation (Fib={fib_val:.2f} > 0.50 for Long or < 0.50 for Short). No Buy in Premium / No Sell in Discount."
+                gate_3_detail_si = f"Gate 3 අවහිරයි: Equilibrium උල්ලංඝනයකි (Fib={fib_val:.2f}). Discount Zone (Buy) හෝ Premium Zone (Sell) වලින් පිටත Trades 100% තහනම්."
+            elif not tier_passed:
+                gate_3_passed = False
+                gate_3_detail_en = "Gate 3 Locked: Price is floating mid-range without tapping Tier 1 (FVG), Tier 2 (Breaker), or Tier 3 (Golden Pocket 0.50-0.786). Mid-range entries strictly forbidden."
+                gate_3_detail_si = "Gate 3 අවහිරයි: මිල Tier 1 (FVG), Tier 2 (Breaker), හෝ Tier 3 (Golden Pocket Fib 0.50-0.786) කලාපයකට නොපැමිණ Range එක මැද පාවෙමින් පවතී. Entries 100% තහනම්."
+            else:
+                gate_3_passed = True
+                gate_3_detail_en = f"Gate 3 Verified ({active_tier}): Retracement tap confirmed at ${active_tier_level:.{precision}f} in {'Discount' if is_buy_setup else 'Premium'} Zone (Fib {fib_val:.2f})."
+                gate_3_detail_si = f"Gate 3 තහවුරුයි ({active_tier}): {'Discount' if is_buy_setup else 'Premium'} කලාපයේ ස්පර්ශය (${active_tier_level:.{precision}f}) තහවුරුයි (Fib {fib_val:.2f})."
         else:
-            gate_3_detail_en = f"Gate 3 Verified: 3M Candle Body Close CHoCH confirmed with RVOL={rvol_val:.2f}x (>=1.35x). Fresh 3M FVG (${fvg_3m_bot:.{precision}f} - ${fvg_3m_top:.{precision}f})."
-            gate_3_detail_si = f"Gate 3 තහවුරුයි: 3M Candle Body Close CHoCH සහ RVOL={rvol_val:.2f}x තහවුරු විය. අලුත්ම 3M FVG එක (${fvg_3m_bot:.{precision}f} - ${fvg_3m_top:.{precision}f}) සෑදී ඇත."
+            gate_3_detail_en = "Gate 3 Locked: Waiting for Gate 2 Wave 1-4 verification."
+            gate_3_detail_si = "Gate 3 අක්‍රියයි: Gate 2 Wave 1-4 තහවුරු වන තෙක් බලා සිටී."
 
         evaluations.append({
             "step_no": 3,
             "rule_no": 3,
             "gate_no": 3,
-            "title": "Gate 3: 3M Candle Body Displacement & RVOL",
-            "title_si": "පියවර 3: 3M ඉටිපන්දම් කඳ බිඳීම සහ සාපේක්ෂ පරිමාව",
+            "title": "Gate 3: 3-Tier Cascade Retracement & Fib Equilibrium",
+            "title_si": "පියවර 3: 3-Tier Cascade Retracement සහ Fib Equilibrium (Tier 1-3 & Discount/Premium)",
             "passed": gate_3_passed,
-            "status": "PASS" if gate_3_passed else ("LOCKED" if not gate_2_passed else "PENDING"),
+            "status": "PASS" if gate_3_passed else ("LOCKED" if (not gate_2_passed or not eq_ok or not tier_passed) else "PENDING"),
             "detail": gate_3_detail_en,
             "detail_si": gate_3_detail_si
         })
 
         # =========================================================================
-        # GATE 4: Strict HL / LH Retracement Exhaustion (No Single-Candle HL/LH)
+        # GATE 4: Volume & Relative Momentum (RVOL >= 1.35x)
         # =========================================================================
-        retracement_passed = False
-        retracement_state = "IDLE"
-        retracement_status_display = "Gate 4: Awaiting 3M CHoCH Shift"
-        calc_trigger_entry = 0.0
-        local_extreme_wick = 0.0
-        exhaustion_type = ""
+        rvol_val = 1.0
+        rvol_ok = False
+        gate_4_passed = False
         gate_4_detail_en = ""
         gate_4_detail_si = ""
 
         if gate_3_passed:
-            (
-                retracement_passed,
-                retracement_state,
-                retracement_status_display,
-                calc_trigger_entry,
-                local_extreme_wick,
-                exhaustion_type,
-                gate_4_detail_en,
-                gate_4_detail_si
-            ) = cls._check_lh_hl_retracement_exhaustion(
-                candles_3m=candles_3m,
-                is_buy=is_buy_setup,
-                breaker_3m_level=breaker_3m_level,
-                fvg_3m_top=fvg_3m_top,
-                fvg_3m_bot=fvg_3m_bot,
-                current_price=price,
-                precision=precision
-            )
-        elif not gate_2_passed or not gate_1_passed or not gate_0_passed:
-            gate_4_detail_en = "Gate 4 Locked: Waiting for prior gates."
-            gate_4_detail_si = "Gate 4 අක්‍රියයි: පෙර පියවර සම්පූර්ණ වන තෙක් බලා සිටී."
+            rvol_val = cls._calculate_3m_rvol(candles_3m)
+            rvol_ok = bool(rvol_val >= 1.35)
+            if rvol_ok:
+                gate_4_passed = True
+                gate_4_detail_en = f"Gate 4 Verified: Relative Volume confirmed (RVOL={rvol_val:.2f}x >= 1.35x). Rebound volume backing entry."
+                gate_4_detail_si = f"Gate 4 තහවුරුයි: සාපේක්ෂ පරිමාව (RVOL={rvol_val:.2f}x >= 1.35x) තහවුරුයි. ආයතනික පරිමාව Rebound එකට පිටුබලය දෙයි."
+            else:
+                gate_4_passed = False
+                gate_4_detail_en = f"Gate 4 Pending: Awaiting Relative Volume surge (Current RVOL={rvol_val:.2f}x < 1.35x institutional threshold)."
+                gate_4_detail_si = f"Gate 4 රැඳී සිටී: සාපේක්ෂ පරිමාව ප්‍රමාණවත් නොවේ (RVOL={rvol_val:.2f}x < 1.35x). පරිමාව තහවුරු වන තෙක් බලා සිටී."
         else:
-            gate_4_detail_en = "Gate 4 Pending: Waiting for Gate 3 3M CHoCH body shift before monitoring LH/HL pullback."
-            gate_4_detail_si = "Gate 4 රැඳී සිටී: 3M CHoCH Body Shift සම්පූර්ණ වන තෙක් LH/HL Pullback නිරීක්ෂණය බලා සිටී."
-
-        gate_4_passed = bool(gate_3_passed and retracement_passed)
+            gate_4_detail_en = "Gate 4 Locked: Waiting for Gate 3 Tier Retracement tap."
+            gate_4_detail_si = "Gate 4 අක්‍රියයි: Gate 3 Retracement ස්පර්ශය තහවුරු වන තෙක් බලා සිටී."
 
         evaluations.append({
             "step_no": 4,
             "rule_no": 4,
             "gate_no": 4,
-            "title": "Gate 4: Absolute Reversal Candle Color & Next Body Close Shift",
-            "title_si": "පියවර 4: නිරපේක්ෂ ප්‍රතිවර්තන ඉටිපන්දම් වර්ණය සහ ඊළඟ Body Close Shift තහවුරු කිරීම",
+            "title": "Gate 4: Volume & Relative Momentum Engine",
+            "title_si": "පියවර 4: සාපේක්ෂ පරිමාව සහ මොමෙන්ටම් එන්ජිම (RVOL >= 1.35x)",
             "passed": gate_4_passed,
             "status": "PASS" if gate_4_passed else ("LOCKED" if not gate_3_passed else "PENDING"),
             "detail": gate_4_detail_en,
@@ -488,40 +392,48 @@ class PrecisionScalpPipeline:
         })
 
         # =========================================================================
-        # GATE 5: Opposing Clearance & Market Order Engine
+        # GATE 5: 2-Candle Closed State Machine (Strict Reversal Confirmation)
         # =========================================================================
-        market_entry_price = calc_trigger_entry if (gate_4_passed and calc_trigger_entry > 0) else price
-        opposing_clearance_ok = True
-        opposing_wall_price = 0.0
-        clearance_rr = 2.0
-        gate_5_passed = False
+        retracement_passed = False
+        retracement_state = "AWAITING_REVERSAL"
+        retracement_status_display = "Gate 5: Verifying 2-Candle State Machine Reversal..."
+        calc_trigger_entry = 0.0
+        local_extreme_wick = 0.0
+        exhaustion_type = ""
         gate_5_detail_en = ""
         gate_5_detail_si = ""
+        gate_5_passed = False
 
-        if gate_4_passed and market_entry_price > 0:
-            opposing_clearance_ok, opposing_wall_price, clearance_rr = cls._check_opposing_obstacle_clearance(
-                candles_5m=candles_5m,
-                entry_price=market_entry_price,
-                is_buy=is_buy_setup
+        if gate_4_passed:
+            (
+                retracement_passed,
+                retracement_state,
+                retracement_status_display,
+                calc_trigger_entry,
+                local_extreme_wick,
+                exhaustion_type,
+                gate_5_detail_en,
+                gate_5_detail_si
+            ) = cls._check_lh_hl_retracement_exhaustion(
+                candles_3m=candles_3m,
+                is_buy=is_buy_setup,
+                breaker_3m_level=active_tier_level,
+                fvg_3m_top=0.0,
+                fvg_3m_bot=0.0,
+                current_price=price,
+                precision=precision
             )
-            if opposing_clearance_ok:
-                gate_5_passed = True
-                gate_5_detail_en = f"Gate 5 Verified: Instant Market Order primed at ${market_entry_price:.{precision}f}. Opposing clearance ({clearance_rr:.2f}R >= 1.5R) confirmed."
-                gate_5_detail_si = f"Gate 5 තහවුරුයි: ${market_entry_price:.{precision}f} හිදී Instant Market Order සූදානම්. ප්‍රතිවිරුද්ධ බාධක පරතරය ({clearance_rr:.2f}R >= 1.5R) තහවුරුයි."
-            else:
-                gate_5_passed = False
-                gate_5_detail_en = f"Gate 5 Rejected: Opposing obstacle clearance ({clearance_rr:.2f}R) < 1.5R! High risk of immediate roadblock."
-                gate_5_detail_si = f"Gate 5 ප්‍රතික්ෂේපයි: ප්‍රතිවිරුද්ධ බාධක පරතරය ({clearance_rr:.2f}R) 1.5R ට වඩා අඩුය. Rejection අවදානම වැඩිය."
+            gate_5_passed = bool(retracement_passed)
         else:
-            gate_5_detail_en = "Gate 5 Locked: Waiting for Gate 4 Micro Shift confirmation."
-            gate_5_detail_si = "Gate 5 අක්‍රියයි: Gate 4 Micro Shift තහවුරු වන තෙක් බලා සිටී."
+            gate_5_detail_en = "Gate 5 Locked: Waiting for Gate 4 RVOL volume surge."
+            gate_5_detail_si = "Gate 5 අක්‍රියයි: Gate 4 RVOL පරිමාව තහවුරු වන තෙක් බලා සිටී."
 
         evaluations.append({
             "step_no": 5,
             "rule_no": 5,
             "gate_no": 5,
-            "title": "Gate 5: Opposing Clearance & Market Order Engine",
-            "title_si": "පියවර 5: ප්‍රතිවිරුද්ධ බාධක පරතරය සහ Market Order සූදානම් කිරීම (Clearance >= 1.5R)",
+            "title": "Gate 5: 2-Candle Closed State Machine (Strict Reversal Confirmation)",
+            "title_si": "පියවර 5: ඉටිපන්දම් 2 ක වැසුණු රාජ්‍ය යන්ත්‍රය (Wick >= 35% & Next Body Close Shift)",
             "passed": gate_5_passed,
             "status": "PASS" if gate_5_passed else ("LOCKED" if not gate_4_passed else "PENDING"),
             "detail": gate_5_detail_en,
@@ -529,8 +441,9 @@ class PrecisionScalpPipeline:
         })
 
         # =========================================================================
-        # GATE 6: Micro-Wick Stop Loss & Cap Engine (0.25% - 0.65% Hard-Cap)
+        # GATE 6: SL Buffer & Risk Hard-Cap (0.25% - 0.65%)
         # =========================================================================
+        market_entry_price = calc_trigger_entry if (gate_5_passed and calc_trigger_entry > 0) else price
         sl_price = 0.0
         risk_pct = 0.0
         risk_dist = 0.0
@@ -539,9 +452,9 @@ class PrecisionScalpPipeline:
         gate_6_detail_en = ""
         gate_6_detail_si = ""
 
-        if gate_5_passed:
+        if gate_5_passed and market_entry_price > 0:
             buffer_pct = 0.0015
-            ref_wick = local_extreme_wick if local_extreme_wick > 0 else (sweep_3m_wick_extreme if sweep_3m_wick_extreme > 0 else market_entry_price)
+            ref_wick = local_extreme_wick if local_extreme_wick > 0 else market_entry_price
             if is_buy_setup:
                 raw_sl = ref_wick * (1.0 - buffer_pct)
                 risk_dist = abs(market_entry_price - raw_sl)
@@ -574,7 +487,7 @@ class PrecisionScalpPipeline:
                         sl_price = round(raw_sl, precision)
 
             gate_6_passed = bool(risk_within_hard_cap and sl_price > 0)
-            wick_label = "Local Lower Wick" if is_buy_setup else "Local Upper Wick"
+            wick_label = "Candle 1 Lower Wick" if is_buy_setup else "Candle 1 Upper Wick"
             if gate_6_passed:
                 gate_6_detail_en = f"Gate 6 Verified: Micro-Wick SL placed at ${sl_price:.{precision}f} (0.15% buffer from 3M {wick_label} ${ref_wick:.{precision}f}). Risk={risk_pct*100:.2f}% (Strict 0.25%-0.65% Hard-Cap)."
                 gate_6_detail_si = f"Gate 6 තහවුරුයි: මයික්‍රෝ-වික් SL එක ${sl_price:.{precision}f} හි තබා ඇත (3M {wick_label} ${ref_wick:.{precision}f} ට 0.15% Buffer). අවදානම={risk_pct*100:.2f}% (0.25%-0.65% Hard-Cap සීමාව තුළයි)."
@@ -582,15 +495,15 @@ class PrecisionScalpPipeline:
                 gate_6_detail_en = f"Gate 6 Rejected: Calculated risk ({risk_pct*100:.2f}%) exceeds 0.65% hard-cap ceiling. Trade cancelled to protect capital."
                 gate_6_detail_si = f"Gate 6 ප්‍රතික්ෂේපයි: අවදානම ({risk_pct*100:.2f}%) උපරිම 0.65% සීමාව ඉක්මවයි. ප්‍රාග්ධනය ආරක්ෂා කිරීමට Trade එක අවලංගු විය."
         else:
-            gate_6_detail_en = "Gate 6 Locked: Waiting for Gate 5 clearance verification."
-            gate_6_detail_si = "Gate 6 අක්‍රියයි: Gate 5 ප්‍රතිවිරුද්ධ බාධක පරතරය තහවුරු වන තෙක් බලා සිටී."
+            gate_6_detail_en = "Gate 6 Locked: Waiting for Gate 5 2-Candle State Machine confirmation."
+            gate_6_detail_si = "Gate 6 අක්‍රියයි: Gate 5 ඉටිපන්දම් 2 ක තහවුරු වීම බලා සිටී."
 
         evaluations.append({
             "step_no": 6,
             "rule_no": 6,
             "gate_no": 6,
-            "title": "Gate 6: Micro-Wick Stop Loss & Cap Engine",
-            "title_si": "පියවර 6: මයික්‍රෝ-වික් Stop Loss එන්ජිම (Local Wick +/- 0.15% Buffer, 0.25%-0.65% Hard-Cap)",
+            "title": "Gate 6: Micro-Wick Stop Loss & 0.25%-0.65% Hard-Cap",
+            "title_si": "පියවර 6: ක්ෂුද්‍ර වික් බෆර් Stop Loss සහ 0.25%-0.65% Hard-Cap සීමාව",
             "passed": gate_6_passed,
             "status": "PASS" if gate_6_passed else ("LOCKED" if not gate_5_passed else "PENDING"),
             "detail": gate_6_detail_en,
@@ -598,7 +511,7 @@ class PrecisionScalpPipeline:
         })
 
         # =========================================================================
-        # GATE 7: Execution & Risk Management (TP1 1:1.50R, TP2 1:2.0R Fixed)
+        # GATE 7: Execution, Targets & Telegram Alert (Instant Market Scalp)
         # =========================================================================
         be_trigger = 0.0
         tp1_target = 0.0
@@ -620,10 +533,10 @@ class PrecisionScalpPipeline:
                 tp1_target = round(market_entry_price - (1.50 * r_val), precision)
                 tp2_target = round(market_entry_price - (2.00 * r_val), precision)
 
-            gate_7_passed = bool(tp1_target > 0 and tp2_target > 0)
+            gate_7_passed = bool(tp2_target > 0)
             if gate_7_passed:
-                gate_7_detail_en = f"Gate 7 Verified: Break-Even at +0.80R (${be_trigger:.{precision}f}). TP1 at 1:1.50R (${tp1_target:.{precision}f}, 60% Close). TP2 at 1:2.0R (${tp2_target:.{precision}f}, 40% Final Exit). Fixed 1:2.0R rapid scalp exit active."
-                gate_7_detail_si = f"Gate 7 තහවුරුයි: +0.80R (${be_trigger:.{precision}f}) හිදී Break-Even. 1:1.50R (${tp1_target:.{precision}f}) හිදී TP1 60% Close. 1:2.0R (${tp2_target:.{precision}f}) හිදී TP2 40% Final Exit. Fixed 1:2.0R අධිවේගී පිටවීම සක්‍රීයයි."
+                gate_7_detail_en = f"Gate 7 Verified: Break-Even at +0.80R (${be_trigger:.{precision}f}). Fixed 1:2.0R TP at ${tp2_target:.{precision}f}. Instant Market Scalp active."
+                gate_7_detail_si = f"Gate 7 තහවුරුයි: +0.80R (${be_trigger:.{precision}f}) හිදී Break-Even. Fixed 1:2.0R ඉලක්කය ${tp2_target:.{precision}f} හිදී. Instant Market Scalp සක්‍රීයයි."
         else:
             gate_7_detail_en = "Gate 7 Locked: Waiting for Gate 6 Stop Loss verification."
             gate_7_detail_si = "Gate 7 අක්‍රියයි: Gate 6 Stop Loss තහවුරු වන තෙක් බලා සිටී."
@@ -632,8 +545,8 @@ class PrecisionScalpPipeline:
             "step_no": 7,
             "rule_no": 7,
             "gate_no": 7,
-            "title": "Gate 7: Execution & Risk Management (TP1 1:1.50R, TP2 1:2.0R Fixed)",
-            "title_si": "පියවර 7: ක්‍රියාත්මක කිරීම සහ අවදානම් කළමනාකරණය (BE +0.80R, TP1 1:1.50R 60%, TP2 1:2.0R 40% Fixed)",
+            "title": "Gate 7: Execution, Targets & Telegram Alert",
+            "title_si": "පියවර 7: ක්‍රියාත්මක කිරීම සහ ඉලක්ක (Instant Market Execution, BE +0.80R, Fixed 1:2.0R TP)",
             "passed": gate_7_passed,
             "status": "PASS" if gate_7_passed else ("LOCKED" if not gate_6_passed else "PENDING"),
             "detail": gate_7_detail_en,
@@ -687,35 +600,32 @@ class PrecisionScalpPipeline:
             entry_area_str = f"INSTANT MARKET {act_str} at ${market_entry_price:.{precision}f} (Wave {wave_count} Micro Shift Confirmed)"
             retracement_status_display = f"🎯 Wave {wave_count} Micro Shift Confirmed! INSTANT MARKET {act_str} Scalp 📌"
         elif not gate_0_passed:
-            entry_area_str = "No Entry (ADX < 20 / BB Squeeze Locked - Gate 0)"
-            retracement_status_display = "Gate 0: Awaiting Volatility Breakout"
+            entry_area_str = "No Entry (ADX < 22 / BB Squeeze Locked - Gate 0)"
+            retracement_status_display = "Gate 0: Market Choppy / Range Blocked 🛑"
         elif news_block:
             entry_area_str = "No Entry (High-Impact News Armor Lock - +/-60 min)"
-            retracement_status_display = "Gate 1: Macro Wait / News Lockout"
+            retracement_status_display = "Gate 1: Macro Wait / USD News Lockout 🛡️"
         elif current_phase == 1:
             entry_area_str = "No Entry (15M Macro Structure Neutral/Chop - Gate 1)"
             retracement_status_display = "Gate 1: Macro Wait / 15M Anchor"
         elif current_phase == 2:
-            if not wave_ok:
-                entry_area_str = f"No Entry (Wave {wave_count} >= 5 Exhaustion - Locked - Gate 2)"
-                retracement_status_display = f"Gate 2: Wave 5 Exhaustion - Locked (Wave {wave_count} >= 5)"
+            entry_area_str = f"No Entry (Wave {wave_count} Exhaustion - Blocked 🛑 - Gate 2)"
+            retracement_status_display = f"Gate 2: Wave {wave_count} Exhaustion - Blocked 🛑"
+        elif current_phase == 3:
+            if not eq_ok:
+                entry_area_str = "No Entry (Equilibrium Violation - Gate 3)"
+                retracement_status_display = "Gate 3: Equilibrium Violation (No Buy in Premium / No Sell in Discount)"
             elif not tier_passed:
-                entry_area_str = f"No Entry (Mid-Range Floating - Gate 2 Locked | Wave {wave_count})"
-                retracement_status_display = f"Gate 2: Mid-Range Floating (Locked) | Wave {wave_count}"
-            elif not eq_ok:
-                entry_area_str = "No Entry (Equilibrium Violation - Gate 2)"
-                retracement_status_display = "Gate 2: Equilibrium Violation (No Buy in Premium / No Sell in Discount)"
+                entry_area_str = f"No Entry (Mid-Range Floating - Gate 3 Locked | Wave {wave_count})"
+                retracement_status_display = f"Gate 3: Mid-Range Floating (Locked) | Wave {wave_count}"
             else:
                 entry_area_str = f"⏳ {active_tier} Tapped (${active_tier_level:.{precision}f}) | Wave {wave_count}"
-                retracement_status_display = f"Gate 2: {active_tier} Tapped | Wave {wave_count}"
-        elif current_phase == 3:
-            entry_area_str = "⏳ 5M Zone Tapped - Waiting for 3M Body Close CHoCH & RVOL >= 1.35x (Gate 3)"
-            retracement_status_display = "Gate 3: 3M Body Shift & RVOL Pending"
+                retracement_status_display = f"Gate 3: {active_tier} Tapped | Wave {wave_count}"
         elif current_phase == 4:
-            entry_area_str = f"{retracement_status_display} (Gate 4)"
+            entry_area_str = f"No Entry (RVOL {rvol_val:.2f}x < 1.35x - Gate 4)"
+            retracement_status_display = f"Gate 4: Awaiting RVOL >= 1.35x Volume Surge ({rvol_val:.2f}x)"
         elif current_phase == 5:
-            entry_area_str = f"Gate 5: Opposing Clearance < 1.5R"
-            retracement_status_display = "Gate 5: Near-Zone Breaker Order Active 🎯"
+            entry_area_str = f"{retracement_status_display} (Gate 5)"
         elif current_phase == 6:
             entry_area_str = f"No Entry (Risk {risk_pct*100:.2f}% > 0.65% Hard-Cap Ceiling - Gate 6)"
             retracement_status_display = "Gate 6: Micro-Wick SL Armed (0.25%-0.65%)"
@@ -724,27 +634,27 @@ class PrecisionScalpPipeline:
 
         # Detailed Bilingual Technical Reasoning
         reasoning_eng = (
-            f"🦅 **100% Sequential Hard-Locked SMC Pipeline (Zero Step Skipping):**\n"
-            f"• **Gate 0 (Regime & Squeeze):** {market_regime} (ADX={adx_val:.1f}, BB Bandwidth={current_bw*100:.2f}%).\n"
-            f"• **Gate 1 (Macro Anchor):** 15M Direction: {t15m_trend or 'NEUTRAL'} ({t15m_seq}). News Armor verified.\n"
-            f"• **Gate 2 (3-Tier Cascade & Wave):** {active_tier} at ${active_tier_level:.{precision}f} (Wave {wave_count} in Wave 1-4).\n"
-            f"• **Gate 3 (3M Body Shift):** 3M Body Close CHoCH with RVOL={rvol_val:.2f}x.\n"
-            f"• **Gate 4 (Wave 1-4 Micro Shift):** {retracement_status_display}.\n"
-            f"• **Gate 5 (Opposing Clearance):** Instant Market Order primed with clearance >= 1.5R.\n"
-            f"• **Gate 6 (Micro-Wick SL):** SL anchored to 3M Local Wick with 0.15% buffer (${sl_price:.{precision}f}, Risk={risk_pct*100:.2f}%).\n"
-            f"• **Gate 7 (Fixed 1:2.0R Scalp):** +0.80R BE (${be_trigger:.{precision}f}), 1:1.50R TP1 (${tp1_target:.{precision}f}, 60%), 1:2.0R TP2 (${tp2_target:.{precision}f}, 40% Fixed)."
+            f"🦅 **100% Sequential Hard-Locked SMC Pipeline (Gates 0 to 7):**\n"
+            f"• **Gate 0 (Choppiness Filter):** {market_regime} (ADX={adx_val:.1f}>=22, BB Squeeze={'LOCKED' if is_bb_sq else 'CLEAR'}).\n"
+            f"• **Gate 1 (15M Macro Anchor):** 15M Direction: {t15m_trend or 'NEUTRAL'} ({t15m_seq}). News Armor verified.\n"
+            f"• **Gate 2 (Wave 1-4 Counter):** Wave {wave_count} verified ({'Wave <= 4 Active' if wave_count <= 4 else 'Wave >= 5 Exhausted'}).\n"
+            f"• **Gate 3 (3-Tier Cascade & Equilibrium):** {active_tier} at ${active_tier_level:.{precision}f} ({'Discount' if is_buy_setup else 'Premium'} Fib={fib_val:.2f}).\n"
+            f"• **Gate 4 (Volume & RVOL):** RVOL={rvol_val:.2f}x (>= 1.35x institutional threshold).\n"
+            f"• **Gate 5 (2-Candle State Machine):** {retracement_status_display}.\n"
+            f"• **Gate 6 (Micro-Wick SL):** SL anchored to Candle 1 Wick with 0.15% buffer (${sl_price:.{precision}f}, Risk={risk_pct*100:.2f}%).\n"
+            f"• **Gate 7 (Fixed 1:2.0R Scalp):** +0.80R BE (${be_trigger:.{precision}f}), Fixed 1:2.0R TP (${tp2_target:.{precision}f})."
         )
 
         reasoning_sin = (
-            f"🦅 **100% Sequential Hard-Locked SMC පද්ධතිය (Sequential Hard-Lock):**\n"
-            f"• **Gate 0 (වෙළඳපල කලාපය):** {market_regime} (ADX={adx_val:.1f}, BB Bandwidth={current_bw*100:.2f}%).\n"
+            f"🦅 **100% Sequential Hard-Locked SMC පද්ධතිය (පියවර 0 සිට 7 දක්වා):**\n"
+            f"• **Gate 0 (වෙළඳපල කලාපය):** {market_regime} (ADX={adx_val:.1f}>=22, BB Squeeze={'අවහිරයි' if is_bb_sq else 'පැහැදිලියි'}).\n"
             f"• **Gate 1 (15M සාර්ව නැංගුරම):** 15M Macro දිශාව {t15m_trend or 'NEUTRAL'} වේ. ආර්ථික පුවත් ආවරණය ක්‍රියාත්මකයි.\n"
-            f"• **Gate 2 (3-Tier Cascade Retracement & Wave):** {active_tier} (${active_tier_level:.{precision}f}) ස්පර්ශ විය. Wave {wave_count} (Wave 1-4 සක්‍රීයයි).\n"
-            f"• **Gate 3 (3M ඉටිපන්දම් කඳ බිඳීම):** 3M Body Close CHoCH සහ RVOL={rvol_val:.2f}x සහිත නැවුම් 3M FVG එකක් සෑදීම.\n"
-            f"• **Gate 4 (Wave 1-4 Micro Shift):** {retracement_status_display}. Rejection Wick >= 35% සහ Body Close Shift තහවුරු විය.\n"
-            f"• **Gate 5 (ප්‍රතිවිරුද්ධ බාධක පරතරය):** Instant Market Order සූදානම් (Clearance >= 1.5R).\n"
-            f"• **Gate 6 (Micro-Wick SL):** 3M Local Wick අන්තයෙන් 0.15% buffer සහිතව SL (${sl_price:.{precision}f}). අවදානම {risk_pct*100:.2f}% (0.25%-0.65% Hard-Cap).\n"
-            f"• **Gate 7 (පිටවීමේ සැලැස්ම):** +0.80R (${be_trigger:.{precision}f}) දී Break-Even, 1:1.50R (${tp1_target:.{precision}f}) දී TP1 60% Close, 1:2.0R (${tp2_target:.{precision}f}) දී TP2 40% Close (Fixed 1:2.0R ඉලක්කය)."
+            f"• **Gate 2 (Wave 1-4 ගණක එන්ජිම):** Wave {wave_count} තහවුරුයි ({'Wave 1-4 සක්‍රීයයි' if wave_count <= 4 else 'Wave 5+ අවහිරයි'}).\n"
+            f"• **Gate 3 (3-Tier Cascade & Equilibrium):** {active_tier} (${active_tier_level:.{precision}f}) ස්පර්ශ විය ({'Discount' if is_buy_setup else 'Premium'} Fib={fib_val:.2f}).\n"
+            f"• **Gate 4 (පරිමාව සහ RVOL):** RVOL={rvol_val:.2f}x (>= 1.35x ආයතනික සීමාව).\n"
+            f"• **Gate 5 (ඉටිපන්දම් 2 ක රාජ්‍ය යන්ත්‍රය):** {retracement_status_display}.\n"
+            f"• **Gate 6 (Micro-Wick SL):** Candle 1 Wick අන්තයෙන් 0.15% buffer සහිතව SL (${sl_price:.{precision}f}). අවදානම {risk_pct*100:.2f}% (0.25%-0.65% Hard-Cap).\n"
+            f"• **Gate 7 (පිටවීමේ සැලැස්ම):** +0.80R (${be_trigger:.{precision}f}) දී Break-Even, Fixed 1:2.0R (${tp2_target:.{precision}f}) ඉලක්කය."
         )
 
         pipeline_phases = []
@@ -1049,34 +959,42 @@ class PrecisionScalpPipeline:
             return is_premium, equilibrium, fib_level, range_high, range_low
 
     @staticmethod
-    def _count_pullback_waves(candles_3m: List[Dict[str, Any]], is_buy: bool) -> int:
+    def _get_current_wave_count(candles_3m: List[Dict[str, Any]], is_buy: bool) -> int:
         """
-        Counts pullback waves (Wave 1, Wave 2, Wave 3, Wave 4, Wave 5+) after key zone tap:
-        Wave 1 to 4: Active & High-probability continuation setups.
-        Wave >= 5: Trend Exhaustion. Block setup ("Wave 5 Exhaustion - Locked").
+        Mathematical Wave 1-4 Counter Engine (Gate 2 - INJ Blow-off Top Fix):
+        Detects Swing Highs (HH) and Swing Lows (HL) via Structural Extrema,
+        and counts BOS expansion impulses:
+        impulse_count = len([p for p in swing_points if p.type == 'BOS_EXPANSION'])
+        If current_wave > 4 (Wave 5+): 100% hard-blocked.
         """
         if not candles_3m or len(candles_3m) < 8:
             return 1
 
-        window = candles_3m[-25:]
+        window = candles_3m[-30:]
         highs = [float(c["high"]) for c in window]
         lows = [float(c["low"]) for c in window]
+        closes = [float(c["close"]) for c in window]
 
-        pullback_cycles = 0
+        impulse_count = 0
         if is_buy:
-            # Count distinct Higher Low swing troughs
-            for i in range(2, len(lows) - 2):
-                if lows[i] <= min(lows[i-2:i]) and lows[i] < min(lows[i+1:i+3]):
-                    pullback_cycles += 1
-        else:
-            # Count distinct Lower High swing peaks
             for i in range(2, len(highs) - 2):
                 if highs[i] >= max(highs[i-2:i]) and highs[i] > max(highs[i+1:i+3]):
-                    pullback_cycles += 1
+                    # Check if subsequent candles pushed past this swing high (BOS expansion)
+                    if any(closes[k] > highs[i] for k in range(i+1, min(i+6, len(closes)))):
+                        impulse_count += 1
+        else:
+            for i in range(2, len(lows) - 2):
+                if lows[i] <= min(lows[i-2:i]) and lows[i] < min(lows[i+1:i+3]):
+                    # Check if subsequent candles pushed below this swing low (BOS expansion)
+                    if any(closes[k] < lows[i] for k in range(i+1, min(i+6, len(closes)))):
+                        impulse_count += 1
 
-        # Clamp to at least 1 wave and max 6
-        wave_num = max(1, min(pullback_cycles + 1, 6))
-        return wave_num
+        current_wave = max(1, min(impulse_count + 1, 6))
+        return current_wave
+
+    @staticmethod
+    def _count_pullback_waves(candles_3m: List[Dict[str, Any]], is_buy: bool) -> int:
+        return PrecisionScalpPipeline._get_current_wave_count(candles_3m, is_buy)
 
     @staticmethod
     def _check_liquidity_sweep_5m(

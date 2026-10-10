@@ -130,33 +130,30 @@ class TelegramService:
         tp2_str = f"{f_tp2:.{prec}f}"
         be_str = f"{f_be:.{prec}f}"
 
-        model_badge = "🦅 <b>100% HARD-LOCKED SMC ENGINE (EQUILIBRIUM & WAVE 1/2 VERIFIED) ✅</b>"
+        model_badge = "🦅 <b>SMC CONFIRMED 2-CANDLE MARKET EXECUTION (WAVE 1-4) ✅</b>"
         lh_hl_type = "Local HL Confirmed" if is_long else "Local LH Confirmed"
-        model_sub_si = f"Gate 0 Regime + 15M Macro + Equilibrium 50% + Wave 1/2 + 3M Body CHoCH + 3M Breaker {lh_hl_type} (Wick >= 35% / Reversal Close) තහවුරු විය. Consolidations සහ Wave >=3 Traps 100% වළක්වා ඇත."
+        model_sub_si = f"Gate 0 Regime + 15M Macro + Wave 1-4 Impulse + Fib 0.50 Equilibrium + 3-Tier Retracement + RVOL >= 1.35x + 2-Candle State Machine ({lh_hl_type} Wick >= 35% & Body Shift Close) තහවුරු විය. Consolidations, Runaways සහ Wave 5+ Traps 100% වළක්වා ඇත."
 
-        entry_type_label = f"3M Breaker / {lh_hl_type} Retracement Entry 🎯"
+        entry_type_label = f"2-Candle State Machine Reversal ({lh_hl_type}) 🎯"
 
         caption = (
             f"🦅 <b>COIN PAIR :- #{clean_sym}/USDT</b>\n"
             f"🦅 <b>FUTURE TYPE :- {dir_str}</b>\n"
             f"{model_badge}\n"
-            f"🏛️ <i>Gate 0 Volatility ✅ • 15M Anchor ✅ • Dealing Range Equilibrium ✅ • Wave 1/2 Pullback ✅ • {lh_hl_type} ✅</i>\n"
-            f"🚨 <b>Rapid Scalp (15-20 Min Exit)</b> | 💀 <b>LEVERAGE :- {leverage}</b>\n\n"
-            f"🎯 <b>ENTRY ({entry_type_label}) :-</b>\n"
+            f"🏛️ <i>Gate 0 Volatility ✅ • 15M Anchor ✅ • Wave 1-4 Engine ✅ • Dealing Range Equilibrium ✅ • 3-Tier Retracement ✅ • RVOL >= 1.35x ✅ • 2-Candle Closed Confirmation ✅</i>\n"
+            f"🚨 <b>Instant Market Scalp (10-15 Min Exit)</b> | 💀 <b>LEVERAGE :- {leverage}</b>\n\n"
+            f"🎯 <b>ENTRY (INSTANT MARKET {dir_str}) :-</b>\n"
             f"<code>{e_str}</code>\n\n"
-            f"🎯 <b>TP 1 (1:1.50R - 60% Close) :-</b>\n"
-            f"<code>{tp1_str}</code>\n\n"
-            f"🎯 <b>TP 2 (1:2.0R-1:2.30R - 40% Final Exit) :-</b>\n"
+            f"🎯 <b>TAKE PROFIT (Fixed 1:2.0R Target) :-</b>\n"
             f"<code>{tp2_str}</code>\n\n"
-            f"🛡️ <b>BREAK-EVEN TRIGGER (+0.80R) :-</b>\n"
+            f"🛡️ <b>BREAK-EVEN TRIGGER (+0.80R Profit) :-</b>\n"
             f"<code>{be_str}</code>\n\n"
-            f"🛑 <b>STOP LOSS (Pro-Wick SL Buffer 0.25%-0.65% Hard-Cap) :-</b>\n"
+            f"🛑 <b>STOP LOSS (Candle 1 Wick Extreme + 0.15% Buffer | 0.25%-0.65% Cap) :-</b>\n"
             f"<code>{sl_str}</code>\n\n"
             f"💰 <b>MARGIN ALLOCATION: 3% - 5% STRICT RISK CAP</b>\n\n"
-            f"🇱🇰 <b>සිංහල උපදෙස් (Pro 5M>3M Precision Scalp Engine):</b>\n"
-            f"{clean_sym} {dir_si} {lh_hl_type} Setup ({confidence}%). {model_sub_si} 3M Breaker/Imbalance මට්ටමෙන් ({e_str}) Entry එක Trigger කරන්න. SL එක 3M {lh_hl_type} Wick අන්තයෙන් තබා +0.80R ({be_str}) දී BE කරන්න. TP 1 ({tp1_str}) දී 60% ලාභ ගෙන Zero-Risk කරන්න. TP 2 ({tp2_str}) දී ඉතිරි 40% Final Exit කර විනාඩි 15-20 න් ට්‍රේඩ් එක සම්පූර්ණයෙන්ම අවසන් කරන්න."
+            f"🇱🇰 <b>සිංහල උපදෙස් (Strict SMC 8-Gate Pipeline Engine):</b>\n"
+            f"{clean_sym} {dir_si} 2-Candle Confirmed Reversal Setup ({confidence}%). {model_sub_si} Candle 2 Close වූ සැනින් INSTANT MARKET {dir_str} ({e_str}) ක්‍රියාත්මක කරන්න. SL එක Candle 1 {lh_hl_type} Wick අන්තයට වඩා 0.15% ක් ඈතින් ({sl_str}) තබා, +0.80R ({be_str}) ලාභයේදී Stop Loss එක Entry Price වෙත ගෙන ගොස් Break-Even කරන්න. Fixed 1:2.0R Target ({tp2_str}) මට්ටමේදී සම්පූර්ණ ලාභය ලබාගෙන විනාඩි 10-15 න් ට්‍රේඩ් එක අවසන් කරන්න."
         )
-
 
         reply_markup = {
             "inline_keyboard": [
@@ -165,8 +162,8 @@ class TelegramService:
                     {"text": f"🛡️ Copy SL ({sl_str})", "copy_text": {"text": sl_str}}
                 ],
                 [
-                    {"text": f"🎯 TP1: 1:1.50R ({tp1_str})", "copy_text": {"text": tp1_str}},
-                    {"text": f"🎯 TP2: 1:2.20R ({tp2_str})", "copy_text": {"text": tp2_str}}
+                    {"text": f"🎯 TP: 1:2.0R ({tp2_str})", "copy_text": {"text": tp2_str}},
+                    {"text": f"🛡️ BE: +0.80R ({be_str})", "copy_text": {"text": be_str}}
                 ],
                 [
                     {"text": f"📊 Open #{clean_sym} on TradingView ↗", "url": tv_url}

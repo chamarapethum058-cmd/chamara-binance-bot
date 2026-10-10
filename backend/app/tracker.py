@@ -640,6 +640,8 @@ async def analyze_single_coin_task(coin: dict, semaphore: asyncio.Semaphore):
             # Determine 8-gate hard-locked pipeline status & Falcon live state
             retr_disp = str(result.get("retracement_status_display") or "").strip()
             market_regime = str(result.get("market_regime") or "TRENDING EXPANSION ✅")
+            wave_cnt = int(result.get("wave_count") or 1)
+            active_tier_name = str(result.get("active_tier") or "Tier 1: 3M FVG")
             
             if active_pos:
                 pos_dir = active_pos.get("direction")
@@ -648,29 +650,29 @@ async def analyze_single_coin_task(coin: dict, semaphore: asyncio.Semaphore):
                 else:
                     status = f"🚀 Running to Targets ({pos_dir})"
             elif current_phase == 0 or "CHOPPY" in market_regime.upper():
-                status = "Gate 0: Awaiting Volatility Breakout"
-                entry_price = "No Entry (ADX < 20 / BB Squeeze Locked)"
+                status = "Gate 0: Market Choppy / Range Blocked 🛑"
+                entry_price = "No Entry (ADX < 22 / BB Squeeze Locked)"
             elif news_locked:
                 status = "Gate 1: Macro Wait / News Lockout"
                 entry_price = f"No Entry (USD News Lockout: {active_news_ev})"
             elif current_phase == 1:
                 status = "Gate 1: Macro Wait / 15M Anchor"
-            elif current_phase == 2:
-                status = retr_disp if retr_disp else (f"Gate 2: Waiting for {'Discount' if is_long else 'Premium'} Retrace (Fib < 50%) | Wave 1/2")
+            elif current_phase == 2 or wave_cnt > 4:
+                status = f"Gate 2: Wave {wave_cnt} Exhaustion - Blocked 🛑" if wave_cnt > 4 else f"Gate 2: Wave {wave_cnt}/4 Active"
             elif current_phase == 3:
-                status = "Gate 3: 3M Body Shift & RVOL Pending"
+                status = retr_disp if retr_disp else f"Gate 3: Retrace to 3-Tier Cascade ({active_tier_name})"
             elif current_phase == 4:
-                status = retr_disp if retr_disp else "Gate 4: Verifying True HL/LH Candle Body..."
+                status = "Gate 4: Awaiting Volume RVOL >= 1.35x Rebound 📊"
             elif current_phase == 5:
-                status = retr_disp if retr_disp else "Gate 5: Near-Zone Breaker Order Active 🎯"
+                status = retr_disp if retr_disp else "Gate 5: 2-Candle Reversal Confirmation..."
             elif current_phase == 6:
-                status = "Gate 6: Micro-Wick SL Armed (0.25%-0.65%)"
+                status = "Gate 6: Micro-Wick SL Armed (0.25%-0.65%) 🛡️"
             elif result.get("is_valid", False) and step_7_passed:
-                status = f"🎯 Local {'HL' if is_long else 'LH'} Confirmed! Triggering {'Long' if is_long else 'Short'} Scalp 📌"
+                status = f"🎯 SMC Confirmed 2-Candle Market Execution! Triggering {'Long' if is_long else 'Short'} Scalp 📌"
             else:
-                status = "Gate 0: Awaiting Volatility Breakout"
+                status = "Gate 0: Market Choppy / Range Blocked 🛑"
 
-            is_supreme_entry = bool(result.get("is_valid", False) and step_7_passed and not active_pos and not news_locked)
+            is_supreme_entry = bool(result.get("is_valid", False) and step_7_passed and not active_pos and not news_locked and wave_cnt <= 4)
 
             # Absolute Execution Guard: Current Candle Color Lock (Stop runaway counter-trend trades)
             curr_c_3m = candles[-1] if (candles and len(candles) > 0) else None
@@ -685,7 +687,7 @@ async def analyze_single_coin_task(coin: dict, semaphore: asyncio.Semaphore):
                     status = "⏳ Current 3M Candle is Green (Pumping) — Short Aborted (Anti-Counter-Pump Lock)"
 
             if not is_supreme_entry and "Triggering" in status:
-                status = retr_disp if retr_disp else "Gate 4: Awaiting Reversal Confirmation..."
+                status = retr_disp if retr_disp else "Gate 5: Awaiting 2-Candle Confirmation..."
 
             calc_entry = 0.0
             calc_sl = 0.0
@@ -695,11 +697,11 @@ async def analyze_single_coin_task(coin: dict, semaphore: asyncio.Semaphore):
 
             if is_supreme_entry:
                 prec = get_dynamic_precision(price)
-                # Step 5: Near-Zone Breaker & Immediate Imbalance Entry
+                # Gate 5: 2-Candle Closed State Machine Execution Entry
                 res_entry = result.get("entry_price")
                 calc_entry = round(float(res_entry), prec) if (res_entry and float(res_entry) > 0) else round(float(price), prec)
                 
-                # Step 6: Pro-Wick Stop Loss Buffer (0.25%-0.65% Hard-Cap)
+                # Gate 6: Micro-Wick Stop Loss Buffer (0.25%-0.65% Hard-Cap)
                 res_sl = result.get("stop_loss_level")
                 if res_sl and float(res_sl) > 0:
                     calc_sl = round(float(res_sl), prec)
@@ -717,25 +719,25 @@ async def analyze_single_coin_task(coin: dict, semaphore: asyncio.Semaphore):
                     r_dist = calc_entry * 0.0035
                     calc_sl = round(calc_entry + (-r_dist if is_long else r_dist), prec)
 
-                # Step 7: Rapid Scalp Exits (BE +0.80R, TP1 1:1.50R 60%, TP2 1:2.20R 40%)
+                # Gate 7: Rapid Scalp Exits (BE +0.80R, Fixed 1:2.0R TP)
                 res_tp1 = result.get("tp1_target")
                 res_tp2 = result.get("tp2_target")
                 res_be = result.get("breakeven_trigger")
 
                 calc_tp1 = round(float(res_tp1), prec) if (res_tp1 and float(res_tp1) > 0) else round(calc_entry + (1.50 * r_dist if is_long else -1.50 * r_dist), prec)
-                calc_tp2 = round(float(res_tp2), prec) if (res_tp2 and float(res_tp2) > 0) else round(calc_entry + (2.20 * r_dist if is_long else -2.20 * r_dist), prec)
+                calc_tp2 = round(float(res_tp2), prec) if (res_tp2 and float(res_tp2) > 0) else round(calc_entry + (2.00 * r_dist if is_long else -2.00 * r_dist), prec)
                 calc_be = round(float(res_be), prec) if (res_be and float(res_be) > 0) else round(calc_entry + (0.80 * r_dist if is_long else -0.80 * r_dist), prec)
 
                 # Overwrite checks for SHORT / LONG to prevent identical/inverted targets
                 if is_long:
                     if calc_tp1 <= calc_entry or calc_tp2 <= calc_tp1 or calc_be <= calc_entry:
                         calc_tp1 = round(calc_entry + (1.50 * r_dist), prec)
-                        calc_tp2 = round(calc_entry + (2.20 * r_dist), prec)
+                        calc_tp2 = round(calc_entry + (2.00 * r_dist), prec)
                         calc_be = round(calc_entry + (0.80 * r_dist), prec)
                 else:
                     if calc_tp1 >= calc_entry or calc_tp2 >= calc_tp1 or calc_be >= calc_entry:
                         calc_tp1 = round(calc_entry - (1.50 * r_dist), prec)
-                        calc_tp2 = round(calc_entry - (2.20 * r_dist), prec)
+                        calc_tp2 = round(calc_entry - (2.00 * r_dist), prec)
                         calc_be = round(calc_entry - (0.80 * r_dist), prec)
 
                 # Final Execution Alignment Check (15M Trend & 5M Market Structure Sync):
