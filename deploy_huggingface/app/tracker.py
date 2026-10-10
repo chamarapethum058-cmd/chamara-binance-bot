@@ -637,12 +637,13 @@ async def analyze_single_coin_task(coin: dict, semaphore: asyncio.Semaphore):
             news_locked = bool(result.get("news_lockout_active", False))
             active_news_ev = str(result.get("active_news_event") or "USD High-Impact News")
 
-            # Determine 8-gate hard-locked pipeline status & Falcon live state
+            # Determine Dual-Timeframe SMC (5M & 3M Symmetric) Pipeline Status
             retr_disp = str(result.get("retracement_status_display") or "").strip()
-            market_regime = str(result.get("market_regime") or "TRENDING EXPANSION ✅")
+            market_regime = str(result.get("market_regime") or "15M EXPANSION ✅")
             wave_cnt = int(result.get("wave_count") or 1)
             wave_label = str(result.get("wave_label") or f"Wave {wave_cnt}")
-            active_tier_name = str(result.get("active_tier") or "Tier 1: 3M FVG")
+            confluence_5m = str(result.get("confluence_5m") or "Awaiting 5M Zone")
+            wave_3m_level = str(result.get("wave_3m_level") or wave_label)
             
             if active_pos:
                 pos_dir = active_pos.get("direction")
@@ -650,30 +651,23 @@ async def analyze_single_coin_task(coin: dict, semaphore: asyncio.Semaphore):
                     status = f"🔒 Position Running ({pos_dir})"
                 else:
                     status = f"🚀 Running to Targets ({pos_dir})"
-            elif current_phase == 0 or ("CHOPPY" in market_regime.upper() and t15m_val not in ["BULLISH", "BEARISH"]):
-                status = "Gate 0: Market Choppy / Range Blocked 🛑"
-                entry_price = "No Entry (ADX < 14 / Squeeze Locked)"
-            elif news_locked:
-                status = "Gate 1: Macro Wait / News Lockout"
-                entry_price = f"No Entry (USD News Lockout: {active_news_ev})"
-            elif current_phase == 1:
-                status = f"Gate 1: Macro Wait / 15M Anchor ({t15m_val})"
-            elif current_phase == 2 or wave_cnt > 4 or "5+" in wave_label:
-                status = f"Gate 2: {wave_label} Exhaustion - Blocked 🛑" if (wave_cnt > 4 or "5+" in wave_label) else f"Gate 2: {wave_label} Active"
-            elif current_phase == 3:
-                status = retr_disp if retr_disp else f"Gate 3: Retrace to 3-Tier Cascade ({active_tier_name})"
-            elif current_phase == 4:
-                status = "Gate 4: Awaiting Volume RVOL >= 1.35x Rebound 📊"
-            elif current_phase == 5:
-                status = retr_disp if retr_disp else "Gate 5: 2-Candle Reversal Confirmation..."
-            elif current_phase == 6:
-                status = "Gate 6: Micro-Wick SL Armed (0.25%-0.65%) 🛡️"
-            elif result.get("is_valid", False) and step_7_passed:
+            elif result.get("is_valid", False) or current_phase == 5:
                 status = f"🎯 SMC Confirmed 2-Candle Market Execution! Triggering {'Long' if is_long else 'Short'} Scalp 📌"
-            elif t15m_val in ["BULLISH", "BEARISH"]:
-                status = f"Gate 1: Macro Wait / 15M Anchor ({t15m_val})"
+            elif news_locked:
+                status = "Gate 1: Macro Wait / USD News Lockout 🛡️"
+                entry_price = f"No Entry (USD News Lockout: {active_news_ev})"
+            elif wave_cnt > 4 or "5+" in wave_3m_level:
+                status = f"Gate 2: {wave_3m_level} Exhaustion - Blocked 🛑"
+            elif current_phase == 4:
+                status = "Gate 4: 3M Wick Rejection (>=35%) & Next Body Close Shift..."
+            elif current_phase == 3:
+                status = f"Gate 3: Retrace to 3M Confluence ({wave_3m_level})"
+            elif current_phase == 2:
+                status = f"Gate 2: Awaiting 3M CHoCH Shift ({confluence_5m})"
+            elif current_phase == 1:
+                status = f"Gate 1: Awaiting 5M Key Zone Tap ({t15m_val})"
             else:
-                status = "Gate 0: Market Choppy / Range Blocked 🛑"
+                status = "Gate 0: 15M Macro Neutral / Chop"
 
             is_supreme_entry = bool(result.get("is_valid", False) and step_7_passed and not active_pos and not news_locked and wave_cnt <= 4)
 
@@ -835,6 +829,8 @@ async def analyze_single_coin_task(coin: dict, semaphore: asyncio.Semaphore):
                 "trend_1h": t1h_val,
                 "trend_15m": t15m_val,
                 "trend_5m": t5m_val,
+                "confluence_5m": result.get("confluence_5m"),
+                "wave_3m_level": result.get("wave_3m_level"),
                 "market_regime": market_regime,
                 "adx_14": result.get("adx_14"),
                 "is_bb_squeeze": result.get("is_bb_squeeze"),

@@ -27,8 +27,8 @@ import time
 import pandas as pd
 
 # Falcon Cloud Engine Build Version (Forces Hugging Face Container Rebuild)
-BUILD_VERSION = "2026.10.10-v144.0-DYNAMIC-WAVE-UNBLOCK-GATE0"
-# Space Force-Restart Timestamp: 2026-10-10T15:32:00+05:30
+BUILD_VERSION = "2026.10.10-v145.0-DUAL-TIMEFRAME-5M-3M-SMC"
+# Space Force-Restart Timestamp: 2026-10-10T17:45:00+05:30
 
 
 
@@ -157,39 +157,56 @@ async def test_telegram():
         return f"❌ Error: {ex}"
 
 def resolve_coin_pipeline(c: dict):
-    """Resolve the 100% sequential hard-locked SMC pipeline status, live state, regime, and bias for a coin."""
+    """Resolve the Dual-Timeframe 5M & 3M Symmetric SMC pipeline status for a coin."""
     last_res = c.get("last_result") if isinstance(c.get("last_result"), dict) else {}
     pipe = last_res.get("pipeline") if isinstance(last_res.get("pipeline"), dict) else {}
     
-    # 0. Bias (Gate 1): 15M Macro Directional Bias (BULLISH / BEARISH)
+    # Level 1: 15M Macro Direction Anchor (BULLISH / BEARISH)
     t15m = str(c.get("trend_15m") or last_res.get("trend_15m") or "NEUTRAL").upper().strip()
-    t5m = str(c.get("trend_5m") or last_res.get("trend_5m") or "NEUTRAL").upper().strip()
-    is_trending = bool(t15m in ["BULLISH", "BEARISH"])
-
     if t15m == "BULLISH":
-        bias_disp = "BULLISH 🟢 (Buy Only)"
+        macro_15m = "BULLISH 🟢"
     elif t15m == "BEARISH":
-        bias_disp = "BEARISH 🔴 (Sell Only)"
-    elif "BULL" in t15m or "BULL" in t5m:
-        bias_disp = f"BULLISH ({t15m})"
-    elif "BEAR" in t15m or "BEAR" in t5m:
-        bias_disp = f"BEARISH ({t15m})"
+        macro_15m = "BEARISH 🔴"
+    elif "BULL" in t15m:
+        macro_15m = "BULLISH 🟢"
+    elif "BEAR" in t15m:
+        macro_15m = "BEARISH 🔴"
     else:
-        bias_disp = "NEUTRAL ⚪"
+        macro_15m = "NEUTRAL ⚪"
 
-    # Regime check (ADX 14 & BB Squeeze) - Unblocked for Trending Coins
-    m_reg = c.get("market_regime") or last_res.get("market_regime") or pipe.get("market_regime")
-    adx_val = float(c.get("adx_14") or last_res.get("adx_14") or pipe.get("adx_14") or 0.0)
-    is_sq = bool(c.get("is_bb_squeeze") or last_res.get("is_bb_squeeze") or pipe.get("is_bb_squeeze") or False)
-    
-    if is_trending or adx_val >= 14.0:
-        regime_disp = "TRENDING EXPANSION ✅"
-    elif m_reg:
-        regime_disp = m_reg
-    else:
-        regime_disp = "CHOPPY / SQUEEZE (LOCKED)"
+    # Level 2: 5M Structural Level Confluence (5M Breaker, 5M FVG, 5M Golden Pocket Fib 0.50-0.786)
+    conf_5m = str(
+        c.get("confluence_5m") 
+        or last_res.get("confluence_5m") 
+        or pipe.get("confluence_5m") 
+        or c.get("active_tier") 
+        or last_res.get("active_tier") 
+        or "Awaiting 5M Zone"
+    ).strip()
+    if not conf_5m or conf_5m in ["None", "NONE", ""]:
+        conf_5m = "Awaiting 5M Zone"
 
-    # Phase / Gate resolution (0 to 7)
+    # Level 4: 3M Wave / Level (Wave 1-4 Retracement / Wave 5+ Blocked)
+    w_3m = str(
+        c.get("wave_3m_level") 
+        or last_res.get("wave_3m_level") 
+        or pipe.get("wave_3m_level") 
+        or ""
+    ).strip()
+    wave_num = int(c.get("wave_count") or last_res.get("wave_count") or pipe.get("wave_count") or 1)
+    wave_lbl = str(c.get("wave_label") or last_res.get("wave_label") or pipe.get("wave_label") or "")
+
+    if not w_3m or w_3m in ["None", ""]:
+        if wave_num > 4 or "5+" in wave_lbl:
+            w_3m = "Wave 5+ (Blocked)"
+        elif wave_num in [2, 4]:
+            w_3m = f"Wave {wave_num}"
+        elif wave_num == 3:
+            w_3m = "Wave 3"
+        else:
+            w_3m = "Wave 1"
+
+    # Phase / Gate resolution (0 to 5)
     raw_phase = c.get("current_phase") if c.get("current_phase") is not None else (
         pipe.get("current_phase") if pipe.get("current_phase") is not None else (
             last_res.get("current_phase") if last_res.get("current_phase") is not None else None
@@ -204,107 +221,70 @@ def resolve_coin_pipeline(c: dict):
     except Exception:
         step_num = 0
 
-    is_buy = "BULL" in bias_disp or "BUY" in status_str.upper() or "LONG" in str(c.get("direction", "")).upper()
+    is_buy = "BULL" in macro_15m or "BUY" in status_str.upper() or "LONG" in str(c.get("direction", "")).upper()
+    is_wave_blocked = bool(wave_num > 4 or "5+" in w_3m or "BLOCKED" in w_3m.upper() or "EXHAUSTION" in status_str.upper())
 
-    # Dynamic Wave Counter (Wave 1, Wave 2 / 4, Wave 3, Wave 5+ (Blocked))
-    wave_lbl = c.get("wave_label") or last_res.get("wave_label") or pipe.get("wave_label")
-    wave_num = int(c.get("wave_count") or last_res.get("wave_count") or pipe.get("wave_count") or 1)
-    
-    if wave_lbl and str(wave_lbl).strip() and "/4" not in str(wave_lbl):
-        wave_disp = str(wave_lbl).strip()
-    else:
-        # Dynamic fallback based on real wave_num
-        if wave_num > 4:
-            wave_disp = "Wave 5+ (Blocked)"
-        elif wave_num == 3:
-            wave_disp = "Wave 3"
-        elif wave_num in [2, 4]:
-            wave_disp = "Wave 2 / 4"
-        else:
-            wave_disp = "Wave 1"
+    # Format execution prices if actionable
+    entry_raw = c.get("entryPrice") or last_res.get("entry_price") or last_res.get("entry_price_area")
+    sl_raw = c.get("stopLoss") or last_res.get("stop_loss_level")
+    tp2_raw = c.get("takeProfit") or last_res.get("tp2_target")
 
-    # Active Tier Extraction (Tier 1: FVG, Tier 2: Breaker, Tier 3: Golden Pocket 0.50-0.786)
-    active_tier = c.get("active_tier") or last_res.get("active_tier") or pipe.get("active_tier") or ""
+    def _fmt_p(val):
+        if val is None:
+            return "-"
+        try:
+            fv = float(val)
+            if fv <= 0:
+                return "-"
+            if fv < 0.001:
+                return f"${fv:.8f}"
+            elif fv < 1.0:
+                return f"${fv:.5f}"
+            elif fv < 100.0:
+                return f"${fv:.4f}"
+            else:
+                return f"${fv:.2f}"
+        except Exception:
+            s = str(val).strip()
+            if s.startswith("$"):
+                return s
+            return f"${s}" if s and s != "-" and "NO ENTRY" not in s.upper() else "-"
 
-    # 2. Sequential Hard-Lock Pipeline Status & Live Gate State
-    is_wave_blocked = bool(wave_num > 4 or "5+" in wave_disp or "BLOCKED" in wave_disp.upper() or "EXHAUSTION" in status_str.upper())
+    e_disp = _fmt_p(entry_raw)
+    sl_disp = _fmt_p(sl_raw)
+    tp_disp = _fmt_p(tp2_raw)
+
+    is_running = any(k in status_str.upper() for k in ["RUNNING", "IN TRADE", "BE ACHIEVED", "POSITION RUNNING"])
+    is_actionable = bool(((is_valid and step_num >= 5) or is_running) and "ABORT" not in status_str.upper() and e_disp != "-")
 
     if news_active or "NEWS" in status_str.upper():
-        step_num = 1
-        pipeline_status = "[Gate 1]: 🛡️ Macro Wait / News Lockout"
-        live_state = "Gate 1: Macro Wait / USD News Lockout 🛡️"
-        active_tier_disp = "USD News Lockout"
-    elif is_wave_blocked:
-        step_num = 2
-        pipeline_status = f"[Gate 2]: 🛑 {wave_disp} Exhaustion - Blocked"
-        live_state = f"Gate 2: {wave_disp} Exhaustion - Blocked 🛑"
-        active_tier_disp = f"{wave_disp} Exhaustion - Locked"
-    elif "ABORT" in status_str.upper() or "ABORT" in str(c.get("status", "")).upper() or "ABORT" in str(pipe.get("status", "")).upper():
-        step_num = 5
-        pipeline_status = f"[Gate 5]: 🚫 {status_str}"
-        live_state = f"Gate 5: {status_str} 🚫"
-        active_tier_disp = "Counter-Trend Candle Abort"
-    elif "RUNNING" in status_str.upper() or "IN TRADE" in status_str.upper() or "BE ACHIEVED" in status_str.upper() or is_valid or step_num == 7:
-        step_num = 7
-        pipeline_status = "[Gate 7]: 🚀 Instant Market Scalp (BE +0.80R / Fixed 1:2.0R)"
-        act_str = "BUY" if is_buy else "SELL"
-        live_state = f"🎯 SMC Confirmed 2-Candle Market Execution! INSTANT MARKET {act_str} 📌"
-        active_tier_disp = active_tier or "Confirmed Market Scalp"
-    elif step_num == 6:
-        pipeline_status = "[Gate 6]: 🛡️ Micro-Wick SL Armed (0.25%-0.65%)"
-        live_state = "Gate 6: Micro-Wick SL Armed (0.25%-0.65%) 🛡️"
-        active_tier_disp = active_tier or "SL Guard Armed"
-    elif step_num == 5:
-        pipeline_status = "[Gate 5]: 🚦 2-Candle State Machine Reversal Pending"
-        live_state = "Gate 5: 3M Wick Rejection (>=35%) & Next Body Close Shift..."
-        active_tier_disp = active_tier or "Reversal Close Pending"
-    elif step_num == 4:
-        pipeline_status = "[Gate 4]: 📊 RVOL >= 1.35x Volume Pending"
-        live_state = "Gate 4: Awaiting Volume RVOL >= 1.35x Rebound 📊"
-        active_tier_disp = active_tier or "Volume Check"
-    elif step_num == 3:
-        if active_tier and "LOCKED" not in active_tier.upper():
-            active_tier_disp = active_tier
-            pipeline_status = f"[Gate 3]: ⏳ {active_tier} (Fib {'< 0.50' if is_buy else '> 0.50'})"
-            live_state = f"Gate 3: Retrace to {active_tier}"
-        elif "MID-RANGE" in active_tier.upper() or "LOCKED" in active_tier.upper():
-            active_tier_disp = active_tier
-            pipeline_status = f"[Gate 3]: ⏳ {active_tier}"
-            live_state = f"Gate 3: {active_tier}"
-        else:
-            active_tier_disp = "Mid-Range Floating (Locked)"
-            pipeline_status = "[Gate 3]: ⏳ Mid-Range Floating (Locked)"
-            live_state = "Gate 3: Waiting for Tier 1-3 Mitigation"
-    elif step_num == 2:
-        pipeline_status = f"[Gate 2]: 🔢 {wave_disp} Active"
-        live_state = f"Gate 2: {wave_disp} Impulse Verified"
-        active_tier_disp = f"{wave_disp} Active"
-    elif step_num == 1 or is_trending:
-        step_num = 1
-        pipeline_status = f"[Gate 1]: 🧭 15M Anchor ({bias_disp})"
-        live_state = f"Gate 1: 15M Macro Trend ({bias_disp})"
-        active_tier_disp = "Awaiting 15M Anchor"
-    else:
         step_num = 0
-        pipeline_status = "[Gate 0]: 🛑 Market Choppy / Range Blocked"
-        live_state = "Gate 0: Market Choppy / Range Blocked 🛑"
-        active_tier_disp = "Volatility Squeeze Locked"
+        active_status = "Gate 1: Macro Wait / USD News Lockout 🛡️"
+    elif is_wave_blocked:
+        active_status = f"Gate 2: {w_3m} Exhaustion - Blocked 🛑"
+    elif is_actionable:
+        act_cmd = "INSTANT MARKET BUY" if is_buy else "INSTANT MARKET SELL"
+        active_status = f"🎯 {act_cmd} | Entry: {e_disp} | SL: {sl_disp} | TP: {tp_disp}"
+    elif step_num == 4:
+        active_status = "Gate 4: 3M Wick Rejection (>=35%) & Next Body Close Shift..."
+    elif step_num == 3:
+        active_status = f"Gate 3: Retrace to 3M Confluence ({w_3m})"
+    elif step_num == 2:
+        active_status = f"Gate 2: Awaiting 3M CHoCH Shift ({conf_5m})"
+    elif step_num == 1:
+        active_status = f"Gate 1: Awaiting 5M Key Zone Tap ({t15m})"
+    else:
+        active_status = "Gate 0: 15M Macro Neutral / Chop"
 
-    # Scrub legacy references
-    for legacy_word in ["RULE", "TRAP", "CONFLUENCE", "CONFIDENCE", "CHOCH CONFIRMATION"]:
-        if legacy_word in live_state.upper() and not any(k in live_state.upper() for k in ["CONFIRMED", "PULLBACK", "EXHAUSTION", "GATE"]):
-            live_state = "Gate 0: Market Choppy / Range Blocked 🛑"
-
-    return step_num, regime_disp, wave_disp, pipeline_status, live_state, active_tier_disp
+    return step_num, macro_15m, conf_5m, w_3m, active_status
 
 def get_watchlist_summary_html():
     db = SessionLocal()
     total_coins = 0
-    choppy_locked = 0
     trending_active = 0
-    gate_2_3_wave_retrace = 0
-    gate_4_5_vol_reversal = 0
-    gate_6_7_active_scalps = 0
+    level_2_active = 0
+    level_3_active = 0
+    level_4_5_active = 0
     news_lockout_active = False
     active_news_title = ""
     try:
@@ -320,7 +300,7 @@ def get_watchlist_summary_html():
 
         total_coins = len(coins)
         for c in coins:
-            s_num, reg_disp, wave_disp, pipe_stat, l_state, _ = resolve_coin_pipeline(c)
+            s_num, macro_15m, conf_5m, w_3m, active_status = resolve_coin_pipeline(c)
             s_up = str(c.get("status", "")).upper()
             if "NEWS" in s_up:
                 news_lockout_active = True
@@ -328,17 +308,15 @@ def get_watchlist_summary_html():
                 if len(parts) > 1:
                     active_news_title = parts[1].strip()
 
-            if "CHOPPY" in reg_disp.upper() or s_num == 0:
-                choppy_locked += 1
-            else:
+            if "BULLISH" in macro_15m or "BEARISH" in macro_15m:
                 trending_active += 1
 
-            if s_num in [2, 3]:
-                gate_2_3_wave_retrace += 1
+            if s_num == 2 or ("Awaiting 5M Zone" not in conf_5m and "Awaiting" not in conf_5m):
+                level_2_active += 1
+            elif s_num == 3:
+                level_3_active += 1
             elif s_num in [4, 5]:
-                gate_4_5_vol_reversal += 1
-            elif s_num in [6, 7]:
-                gate_6_7_active_scalps += 1
+                level_4_5_active += 1
     except Exception as e:
         logger.error(f"Error summary: {e}")
     finally:
@@ -356,25 +334,25 @@ def get_watchlist_summary_html():
             <b style="color:#38bdf8; font-size:22px; font-family:monospace;">{total_coins} Coins</b>
         </div>
         <div style="text-align:center; min-width:140px;">
-            <span style="color:#94a3b8; font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">⚡ Trending Expansion</span><br>
-            <b style="color:#10b981; font-size:22px; font-family:monospace;">{trending_active} (Gate 1+)</b>
+            <span style="color:#94a3b8; font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">🧭 15M Macro Trending</span><br>
+            <b style="color:#10b981; font-size:22px; font-family:monospace;">{trending_active} (Level 1+)</b>
         </div>
         <div style="text-align:center; min-width:140px;">
-            <span style="color:#94a3b8; font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">🔒 Choppy / Squeeze</span><br>
-            <b style="color:#f43f5e; font-size:22px; font-family:monospace;">{choppy_locked} (Gate 0)</b>
+            <span style="color:#94a3b8; font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">📐 5M Level Tapped</span><br>
+            <b style="color:#38bdf8; font-size:22px; font-family:monospace;">{level_2_active} (Level 2)</b>
         </div>
         <div style="text-align:center; min-width:140px;">
-            <span style="color:#94a3b8; font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">⏳ Wave & Retrace</span><br>
-            <b style="color:#a78bfa; font-size:22px; font-family:monospace;">{gate_2_3_wave_retrace} (Gate 2-3)</b>
+            <span style="color:#94a3b8; font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">⚡ 3M CHoCH Shift</span><br>
+            <b style="color:#a78bfa; font-size:22px; font-family:monospace;">{level_3_active} (Level 3)</b>
         </div>
         <div style="text-align:center; min-width:140px;">
-            <span style="color:#94a3b8; font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">🎯 Reversal & Scalps</span><br>
-            <b style="color:#34d399; font-size:22px; font-family:monospace;">{gate_4_5_vol_reversal + gate_6_7_active_scalps} (Gate 4-7)</b>
+            <span style="color:#94a3b8; font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">🎯 Wave 1-4 & Scalps</span><br>
+            <b style="color:#34d399; font-size:22px; font-family:monospace;">{level_4_5_active} (Level 4-5)</b>
         </div>
     </div>"""
 
 
-WATCHLIST_COLUMNS = ["Symbol (.P)", "Regime", "Wave Count", "Current Gate", "Active Tier / Status"]
+WATCHLIST_COLUMNS = ["Symbol (.P)", "15M Macro", "5M Confluence", "3M Wave / Level", "Active Status"]
 
 def get_watchlist_data():
     db = SessionLocal()
@@ -391,81 +369,36 @@ def get_watchlist_data():
             coins = DEFAULT_SMC_MONITORED_COINS
 
         for c in coins:
-            step_num, regime_disp, wave_disp, pipeline_status, live_state, active_tier_disp = resolve_coin_pipeline(c)
-            last_res = c.get("last_result") if isinstance(c.get("last_result"), dict) else {}
-            status_str_val = str(c.get("status") or "").upper()
-            is_valid = bool(c.get("is_valid", False) or last_res.get("is_valid", False))
-            is_running = any(k in status_str_val for k in ["RUNNING", "IN TRADE", "BE ACHIEVED", "POSITION RUNNING"])
-            is_actionable = bool(((is_valid and step_num == 7) or is_running) and "ABORT" not in status_str_val and "ABORT" not in live_state.upper())
-
-            # Format execution prices
-            entry_raw = c.get("entryPrice") or last_res.get("entry_price") or last_res.get("entry_price_area")
-            sl_raw = c.get("stopLoss") or last_res.get("stop_loss_level")
-            tp1_raw = c.get("takeProfit1") or last_res.get("tp1_target")
-            tp2_raw = c.get("takeProfit") or last_res.get("tp2_target")
-
-            def _fmt_p(val):
-                if val is None:
-                    return "-"
-                try:
-                    fv = float(val)
-                    if fv <= 0:
-                        return "-"
-                    if fv < 0.001:
-                        return f"${fv:.8f}"
-                    elif fv < 1.0:
-                        return f"${fv:.5f}"
-                    elif fv < 100.0:
-                        return f"${fv:.4f}"
-                    else:
-                        return f"${fv:.2f}"
-                except Exception:
-                    s = str(val).strip()
-                    if s.startswith("$"):
-                        return s
-                    return f"${s}" if s and s != "-" and "NO ENTRY" not in s.upper() else "-"
-
-            entry_disp = _fmt_p(entry_raw) if (is_actionable and entry_raw and "NO ENTRY" not in str(entry_raw).upper()) else "-"
-            sl_disp = _fmt_p(sl_raw) if (is_actionable and sl_raw) else "-"
-            tp1_disp = _fmt_p(tp1_raw) if (is_actionable and tp1_raw) else "-"
-            tp2_disp = _fmt_p(tp2_raw) if (is_actionable and tp2_raw) else "-"
+            step_num, macro_15m, conf_5m, w_3m, active_status = resolve_coin_pipeline(c)
 
             # Clean Coin Symbol to .P Binance Futures Perpetual Ticker
             raw_sym = str(c.get("symbol", "")).strip().upper()
             if raw_sym.endswith(".P"):
                 disp_sym = raw_sym
             else:
-                clean_s = raw_sym.replace("USDT", "").strip()
+                clean_s = raw_sym.replace(".P", "").replace("USDT", "").strip()
                 disp_sym = f"{clean_s}USDT.P"
-
-            # Build Column 5: Active Tier / Status
-            if is_actionable and entry_disp != "-":
-                active_tier_status = f"{active_tier_disp} | {live_state} | Entry: {entry_disp} | SL: {sl_disp} | TP: {tp2_disp}"
-            elif active_tier_disp and active_tier_disp != live_state and active_tier_disp not in live_state:
-                active_tier_status = f"{active_tier_disp} | {live_state}"
-            else:
-                active_tier_status = live_state
 
             data.append([
                 disp_sym,
-                regime_disp,
-                wave_disp,
-                pipeline_status,
-                active_tier_status
+                macro_15m,
+                conf_5m,
+                w_3m,
+                active_status
             ])
     except Exception as e:
         logger.error(f"Error loading watchlist: {e}")
         fallback_data = []
         for def_coin in DEFAULT_SMC_MONITORED_COINS:
-            s_num, r_disp, w_disp, p_stat, l_st, a_tier = resolve_coin_pipeline(def_coin)
+            step_num, macro_15m, conf_5m, w_3m, active_status = resolve_coin_pipeline(def_coin)
             raw_s = str(def_coin.get("symbol", "")).strip().upper()
-            clean_s = raw_s if raw_s.endswith(".P") else f"{raw_s.replace('USDT', '').strip()}USDT.P"
+            clean_s = raw_s if raw_s.endswith(".P") else f"{raw_s.replace('.P', '').replace('USDT', '').strip()}USDT.P"
             fallback_data.append([
                 clean_s,
-                r_disp,
-                w_disp,
-                p_stat,
-                a_tier or l_st
+                macro_15m,
+                conf_5m,
+                w_3m,
+                active_status
             ])
         return pd.DataFrame(fallback_data, columns=WATCHLIST_COLUMNS)
     finally:
@@ -477,15 +410,15 @@ def get_watchlist_data():
     # Guaranteed non-empty fallback DataFrame
     fallback_data = []
     for def_coin in DEFAULT_SMC_MONITORED_COINS:
-        s_num, r_disp, w_disp, p_stat, l_st, a_tier = resolve_coin_pipeline(def_coin)
+        step_num, macro_15m, conf_5m, w_3m, active_status = resolve_coin_pipeline(def_coin)
         raw_s = str(def_coin.get("symbol", "")).strip().upper()
-        clean_s = raw_s if raw_s.endswith(".P") else f"{raw_s.replace('USDT', '').strip()}USDT.P"
+        clean_s = raw_s if raw_s.endswith(".P") else f"{raw_s.replace('.P', '').replace('USDT', '').strip()}USDT.P"
         fallback_data.append([
             clean_s,
-            r_disp,
-            w_disp,
-            p_stat,
-            a_tier or l_st
+            macro_15m,
+            conf_5m,
+            w_3m,
+            active_status
         ])
     return pd.DataFrame(fallback_data, columns=WATCHLIST_COLUMNS)
 
@@ -536,42 +469,35 @@ async def run_live_coin_analysis(symbol_input, timeframe_input, mode_input, engi
     adx_v = float(res.get("adx_14", 0.0))
     is_sq = bool(res.get("is_bb_squeeze", False))
     wave_num = int(res.get("wave_count", 1))
+    wave_label = str(res.get("wave_label") or f"Wave {wave_num}")
     fib_val = float(res.get("fib_level", 0.5))
+    confluence_5m = str(res.get("confluence_5m") or "Awaiting 5M Zone")
+    wave_3m_level = str(res.get("wave_3m_level") or wave_label)
 
-    regime_step_disp = f"{m_reg} (ADX: {adx_v:.1f})" if adx_v > 0 else m_reg
+    regime_step_disp = f"15M {t15m} EXPANSION ✅" if t15m in ["BULLISH", "BEARISH"] else "15M CONSOLIDATION ⚪"
 
     retr_disp = str(res.get("retracement_status_display") or "").strip()
     is_buy_dir = ("BUY" in entry_area.upper() or "LONG" in str(res.get("direction", "")).upper())
 
-    # Determine 100% hard-locked gate status & live state
-    if ("CHOPPY" in m_reg.upper() or curr_phase == 0) and adx_v < 16.0:
-        pipeline_step_disp = "[Gate 0]: 🛑 Market Choppy / Range Blocked"
-        falcon_live_state = "Gate 0: Market Choppy / Range Blocked 🛑"
-    elif is_valid:
-        pipeline_step_disp = "[Gate 7]: 🚀 Rapid Exit Delivery (BE +0.80R / TP1 / TP2)"
-        falcon_live_state = "🎯 Local HL Confirmed! Triggering Long Scalp 📌" if is_buy_dir else "🎯 Local LH Confirmed! Triggering Short Scalp 📌"
-    elif curr_phase == 6:
-        pipeline_step_disp = "[Gate 6]: 🛡️ Micro-Wick SL Buffer Armed (0.25% - 0.65%)"
-        falcon_live_state = "Gate 6: Micro-Wick SL Buffer Armed"
-    elif curr_phase == 5:
-        pipeline_step_disp = "[Gate 5]: 🎯 Near-Zone Breaker Order Active"
-        falcon_live_state = "Gate 5: Near-Zone Breaker Order Active 🎯"
+    # Determine 5-Level SMC pipeline status & live state
+    if curr_phase == 5 or is_valid:
+        pipeline_step_disp = "[Level 5]: 🎯 2-Candle Reversal Market Execution (Fixed 1:2.0R)"
+        falcon_live_state = f"🎯 SMC Confirmed 2-Candle Market Execution! INSTANT MARKET {'BUY' if is_buy_dir else 'SELL'} 📌"
     elif curr_phase == 4:
-        pipeline_step_disp = f"[Gate 4]: {retr_disp}" if retr_disp else ("[Gate 4]: 🔍 Verifying True HL Retracement..." if is_buy_dir else "[Gate 4]: 🔍 Verifying True LH Retracement...")
-        falcon_live_state = "Gate 4: Verifying True HL/LH Candle Body..."
+        pipeline_step_disp = "[Level 4]: 🚦 3M 2-Candle Reversal Pending (Wick >= 35%)"
+        falcon_live_state = "Level 4: 3M Wick Rejection (>=35%) & Next Body Close Shift..."
     elif curr_phase == 3:
-        pipeline_step_disp = "[Gate 3]: ⚡ 3M Candle Body CHoCH & RVOL >= 1.35x"
-        falcon_live_state = "Gate 3: Waiting for 3M Body CHoCH (RVOL >= 1.35x)"
+        pipeline_step_disp = f"[Level 3]: ⚡ 3M Micro Retracement ({wave_3m_level})"
+        falcon_live_state = f"Level 3: Retrace to 3M Confluence ({wave_3m_level})"
     elif curr_phase == 2:
-        zone_label = "Discount Retrace (Fib < 50%)" if is_buy_dir else "Premium Retrace (Fib > 50%)"
-        pipeline_step_disp = f"[Gate 2]: ⏳ 5M {zone_label} | Wave {wave_num}/2"
-        falcon_live_state = f"Gate 2: Waiting for {zone_label} | Wave {wave_num}/2"
+        pipeline_step_disp = f"[Level 2]: 📐 Awaiting 3M CHoCH Shift ({confluence_5m})"
+        falcon_live_state = f"Level 2: Awaiting 3M CHoCH Shift ({'Green Body > LH' if is_buy_dir else 'Red Body < HL'})"
     elif curr_phase == 1:
-        pipeline_step_disp = "[Gate 1]: 🧭 15M Macro Direction Anchor"
-        falcon_live_state = "Gate 1: Waiting for 15M Macro Alignment"
+        pipeline_step_disp = f"[Level 1]: 🧭 Awaiting 5M Key Zone Tap ({t15m})"
+        falcon_live_state = f"Level 1: Awaiting 5M Key Zone Tap ({t15m})"
     else:
-        pipeline_step_disp = "[Gate 0]: 🔒 Volatility Filter / Squeeze Check"
-        falcon_live_state = "Gate 0: Awaiting Volatility Breakout"
+        pipeline_step_disp = "[Level 0]: 🛑 15M Macro Neutral / Chop"
+        falcon_live_state = "Level 0: 15M Macro Neutral / Chop 🛑"
 
     t15m = str(res.get("trend_15m") or "NEUTRAL").upper().strip()
     t5m = str(res.get("trend_5m") or "NEUTRAL").upper().strip()
@@ -579,34 +505,34 @@ async def run_live_coin_analysis(symbol_input, timeframe_input, mode_input, engi
     if is_valid and is_buy_dir:
         status_banner = f"""<div style="background:#064e3b; border:1px solid #10b981; border-radius:10px; padding:15px; color:#d1fae5;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
-                <h2 style="margin:0; color:#34d399;">🟢 ACTIVE BUY LIMIT SETUP (HARD-LOCKED SMC VERIFIED)</h2>
-                <span style="background:#10b981; color:#064e3b; font-weight:bold; padding:4px 12px; border-radius:20px; font-size:14px;">🎯 WAVE {wave_num} HL TRIGGERED 📌</span>
+                <h2 style="margin:0; color:#34d399;">🟢 ACTIVE BUY LIMIT SETUP (DUAL-TIMEFRAME SMC VERIFIED)</h2>
+                <span style="background:#10b981; color:#064e3b; font-weight:bold; padding:4px 12px; border-radius:20px; font-size:14px;">🎯 {wave_3m_level} TRIGGERED 📌</span>
             </div>
-            <p style="margin:8px 0 0 0; font-size:14px;"><b>Symbol:</b> {sym} | <b>Timeframe:</b> {tf} | <b>Regime:</b> {m_reg} | <b>Equilibrium:</b> Discount Zone (Fib: {fib_val:.3f} &lt; 0.50) | <b>Wave:</b> {wave_num}/2</p>
+            <p style="margin:8px 0 0 0; font-size:14px;"><b>Symbol:</b> {sym} | <b>Timeframe:</b> {tf} | <b>15M Macro:</b> {t15m} | <b>5M Confluence:</b> {confluence_5m} | <b>Execution:</b> Market Order at ${res.get('entry_price', 0):.4f}</p>
         </div>"""
     elif is_valid and not is_buy_dir:
         status_banner = f"""<div style="background:#7f1d1d; border:1px solid #ef4444; border-radius:10px; padding:15px; color:#fee2e2;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
-                <h2 style="margin:0; color:#f87171;">🔴 ACTIVE SELL LIMIT SETUP (HARD-LOCKED SMC VERIFIED)</h2>
-                <span style="background:#ef4444; color:#7f1d1d; font-weight:bold; padding:4px 12px; border-radius:20px; font-size:14px;">🎯 WAVE {wave_num} LH TRIGGERED 📌</span>
+                <h2 style="margin:0; color:#f87171;">🔴 ACTIVE SELL LIMIT SETUP (DUAL-TIMEFRAME SMC VERIFIED)</h2>
+                <span style="background:#ef4444; color:#7f1d1d; font-weight:bold; padding:4px 12px; border-radius:20px; font-size:14px;">🎯 {wave_3m_level} TRIGGERED 📌</span>
             </div>
-            <p style="margin:8px 0 0 0; font-size:14px;"><b>Symbol:</b> {sym} | <b>Timeframe:</b> {tf} | <b>Regime:</b> {m_reg} | <b>Equilibrium:</b> Premium Zone (Fib: {fib_val:.3f} &gt; 0.50) | <b>Wave:</b> {wave_num}/2</p>
+            <p style="margin:8px 0 0 0; font-size:14px;"><b>Symbol:</b> {sym} | <b>Timeframe:</b> {tf} | <b>15M Macro:</b> {t15m} | <b>5M Confluence:</b> {confluence_5m} | <b>Execution:</b> Market Order at ${res.get('entry_price', 0):.4f}</p>
         </div>"""
-    elif "CHOPPY" in m_reg.upper() or curr_phase == 0:
+    elif curr_phase == 0 or t15m == "NEUTRAL":
         status_banner = f"""<div style="background:#450a0a; border:1px solid #f43f5e; border-radius:10px; padding:15px; color:#ffe4e6;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
-                <h2 style="margin:0; color:#fb7185;">🔒 GATE 0: CHOPPY / SQUEEZE LOCKOUT ACTIVE</h2>
-                <span style="background:#e11d48; color:#ffffff; font-weight:bold; padding:4px 12px; border-radius:20px; font-size:14px;">ZERO TRADES IN SIDEWAYS</span>
+                <h2 style="margin:0; color:#fb7185;">🔒 LEVEL 0: 15M MACRO NEUTRAL / CONSOLIDATION LOCKOUT</h2>
+                <span style="background:#e11d48; color:#ffffff; font-weight:bold; padding:4px 12px; border-radius:20px; font-size:14px;">NO TRADES IN NEUTRAL</span>
             </div>
-            <p style="margin:8px 0 0 0; font-size:14px;"><b>Regime:</b> {m_reg} (ADX: {adx_v:.1f} &lt; 20 or BB Squeeze) | <b>Status:</b> Choppy Consolidation Range තුළ ව්‍යාජ HL/LH වලට හසුවීම වැළැක්වීමට Pipeline එක Hard-Lock කර ඇත.</p>
+            <p style="margin:8px 0 0 0; font-size:14px;"><b>15M Macro:</b> {t15m} | <b>Status:</b> පැහැදිලි 15M Macro Direction එකක් (Bullish හෝ Bearish) නොමැතිව වෙළඳාම් කිරීම 100% ක් අත්හිටුවා ඇත.</p>
         </div>"""
     else:
         status_banner = f"""<div style="background:#1e1b4b; border:1px solid #6366f1; border-radius:10px; padding:15px; color:#e0e7ff;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
-                <h2 style="margin:0; color:#818cf8;">⏳ 100% HARD-LOCKED SMC PIPELINE: GATE {curr_phase}/7</h2>
-                <span style="background:#4f46e5; color:#ffffff; font-weight:bold; padding:4px 12px; border-radius:20px; font-size:14px;">GATE {curr_phase} EVALUATION</span>
+                <h2 style="margin:0; color:#818cf8;">⏳ DUAL-TIMEFRAME SMC PIPELINE: LEVEL {curr_phase}/5</h2>
+                <span style="background:#4f46e5; color:#ffffff; font-weight:bold; padding:4px 12px; border-radius:20px; font-size:14px;">LEVEL {curr_phase} EVALUATION</span>
             </div>
-            <p style="margin:8px 0 0 0; font-size:14px;"><b>Regime:</b> {m_reg} | <b>Status:</b> {pipeline_step_disp} | <b>Live State:</b> {falcon_live_state} | <b>Wave:</b> {wave_num}/2</p>
+            <p style="margin:8px 0 0 0; font-size:14px;"><b>15M Macro:</b> {t15m} | <b>5M Confluence:</b> {confluence_5m} | <b>Status:</b> {pipeline_step_disp} | <b>Live State:</b> {falcon_live_state}</p>
         </div>"""
 
     def _fmt_price_val(v):
@@ -633,17 +559,14 @@ async def run_live_coin_analysis(symbol_input, timeframe_input, mode_input, engi
     be_str = _fmt_price_val(be)
     entry_disp = entry_area if (is_valid or curr_phase >= 5) and "NO ENTRY" not in entry_area.upper() else "-"
 
-    # Format 100% Hard-Locked SMC Checklist (Gate 0 - Gate 7)
+    # Format Dual-Timeframe SMC Checklist (Level 1 - Level 5)
     checklist = res.get("rules_checklist", [])
     rule_num_map = {
-        0: ("Gate 0", "Market Regime & Choppy Filter", "පියවර 0: වෙළඳපල චලිතය සහ බෝලින්ජර් ස්ක්වීස් පරීක්ෂාව (ADX >= 20 & No BB Squeeze)"),
-        1: ("Gate 1", "Macro 15M Anchor & News Armor", "පියවර 1: සාර්ව නැංගුරම සහ ආර්ථික පුවත් ආවරණය (15M Macro Anchor & News Armor)"),
-        2: ("Gate 2", "Adaptive Retracement & Wave Counter", "පියවර 2: අනුවර්තී Retracement සහ Wave Counter (Mode A / Mode B & Wave 1-4)"),
-        3: ("Gate 3", "3M Candle Body Displacement & RVOL", "පියවර 3: 3M කැන්ඩල් බොඩි චෝච් සහ RVOL >= 1.35x (3M Body Shift & RVOL)"),
-        4: ("Gate 4", "Wave 1-4 2-Candle Micro Shift", "පියවර 4: Wave 1-4 Rejection Wick >= 35% සහ Next Body Close Shift"),
-        5: ("Gate 5", "Opposing Clearance & Market Order", "පියවර 5: ප්‍රතිවිරුද්ධ බාධක පරතරය (Clearance >= 1.5R) සහ Market Order"),
-        6: ("Gate 6", "Micro-Wick Buffer SL (0.25% - 0.65%)", "පියවර 6: මයික්‍රෝ-වික් බෆර් Stop Loss (+/-0.15% Buffer, 0.25%-0.65% Hard-Cap)"),
-        7: ("Gate 7", "Rapid Scalp Exit Engine (1:2.0R Fixed)", "පියවර 7: අධිවේගී පිටවීමේ එන්ජිම (BE +0.80R, TP1 1:1.50R 60%, TP2 1:2.0R 40% Fixed)")
+        1: ("Level 1", "15M Macro Trend Anchor", "පියවර 1: 15M සාර්ව ප්‍රවණතා නැංගුරම (15M Macro Trend Anchor & News Armor)"),
+        2: ("Level 2", "5M Structural Level Detector", "පියවර 2: 5M ව්‍යුහාත්මක කලාප අනාවරකය (5M Breaker, FVG, Fib 0.50-0.786)"),
+        3: ("Level 3", "3M CHoCH Structure Shift", "පියවර 3: 3M CHoCH ව්‍යුහාත්මක හැරීම (Change of Character Shift)"),
+        4: ("Level 4", "3M Wave 1-4 Micro Retracement", "පියවර 4: 3M Wave 1-4 ක්ෂුද්‍ර නැවත පැමිණීම (3M Breaker, FVG, Fib 0.50-0.618)"),
+        5: ("Level 5", "3M 2-Candle Reversal & Execution", "පියවර 5: ඉටිපන්දම් 2 ක හැරීම සහ ක්ෂණික වෙළඳපල නියෝගය (Wick >= 35%, Body Break, SL 0.15%, TP 1:2.0R)")
     }
     rule_rows = ""
     for r_no, (r_label, name_en, name_si) in rule_num_map.items():
@@ -653,32 +576,31 @@ async def run_live_coin_analysis(symbol_input, timeframe_input, mode_input, engi
         detail_txt = rule_item.get("detail_si") or rule_item.get("detail") or "-" if rule_item else "-"
         rule_rows += f"| **{r_label}** | {name_si} | **{badge}** | {detail_txt} |\n"
 
-    rules_smc_md = f"""### 🦅 100% Hard-Locked SMC Pipeline (Gate 0 - Gate 7)
-| ගේට්ටුව (Hard Gate) | ආයතනික පදනම (Protocol) | තත්ත්වය (Status) | සජීවී ඇගයීම (Live Institutional Audit) |
+    rules_smc_md = f"""### 🦅 Dual-Timeframe SMC Confluence Engine (Level 1 - Level 5)
+| මට්ටම (SMC Level) | ආයතනික පදනම (Protocol) | තත්ත්වය (Status) | සජීවී ඇගයීම (Live Institutional Audit) |
 | :---: | :--- | :---: | :--- |
 {rule_rows}"""
 
     # Extract Multi-Timeframe Triad variables for display (15M / 5M / 3M)
     t15m_md = str(res.get("trend_15m") or "NEUTRAL").upper()
-    t5m_md = str(res.get("trend_5m") or t15m_md).upper()
-    zone_val = str(res.get("zone_type") or ("DISCOUNT (< 50%)" if "BUY" in entry_area.upper() else "PREMIUM (> 50%)"))
-    post_choch = "3M Instant Market Order Primed ✅" if is_valid else "Awaiting Hard-Locked Sequential Gates ⏳"
+    zone_val = str(res.get("zone_type") or ("DISCOUNT (< 50%)" if is_buy_dir else "PREMIUM (> 50%)"))
+    post_choch = "3M Instant Market Order Primed ✅" if is_valid else f"Level {curr_phase}/5 Active ⏳"
 
     triad_md = f"""{rules_smc_md}
 
 ---
 
-### 🏛️ Multi-Timeframe Precision Architecture (15M Macro • 5M Structure & Equilibrium • 3M Sniper Execution)
+### 🏛️ Multi-Timeframe Precision Architecture (15M Macro Anchor • 5M Structural Level • 3M Sniper Execution)
 | Timeframe | Institutional Function | Status / Structure | Confirmation |
 | :--- | :--- | :--- | :--- |
 | **15M HTF** | Macro Direction Anchor (100 Candles) | **{t15m_md}** | HH/HL = Buy Only, LL/LH = Sell Only |
-| **5M ITF** | Equilibrium & Zone Retrace Tap | **{t5m_md} ({zone_val})** | Discount (Fib < 0.50) / Premium (Fib > 0.50) & Wave 1-4 Only |
-| **3M LTF** | Instant Market Order Trigger | **{post_choch}** | Rejection Wick >= 35% + Body Shift, 0.25%-0.65% SL, +0.80R BE |
+| **5M ITF** | Structural Level Detector (Pullback Zone) | **{confluence_5m} ({zone_val})** | 5M Breaker Re-test, 5M FVG Tap, or 5M Golden Pocket Fib 0.50-0.786 |
+| **3M LTF** | CHoCH Shift & 2-Candle Reversal Market Order | **{post_choch}** | Wick >= 35% + Body Break, 0.15% SL Buffer, Fixed 1:2.0R TP |
 """
 
     reasoning_text = res.get("reasoning", "No technical reasoning available.")
     invalidation_text = res.get("invalidation", "None provided.")
-    risk_notes_text = res.get("risk_notes", "Strict 0.25% - 0.65% capital protection.")
+    risk_notes_text = res.get("risk_notes", "Strict 0.15% SL beyond Rejection Wick, Fixed 1:2.0R TP.")
 
     reasoning_full_md = f"""
 ### 🧠 Institutional Technical Reasoning & Bilingual Explanation
@@ -687,7 +609,7 @@ async def run_live_coin_analysis(symbol_input, timeframe_input, mode_input, engi
 ---
 **🛑 Invalidation Level:** `{invalidation_text}`  
 **⚠️ Risk Management Notes:** `{risk_notes_text}`  
-<b>🛡️ 100% Sequential Hard-Locked Pipeline:</b> `Active Verification (Zero Step Skipping)`
+<b>🛡️ Dual-Timeframe SMC Engine:</b> `5M & 3M Symmetric Multi-Pathway Active`
 """
 
     # Pack raw json for telegram dispatch
@@ -695,7 +617,7 @@ async def run_live_coin_analysis(symbol_input, timeframe_input, mode_input, engi
         "symbol": sym,
         "timeframe": tf,
         "is_valid": is_valid,
-        "market_regime": m_reg,
+        "market_regime": regime_step_disp,
         "pipeline_status": pipeline_step_disp,
         "live_state": falcon_live_state,
         "entry": entry_disp,
@@ -735,36 +657,33 @@ async def send_analysis_to_telegram(json_state_str):
         tp2 = data.get("tp2")
         be = data.get("be")
         is_valid = data.get("is_valid", False)
-        m_reg = data.get("market_regime", "TRENDING EXPANSION ✅")
-        pipe_stat = data.get("pipeline_status", "[Gate 7]: Running to Targets")
+        m_reg = data.get("market_regime", "15M EXPANSION ✅")
+        pipe_stat = data.get("pipeline_status", "[Level 5]: 2-Candle Market Execution")
         live_stat = data.get("live_state", "SIGNAL TRIGGERED 📌")
 
         is_buy = "BUY" in str(entry).upper() or "LONG" in str(data.get("direction", "")).upper()
         dir_str = "INSTANT MARKET BUY 🟢" if is_buy else ("INSTANT MARKET SELL 🔴" if ("SELL" in str(entry).upper() or "SHORT" in str(data.get("direction", "")).upper()) else "MARKET UPDATE 📊")
 
         msg = (
-            f"🦅 <b>Falcon 100% Hard-Locked SMC Precision Scalp Analysis</b>\n\n"
+            f"🦅 <b>Falcon Dual-Timeframe SMC Precision Scalp Analysis</b>\n\n"
             f"<b>Symbol:</b> #{sym} ({tf})\n"
             f"<b>Direction:</b> {dir_str}\n"
-            f"<b>Regime:</b> {m_reg}\n"
-            f"<b>Gate Status:</b> {pipe_stat}\n"
+            f"<b>15M Macro:</b> {m_reg}\n"
+            f"<b>SMC Level:</b> {pipe_stat}\n"
             f"<b>Live State:</b> {live_stat}\n\n"
             f"🎯 <b>Execution:</b> <code>{entry}</code>\n"
-            f"🛑 <b>Micro-Wick SL:</b> <code>${sl}</code> (0.25% - 0.65% Hard-Cap)\n"
+            f"🛑 <b>Micro-Wick SL:</b> <code>${sl}</code> (0.15% beyond Wick)\n"
             f"🎯 <b>TP 1 (60%):</b> <code>${tp1}</code> (1:1.50R Partial Lock)\n"
             f"🏁 <b>TP 2 (40%):</b> <code>${tp2}</code> (1:2.0R Fixed Target)\n"
             f"🛡️ <b>Break-Even (+0.80R):</b> <code>${be}</code>\n\n"
-            f"<b>🦅 100% Sequential Hard-Locked SMC Confluences:</b>\n"
-            f"• Gate 0: Market Regime Filter (ADX >= 20 & No BB Squeeze)\n"
-            f"• Gate 1: 15M Macro Direction Anchor & News Armor (+/-60m)\n"
-            f"• Gate 2: Adaptive Dual-Retracement (Mode A / Mode B & Wave 1-4)\n"
-            f"• Gate 3: 3M Candle Body Close CHoCH & RVOL >= 1.35x\n"
-            f"• Gate 4: Wave 1-4 Rejection Wick >= 35% & Body Close Shift\n"
-            f"• Gate 5: Opposing Clearance >= 1.5R (Instant Market Order Primed)\n"
-            f"• Gate 6: Micro-Wick Buffer SL (0.15% Buffer, 0.25%-0.65% Cap)\n"
-            f"• Gate 7: Execution & Risk Management (BE +0.80R, TP1 1.50R, TP2 2.0R Fixed)\n\n"
+            f"<b>🦅 Dual-Timeframe 5M & 3M SMC Confluences:</b>\n"
+            f"• Level 1: 15M Macro Direction Anchor & News Armor (+/-60m)\n"
+            f"• Level 2: 5M Structural Level Detector (5M Breaker / FVG / Fib 0.50-0.786)\n"
+            f"• Level 3: 3M CHoCH Structure Shift (Green Body > LH / Red Body < HL)\n"
+            f"• Level 4: 3M Wave 1-4 Micro Retracement (3M Breaker / FVG / Fib 0.50-0.618)\n"
+            f"• Level 5: 3M 2-Candle Reversal & Execution (Wick >= 35%, Body Break, SL 0.15%, TP 1:2.0R)\n\n"
             f"<b>සිංහල සටහන (Sinhala):</b>\n"
-            f"Falcon 100% Hard-Locked SMC Engine මඟින් #{sym} සඳහා තහවුරු කළ වාර්තාව. Range Bound Consolidation තුළ ව්‍යාජ HL/LH වලට හසුවීම වැළැක්වීමට Gate 0 සිට Gate 7 දක්වා පියවරෙන් පියවර 100% ක් පරීක්ෂා කර ඇත."
+            f"Falcon Dual-Timeframe SMC Engine (5M & 3M Symmetric) මඟින් #{sym} සඳහා තහවුරු කළ වාර්තාව. 15M Macro Direction එක යටතේ 5M සහ 3M Pathways 3 (FVG, Breaker, Fib) හරහා Level 1 සිට Level 5 දක්වා 100% ක් පරීක්ෂා කර ඇත."
         )
 
         sent = False
@@ -803,19 +722,17 @@ async def send_analysis_to_telegram(json_state_str):
         return f"❌ Error sending to Telegram: {ex}"
 
 # Build Gradio UI
-with gr.Blocks(title="Falcon 100% Hard-Locked SMC Cloud Engine") as demo:
+with gr.Blocks(title="Falcon Dual-Timeframe SMC Confluence Engine (5M & 3M Symmetric)") as demo:
     gr.Markdown("""
-    # 🦅 Falcon 100% Hard-Locked SMC Engine & Live Streamer
-    **Status:** 🟢 **LIVE & RUNNING 24/7 (v138.0 Active)** | **Pipeline:** 100% Sequential Hard-Lock (Gate 0 - Gate 7) | **Architecture:** Volatility Regime -> 15M Anchor -> Equilibrium & Wave 1/2 Retrace -> 3M Body CHoCH -> True HL/LH Exhaustion -> Near-Zone Execution
-    
-    This space runs in the cloud 24/7 even when your personal computer is turned off. 
-    Every coin is evaluated strictly from Gate 0 to Gate 7 with ZERO step skipping. Choppy ranges (ADX < 20 / BB Squeeze) and Wave >= 3 trend exhaustion are 100% locked out.
+    # 🦅 Falcon Dual-Timeframe SMC Confluence Engine (5M & 3M Symmetric)
+    **Status:** 🟢 **LIVE & RUNNING 24/7 (v145.0 Active)** | **Architecture:** Dual-Layer 5M & 3M Multi-Pathway HL/LH Reversal Engine  
+    **Framework:** Level 1: 15M Macro Anchor -> Level 2: 5M Structural Level (Breaker/FVG/Fib) -> Level 3: 3M CHoCH Shift -> Level 4: 3M Wave 1-4 Retracement -> Level 5: 3M 2-Candle Reversal & Market Execution (SL 0.15%, Fixed 1:2.0R TP)
     """)
 
     with gr.Tabs():
         # TAB 1: INTERACTIVE LIVE MARKET ANALYZER
         with gr.Tab("🔍 Live Market Analyzer (ඕනෑම Coin එකක් විශ්ලේෂණය කරන්න)"):
-            gr.Markdown("### 🎯 Analyze Any Binance Crypto Pair with 100% Hard-Locked SMC Engine")
+            gr.Markdown("### 🎯 Analyze Any Binance Crypto Pair with Dual-Timeframe SMC Engine (5M & 3M Symmetric)")
             
             with gr.Row():
                 symbol_in = gr.Dropdown(
@@ -837,31 +754,31 @@ with gr.Blocks(title="Falcon 100% Hard-Locked SMC Cloud Engine") as demo:
                 )
                 mode_in = gr.Dropdown(
                     label="Execution Mode",
-                    choices=["PRECISION_SCALP (100% Hard-Locked)", "SNIPER_STRICT (Zero-Bypass)"],
-                    value="PRECISION_SCALP (100% Hard-Locked)",
+                    choices=["PRECISION_SCALP (5M & 3M Symmetric)", "SNIPER_STRICT (Zero-Bypass)"],
+                    value="PRECISION_SCALP (5M & 3M Symmetric)",
                     info="Precision execution engine"
                 )
                 engine_in = gr.Radio(
                     label="Analysis Engine",
-                    choices=["⚡ Fast Programmatic SMC (Local 7-Gate)", "🧠 Hybrid AI Deep Reasoning (Gemini + Local Rules)"],
-                    value="⚡ Fast Programmatic SMC (Local 7-Gate)",
+                    choices=["⚡ Fast Programmatic SMC (Local 5-Level)", "🧠 Hybrid AI Deep Reasoning (Gemini + Local Rules)"],
+                    value="⚡ Fast Programmatic SMC (Local 5-Level)",
                     info="100% Free & Fast Python math vs Hybrid Gemini AI"
                 )
 
             with gr.Row():
-                analyze_btn = gr.Button("🚀 Run Hard-Locked SMC Analysis (දැන් විශ්ලේෂණය කරන්න)", variant="primary", size="lg")
+                analyze_btn = gr.Button("🚀 Run Dual-Timeframe SMC Analysis (දැන් විශ්ලේෂණය කරන්න)", variant="primary", size="lg")
 
             status_banner_out = gr.HTML("""<div style="background:#1e1b4b; border:1px solid #4338ca; border-radius:10px; padding:15px; color:#c7d2fe;">
-                <b>Ready to Analyze:</b> Select a coin and click the button above to run real-time 100% Hard-Locked SMC analysis.
+                <b>Ready to Analyze:</b> Select a coin and click the button above to run real-time Dual-Timeframe SMC analysis.
             </div>""")
 
             with gr.Row():
-                regime_out = gr.Textbox(label="⚡ Market Regime (Gate 0)", interactive=False)
-                pipeline_step_out = gr.Textbox(label="🦅 Hard-Locked Gate Status", interactive=False)
-                entry_out = gr.Textbox(label="🎯 Instant Market Order", interactive=False)
-                sl_out = gr.Textbox(label="🛑 Micro-Wick SL Buffer (0.25%-0.65%)", interactive=False)
-                tp1_out = gr.Textbox(label="🎯 TP 1 (1:1.50R - 60%)", interactive=False)
-                tp2_out = gr.Textbox(label="🏁 TP 2 (1:2.0R Fixed - 40%)", interactive=False)
+                regime_out = gr.Textbox(label="⚡ 15M Macro Trend (Level 1)", interactive=False)
+                pipeline_step_out = gr.Textbox(label="🦅 SMC Level Status (Level 1-5)", interactive=False)
+                entry_out = gr.Textbox(label="🎯 Instant Market Order (Level 5)", interactive=False)
+                sl_out = gr.Textbox(label="🛑 Stop Loss (0.15% beyond Wick)", interactive=False)
+                tp1_out = gr.Textbox(label="🎯 TP 1 (1:1.50R Partial)", interactive=False)
+                tp2_out = gr.Textbox(label="🏁 TP 2 (1:2.0R Fixed Target)", interactive=False)
                 be_out = gr.Textbox(label="🛡️ Break-Even (+0.80R)", interactive=False)
 
             triad_out = gr.Markdown("### 🏛️ Multi-Timeframe Precision Architecture\n*Awaiting analysis...*")
@@ -888,9 +805,15 @@ with gr.Blocks(title="Falcon 100% Hard-Locked SMC Cloud Engine") as demo:
         # TAB 2: 24/7 BACKGROUND MONITORING WATCHLIST
         with gr.Tab("📊 24/7 Background Live Watchlist (සජීවී නිරීක්ෂණය)"):
             gr.Markdown("""
-            ### 📡 24/7 Background Cloud Scanner Watchlist — 100% Hard-Locked SMC Pipeline
-            **Falcon 100% Hard-Locked 5M > 3M Precision Scalp Pipeline Tracker**  
-            මෙම සජීවී Watchlist එක මඟින් Binance හි ප්‍රමුඛ පෙළේ Coins Gate 0 (ADX/Squeeze Choppiness Filter), Gate 1 (15M Macro Anchor), Gate 2 (Wave 1-4 Counter Engine), Gate 3 (3-Tier Cascade Retracement & Fib 0.50 Equilibrium), Gate 4 (Volume RVOL >= 1.35x), Gate 5 (2-Candle Closed State Machine Reversal), Gate 6 (Micro-Wick SL Buffer 0.25%-0.65%), සහ Gate 7 (Fixed 1:2.0R Scalp Exit) පියවරෙන් පියවර නිරීක්ෂණය කරයි. **පියවර 7ම සාර්ථකව සම්පූර්ණ වී Triggered වන අධිවේගී Instant Market Scalp අවස්ථා (INSTANT MARKET BUY/SELL 📌) පමණක් Telegram වෙත ස්වයංක්‍රීයව නිකුත් කෙරේ.**
+            ### 📡 24/7 Background Cloud Scanner Watchlist — Dual-Timeframe SMC Engine (5M & 3M Symmetric)
+            **Falcon Dual-Layer Multi-Pathway HL/LH Reversal Tracker**  
+            මෙම සජීවී Watchlist එක මඟින් Binance හි ප්‍රමුඛ පෙළේ Coins:  
+            1. **15M Macro Trend Anchor** (Bullish -> Buy Only, Bearish -> Sell Only)  
+            2. **5M Structural Level Detector** (5M Breaker Re-test, 5M FVG Tap, හෝ 5M Golden Pocket Fib 0.50-0.786)  
+            3. **3M CHoCH Shift** (Green Body > LH හෝ Red Body < HL)  
+            4. **3M Wave 1-4 Micro Retracement** (3M Breaker, 3M FVG, හෝ 3M Fib 0.50-0.618; Wave >= 5 Blocked)  
+            5. **3M 2-Candle Reversal & Execution** (Wick >= 35%, Body Break, SL 0.15% beyond Wick, Fixed 1:2.0R TP)  
+            අනුපිළිවෙලින් පරීක්ෂා කරයි. **සියලුම මට්ටම් සාර්ථකව සපුරා ඇති අවස්ථා (INSTANT MARKET BUY/SELL 📌) පමණක් Telegram වෙත ක්ෂණිකව නිකුත් කෙරේ.**
             """)
 
             summary_banner = gr.HTML(get_watchlist_summary_html)
