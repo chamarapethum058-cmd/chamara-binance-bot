@@ -27,8 +27,8 @@ import time
 import pandas as pd
 
 # Falcon Cloud Engine Build Version (Forces Hugging Face Container Rebuild)
-BUILD_VERSION = "2026.10.10-v142.0-8GATE-WAVE-COUNTER-2CANDLE-SMC-ENGINE"
-# Space Force-Restart Timestamp: 2026-10-10T14:10:00+05:30
+BUILD_VERSION = "2026.10.10-v143.0-TIMER-10S-GATE0-UNLOCK"
+# Space Force-Restart Timestamp: 2026-10-10T14:48:00+05:30
 
 
 
@@ -161,14 +161,16 @@ def resolve_coin_pipeline(c: dict):
     last_res = c.get("last_result") if isinstance(c.get("last_result"), dict) else {}
     pipe = last_res.get("pipeline") if isinstance(last_res.get("pipeline"), dict) else {}
     
-    # 0. Regime check (ADX 14 & BB Squeeze)
+    # 0. Regime check (ADX 14 & BB Squeeze) - Unlocked Squeeze for ADX >= 16
     m_reg = c.get("market_regime") or last_res.get("market_regime") or pipe.get("market_regime")
     adx_val = float(c.get("adx_14") or last_res.get("adx_14") or pipe.get("adx_14") or 0.0)
     is_sq = bool(c.get("is_bb_squeeze") or last_res.get("is_bb_squeeze") or pipe.get("is_bb_squeeze") or False)
     
-    if m_reg:
+    if m_reg and "CHOPPY" in m_reg.upper() and adx_val >= 16.0:
+        regime_disp = "TRENDING EXPANSION ✅"
+    elif m_reg:
         regime_disp = m_reg
-    elif adx_val >= 20.0 and not is_sq:
+    elif adx_val >= 16.0:
         regime_disp = "TRENDING EXPANSION ✅"
     else:
         regime_disp = "CHOPPY / SQUEEZE (LOCKED)"
@@ -216,11 +218,16 @@ def resolve_coin_pipeline(c: dict):
         pipeline_status = "[Gate 1]: 🛡️ Macro Wait / News Lockout"
         live_state = "Gate 1: Macro Wait / USD News Lockout 🛡️"
         active_tier_disp = "USD News Lockout"
-    elif "CHOPPY" in regime_disp.upper() or step_num == 0:
+    elif ("CHOPPY" in regime_disp.upper() or step_num == 0) and adx_val < 16.0:
         step_num = 0
         pipeline_status = "[Gate 0]: 🛑 Market Choppy / Range Blocked"
         live_state = "Gate 0: Market Choppy / Range Blocked 🛑"
         active_tier_disp = "Volatility Squeeze Locked"
+    elif step_num == 0 and adx_val >= 16.0:
+        step_num = 1
+        pipeline_status = f"[Gate 1]: 🧭 15M Anchor ({bias_disp})"
+        live_state = f"Gate 1: 15M Macro Trend ({bias_disp})"
+        active_tier_disp = "Awaiting 15M Anchor"
     elif wave_num > 4 or "EXHAUSTION" in status_str.upper() or "WAVE 5" in status_str.upper():
         step_num = 2
         pipeline_status = f"[Gate 2]: 🛑 Wave {wave_num} Exhaustion - Blocked"
@@ -530,9 +537,9 @@ async def run_live_coin_analysis(symbol_input, timeframe_input, mode_input, engi
     is_buy_dir = ("BUY" in entry_area.upper() or "LONG" in str(res.get("direction", "")).upper())
 
     # Determine 100% hard-locked gate status & live state
-    if "CHOPPY" in m_reg.upper() or curr_phase == 0:
-        pipeline_step_disp = "[Gate 0]: 🔒 Choppy Range / Squeeze (Locked)"
-        falcon_live_state = "Gate 0: Awaiting Volatility Breakout"
+    if ("CHOPPY" in m_reg.upper() or curr_phase == 0) and adx_v < 16.0:
+        pipeline_step_disp = "[Gate 0]: 🛑 Market Choppy / Range Blocked"
+        falcon_live_state = "Gate 0: Market Choppy / Range Blocked 🛑"
     elif is_valid:
         pipeline_step_disp = "[Gate 7]: 🚀 Rapid Exit Delivery (BE +0.80R / TP1 / TP2)"
         falcon_live_state = "🎯 Local HL Confirmed! Triggering Long Scalp 📌" if is_buy_dir else "🎯 Local LH Confirmed! Triggering Short Scalp 📌"
@@ -893,11 +900,8 @@ with gr.Blocks(title="Falcon 100% Hard-Locked SMC Cloud Engine") as demo:
             )
             refresh_wl_btn.click(fn=refresh_all_watchlist, outputs=[summary_banner, watchlist_table])
 
-            try:
-                timer = gr.Timer(3, active=True)
-                timer.tick(fn=refresh_all_watchlist, outputs=[summary_banner, watchlist_table])
-            except Exception as te:
-                logger.warning(f"gr.Timer fallback: {te}")
+            timer = gr.Timer(value=10, active=True)
+            timer.tick(fn=refresh_all_watchlist, outputs=[summary_banner, watchlist_table])
 
             with gr.Row():
                 test_btn = gr.Button("📲 Test Telegram Notification", variant="primary")
@@ -908,6 +912,9 @@ with gr.Blocks(title="Falcon 100% Hard-Locked SMC Cloud Engine") as demo:
                 gpu_btn = gr.Button("⚡ Verify AI Hardware Status", variant="secondary")
                 gpu_txt = gr.Textbox(label="Hardware Status", interactive=False)
             gpu_btn.click(fn=check_falcon_status, inputs=[gpu_txt], outputs=[gpu_txt])
+
+    # Initial page load auto-refresh
+    demo.load(fn=refresh_all_watchlist, outputs=[summary_banner, watchlist_table])
 
 if __name__ == "__main__":
     demo.queue(default_concurrency_limit=10).launch(

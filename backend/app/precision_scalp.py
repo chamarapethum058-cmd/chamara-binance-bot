@@ -22,8 +22,8 @@ PRECISION_SCALP_STEPS_CATALOGUE = [
     {
         "step_no": 0,
         "title": "Gate 0: Choppiness & Consolidation Filter",
-        "title_si": "පියවර 0: වෙළඳපල කලාපය සහ තදවීම පෙරහන (ADX >= 22 & Bollinger Squeeze Lock)",
-        "description": "ADX(14) < 22 or Bollinger Bands Squeeze detected -> Pipeline 100% Locked. Zero entries in choppy sideways markets."
+        "title_si": "පියවර 0: වෙළඳපල කලාපය සහ තදවීම පෙරහන (ADX >= 16 & Unlocked Squeeze)",
+        "description": "ADX(14) < 16 or severe compression -> Pipeline Locked. Trending coins with ADX >= 16 pass directly to Gate 1 and Gate 2."
     },
     {
         "step_no": 1,
@@ -126,22 +126,27 @@ class PrecisionScalpPipeline:
         evaluations: List[Dict[str, Any]] = []
 
         # =========================================================================
-        # GATE 0: Choppiness & Consolidation Filter (ARKM Fix)
+        # GATE 0: Choppiness & Consolidation Filter (ARKM Fix - Unlocked Squeeze)
         # =========================================================================
         adx_candles = candles_15m if len(candles_15m) >= 28 else candles_5m
         adx_val = cls._calculate_adx_14(adx_candles)
         sq_candles = candles_15m if len(candles_15m) >= 20 else candles_5m
         is_bb_sq, current_bw = cls._check_bb_squeeze(sq_candles)
 
-        gate_0_passed = bool(adx_val >= 22.0 and not is_bb_sq)
+        # UNLOCK GATE 0 (Over-strict squeeze relaxed):
+        # 1. BB-Width Squeeze check bypassed for trending coins (ADX >= 16.0)
+        # 2. Squeeze threshold reduced by 50% for extreme compression only (< 0.325%)
+        # 3. Trending coins with ADX >= 16 pass directly to Gate 1 and Gate 2
+        is_severe_compression = bool(current_bw < 0.00325 and adx_val < 16.0)
+        gate_0_passed = bool(adx_val >= 16.0 or not is_severe_compression)
         market_regime = "TRENDING EXPANSION ✅" if gate_0_passed else "CHOPPY / SQUEEZE (LOCKED)"
 
         if not gate_0_passed:
-            gate_0_detail_en = f"Gate 0: Market Choppy / Range Blocked 🛑 (ADX={adx_val:.1f} < 22 or BB Squeeze active {current_bw*100:.2f}%)."
-            gate_0_detail_si = f"Gate 0: Market Choppy / Range Blocked 🛑 (ADX={adx_val:.1f} < 22 හෝ BB Squeeze {current_bw*100:.2f}%). Choppy sideways market සම්පූර්ණයෙන්ම අවහිරයි."
+            gate_0_detail_en = f"Gate 0: Market Choppy / Range Blocked 🛑 (ADX={adx_val:.1f} < 16 or severe compression {current_bw*100:.2f}%)."
+            gate_0_detail_si = f"Gate 0: Market Choppy / Range Blocked 🛑 (ADX={adx_val:.1f} < 16 හෝ දැඩි Squeeze {current_bw*100:.2f}%). Choppy sideways market සම්පූර්ණයෙන්ම අවහිරයි."
         else:
-            gate_0_detail_en = f"Gate 0 Verified: Trending Volatility confirmed (ADX={adx_val:.1f} >= 22, BB Expansion active)."
-            gate_0_detail_si = f"Gate 0 තහවුරුයි: ප්‍රමාණවත් වෙළඳපල චලනයක් පවතී (ADX={adx_val:.1f} >= 22). Trend Expansion සක්‍රීයයි."
+            gate_0_detail_en = f"Gate 0 Verified: Trending Volatility confirmed (ADX={adx_val:.1f} >= 16, Squeeze Unlocked)."
+            gate_0_detail_si = f"Gate 0 තහවුරුයි: ප්‍රමාණවත් වෙළඳපල චලනයක් පවතී (ADX={adx_val:.1f} >= 16). Squeeze නිදහස් කර Trend Expansion සක්‍රීයයි."
 
         evaluations.append({
             "step_no": 0,
@@ -912,9 +917,9 @@ class PrecisionScalpPipeline:
         current_bw = bandwidths[-1] if bandwidths else 0.02
         min_recent_bw = min(bandwidths[-20:]) if len(bandwidths) >= 20 else current_bw
 
-        # Squeeze detected if current Bandwidth is extremely compressed (< 0.65% of price)
-        # or hovering within 5% of its 20-period historical minimum when bandwidth < 1.2%
-        is_squeeze = (current_bw < 0.0065) or (current_bw <= min_recent_bw * 1.05 and current_bw < 0.012)
+        # Squeeze threshold reduced by 50% (< 0.325% instead of 0.65%)
+        # Normal consolidations do not trigger squeeze; extreme micro-compression only
+        is_squeeze = (current_bw < 0.00325) or (current_bw <= min_recent_bw * 1.02 and current_bw < 0.006)
         return is_squeeze, round(current_bw, 4)
 
     @staticmethod

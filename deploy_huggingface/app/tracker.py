@@ -651,7 +651,7 @@ async def analyze_single_coin_task(coin: dict, semaphore: asyncio.Semaphore):
                     status = f"🚀 Running to Targets ({pos_dir})"
             elif current_phase == 0 or "CHOPPY" in market_regime.upper():
                 status = "Gate 0: Market Choppy / Range Blocked 🛑"
-                entry_price = "No Entry (ADX < 22 / BB Squeeze Locked)"
+                entry_price = "No Entry (ADX < 16 / Squeeze Locked)"
             elif news_locked:
                 status = "Gate 1: Macro Wait / News Lockout"
                 entry_price = f"No Entry (USD News Lockout: {active_news_ev})"
