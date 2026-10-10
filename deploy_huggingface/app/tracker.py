@@ -644,6 +644,10 @@ async def analyze_single_coin_task(coin: dict, semaphore: asyncio.Semaphore):
             wave_label = str(result.get("wave_label") or f"Wave {wave_cnt}")
             confluence_5m = str(result.get("confluence_5m") or "Awaiting 5M Zone")
             wave_3m_level = str(result.get("wave_3m_level") or wave_label)
+            five_min_valid = bool(result.get("five_min_structure_valid", True))
+            five_min_w = int(result.get("five_min_wave", 1))
+            three_min_w = int(result.get("three_min_wave", wave_cnt))
+            is_pullback_w = bool(result.get("is_pullback_wave", True))
             
             if active_pos:
                 pos_dir = active_pos.get("direction")
@@ -656,8 +660,15 @@ async def analyze_single_coin_task(coin: dict, semaphore: asyncio.Semaphore):
             elif news_locked:
                 status = "Gate 1: Macro Wait / USD News Lockout 🛡️"
                 entry_price = f"No Entry (USD News Lockout: {active_news_ev})"
-            elif wave_cnt > 4 or "5+" in wave_3m_level:
+            elif not five_min_valid:
+                status = "5M Structural Break Detected - Setup Invalidated 🛑"
+            elif five_min_w > 4:
+                status = "5M Macro Wave 5+ Exhaustion Trap - Blocked 🛑"
+            elif wave_cnt > 4 or "5+" in wave_3m_level or three_min_w > 4:
                 status = f"Gate 2: {wave_3m_level} Exhaustion - Blocked 🛑"
+            elif not is_pullback_w and current_phase >= 3:
+                target_w = "Wave 2" if three_min_w <= 1 else "Wave 4"
+                status = f"Gate 3: Awaiting {target_w} Micro Pullback"
             elif current_phase == 4:
                 status = "Gate 4: 3M Wick Rejection (>=35%) & Next Body Close Shift..."
             elif current_phase == 3:
@@ -669,7 +680,16 @@ async def analyze_single_coin_task(coin: dict, semaphore: asyncio.Semaphore):
             else:
                 status = "Gate 0: 15M Macro Neutral / Chop"
 
-            is_supreme_entry = bool(result.get("is_valid", False) and step_7_passed and not active_pos and not news_locked and wave_cnt <= 4)
+            is_supreme_entry = bool(
+                result.get("is_valid", False)
+                and step_7_passed
+                and not active_pos
+                and not news_locked
+                and five_min_valid
+                and five_min_w <= 4
+                and wave_cnt <= 4
+                and three_min_w in [2, 4]
+            )
 
             # Absolute Execution Guard: Current Candle Color Lock (Stop runaway counter-trend trades)
             curr_c_3m = candles[-1] if (candles and len(candles) > 0) else None
@@ -836,6 +856,10 @@ async def analyze_single_coin_task(coin: dict, semaphore: asyncio.Semaphore):
                 "is_bb_squeeze": result.get("is_bb_squeeze"),
                 "wave_count": result.get("wave_count"),
                 "wave_label": result.get("wave_label"),
+                "five_min_structure_valid": five_min_valid,
+                "five_min_wave": five_min_w,
+                "three_min_wave": three_min_w,
+                "is_pullback_wave": is_pullback_w,
                 "fib_level": result.get("fib_level"),
                 "setup_path": result.get("setup_path"),
                 "setup_route": result.get("setup_route"),

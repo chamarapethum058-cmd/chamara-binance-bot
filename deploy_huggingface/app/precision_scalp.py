@@ -77,6 +77,228 @@ def get_dynamic_precision(price: float) -> int:
         return 4
 
 
+class FiveMinStructureResult(tuple):
+    """
+    Result container for 5M Structure & Wave Check.
+    Supports unpacking as (five_min_structure_valid, five_min_wave),
+    while also exposing rich attributes.
+    """
+    def __new__(cls, valid: bool, wave: int, wave_label: str = "", has_level: bool = False, confluence: str = "", key_level: float = 0.0, msg: str = "", msg_si: str = ""):
+        return super().__new__(cls, (valid, wave))
+
+    def __init__(self, valid: bool, wave: int, wave_label: str = "", has_level: bool = False, confluence: str = "", key_level: float = 0.0, msg: str = "", msg_si: str = ""):
+        self.valid = valid
+        self.wave = wave
+        self.wave_label = wave_label
+        self.has_level = has_level
+        self.confluence = confluence
+        self.key_level = key_level
+        self.msg = msg
+        self.msg_si = msg_si
+
+
+class ThreeMinWaveResult(int):
+    """
+    Result container for 3M Micro Wave Count.
+    Behaves as an int (e.g. 1, 2, 3, 4, 5) so `three_min_wave in [2, 4]` works directly,
+    while also exposing `.wave` and `.wave_label`.
+    """
+    def __new__(cls, wave: int, wave_label: str = ""):
+        return super().__new__(cls, wave)
+
+    def __init__(self, wave: int, wave_label: str = ""):
+        self.wave = wave
+        self.wave_label = wave_label
+
+
+class TwoCandleExecutionResult(tuple):
+    """
+    Result container for 2-Candle Execution check.
+    Supports unpacking as (is_triggered, rejection_wick_extreme, trigger_entry_price, detail_en, detail_si).
+    """
+    def __new__(cls, is_triggered: bool, rej_wick_extreme: float, entry_price: float, detail_en: str = "", detail_si: str = ""):
+        return super().__new__(cls, (is_triggered, rej_wick_extreme, entry_price, detail_en, detail_si))
+
+    def __init__(self, is_triggered: bool, rej_wick_extreme: float, entry_price: float, detail_en: str = "", detail_si: str = ""):
+        self.is_triggered = is_triggered
+        self.rej_wick_extreme = rej_wick_extreme
+        self.entry_price = entry_price
+        self.detail_en = detail_en
+        self.detail_si = detail_si
+
+
+def check_5m_structure_and_waves(
+    df_or_candles_5m: Any,
+    is_buy: Optional[bool] = None,
+    current_price: float = 0.0
+) -> FiveMinStructureResult:
+    """
+    # 1. 5M STRUCTURE & WAVE CHECK
+    five_min_structure_valid, five_min_wave = check_5m_structure_and_waves(df_5m)
+
+    if not five_min_structure_valid:
+        # 5M Level එක Break වී ඇත්නම් Trade එක සම්පූර්ණයෙන්ම අවලංගුයි
+        return False, "5M Structural Break Detected - Setup Invalidated 🛑"
+
+    if five_min_wave > 4:
+        return False, "5M Macro Wave 5+ Exhaustion Trap - Blocked 🛑"
+    """
+    if hasattr(df_or_candles_5m, "to_dict"):
+        candles = df_or_candles_5m.to_dict(orient="records")
+    elif isinstance(df_or_candles_5m, list):
+        candles = df_or_candles_5m
+    else:
+        candles = []
+
+    if not candles or len(candles) < 8:
+        return FiveMinStructureResult(
+            valid=False,
+            wave=1,
+            wave_label="Wave 1",
+            has_level=False,
+            confluence="Awaiting 5M Zone",
+            key_level=0.0,
+            msg="5M Structural Break Detected - Setup Invalidated 🛑",
+            msg_si="5M ව්‍යුහාත්මක බිඳවැටීමක් හඳුනාගෙන ඇත - Setup එක සම්පූර්ණයෙන්ම අවලංගුයි 🛑"
+        )
+
+    highs = [float(c["high"]) for c in candles]
+    lows = [float(c["low"]) for c in candles]
+    closes = [float(c["close"]) for c in candles]
+    curr_p = float(current_price) if current_price > 0 else closes[-1]
+
+    # Auto-resolve is_buy if not provided
+    if is_buy is None:
+        is_buy = bool(curr_p >= sum(closes[-20:]) / len(closes[-20:]))
+
+    # 1. 5M Macro Wave Counting
+    five_min_wave, five_min_wave_lbl = PrecisionScalpPipeline._get_dynamic_wave_structure(
+        candles, is_buy=is_buy, current_price=curr_p
+    )
+
+    # 2. 5M Structural Break Analysis
+    structure_valid = True
+    msg = ""
+    msg_si = ""
+
+    lookback = min(len(candles), 40)
+    recent_highs = highs[-lookback:]
+    recent_lows = lows[-lookback:]
+    recent_closes = closes[-lookback:]
+
+    prior_highs = recent_highs[:-3] if len(recent_highs) > 5 else recent_highs
+    prior_lows = recent_lows[:-3] if len(recent_lows) > 5 else recent_lows
+
+    if is_buy:
+        # In Uptrend: swing lows / demand base must hold. If price breaks below -> Invalidated
+        swing_lows = []
+        for i in range(2, len(prior_lows) - 2):
+            if prior_lows[i] <= min(prior_lows[max(0, i-2):i]) and prior_lows[i] <= min(prior_lows[i+1:min(len(prior_lows), i+3)]):
+                swing_lows.append(prior_lows[i])
+        valid_demand_sl = min(swing_lows) if swing_lows else (min(prior_lows) if prior_lows else curr_p * 0.99)
+        if any(c_close < valid_demand_sl * 0.9995 for c_close in recent_closes[-3:]) or curr_p < valid_demand_sl * 0.9985:
+            structure_valid = False
+            msg = "5M Structural Break Detected - Setup Invalidated 🛑"
+            msg_si = "5M ව්‍යුහාත්මක බිඳවැටීමක් හඳුනාගෙන ඇත - Setup එක සම්පූර්ණයෙන්ම අවලංගුයි 🛑"
+    else:
+        # In Downtrend: swing highs / supply base must hold. If price breaks above -> Invalidated
+        swing_highs = []
+        for i in range(2, len(prior_highs) - 2):
+            if prior_highs[i] >= max(prior_highs[max(0, i-2):i]) and prior_highs[i] >= max(prior_highs[i+1:min(len(prior_highs), i+3)]):
+                swing_highs.append(prior_highs[i])
+        valid_supply_sh = max(swing_highs) if swing_highs else (max(prior_highs) if prior_highs else curr_p * 1.01)
+        if any(c_close > valid_supply_sh * 1.0005 for c_close in recent_closes[-3:]) or curr_p > valid_supply_sh * 1.0015:
+            structure_valid = False
+            msg = "5M Structural Break Detected - Setup Invalidated 🛑"
+            msg_si = "5M ව්‍යුහාත්මක බිඳවැටීමක් හඳුනාගෙන ඇත - Setup එක සම්පූර්ණයෙන්ම අවලංගුයි 🛑"
+
+    # 3. 5M Structural Level Pathways (Breaker, FVG, Fib 0.50-0.786)
+    has_lvl, conf_5m, key_lvl = PrecisionScalpPipeline._check_5m_structural_levels(
+        candles_5m=candles,
+        is_buy=is_buy,
+        current_price=curr_p
+    )
+
+    if structure_valid and five_min_wave > 4:
+        msg = "5M Macro Wave 5+ Exhaustion Trap - Blocked 🛑"
+        msg_si = "5M Macro Wave 5+ Exhaustion Trap - අවහිර කර ඇත 🛑"
+
+    return FiveMinStructureResult(
+        valid=structure_valid,
+        wave=five_min_wave,
+        wave_label=five_min_wave_lbl,
+        has_level=has_lvl,
+        confluence=conf_5m,
+        key_level=key_lvl,
+        msg=msg,
+        msg_si=msg_si
+    )
+
+
+def get_3m_micro_wave_count(
+    df_or_candles_3m: Any,
+    is_buy: Optional[bool] = None,
+    current_price: float = 0.0
+) -> ThreeMinWaveResult:
+    """
+    # 2. 3M MICRO WAVE CHECK (5M ආරක්ෂිත නම් පමණක්)
+    three_min_wave = get_3m_micro_wave_count(df_3m)
+
+    if three_min_wave in [2, 4]:
+        # 5M සහ 3M දෙකම එකඟ වූ විට Entry Confirmation
+        check_2_candle_execution()
+    """
+    if hasattr(df_or_candles_3m, "to_dict"):
+        candles = df_or_candles_3m.to_dict(orient="records")
+    elif isinstance(df_or_candles_3m, list):
+        candles = df_or_candles_3m
+    else:
+        candles = []
+
+    if not candles:
+        return ThreeMinWaveResult(1, "Wave 1")
+
+    curr_p = float(current_price) if current_price > 0 else float(candles[-1]["close"])
+    if is_buy is None:
+        closes = [float(c["close"]) for c in candles]
+        is_buy = bool(curr_p >= sum(closes[-20:]) / len(closes[-20:]))
+
+    wave_num, wave_label = PrecisionScalpPipeline._get_dynamic_wave_structure(
+        candles, is_buy=is_buy, current_price=curr_p
+    )
+    return ThreeMinWaveResult(wave_num, wave_label)
+
+
+def check_2_candle_execution(
+    df_or_candles_3m: Any = None,
+    is_buy: bool = True,
+    current_price: float = 0.0
+) -> TwoCandleExecutionResult:
+    """
+    5M සහ 3M දෙකම එකඟ වූ විට Entry Confirmation:
+    1. Rejection Wick Ratio >= 35%
+    2. Next Candle Body breaks previous candle extreme & closes in trend direction.
+    3. Strict Color Guard.
+    """
+    if df_or_candles_3m is not None:
+        if hasattr(df_or_candles_3m, "to_dict"):
+            candles = df_or_candles_3m.to_dict(orient="records")
+        elif isinstance(df_or_candles_3m, list):
+            candles = df_or_candles_3m
+        else:
+            candles = []
+    else:
+        candles = []
+
+    curr_p = float(current_price) if current_price > 0 else (float(candles[-1]["close"]) if candles else 0.0)
+    is_trig, wick_ext, entry_p, en_det, si_det = PrecisionScalpPipeline._check_3m_two_candle_reversal_trigger(
+        candles_3m=candles,
+        is_buy=is_buy,
+        current_price=curr_p
+    )
+    return TwoCandleExecutionResult(is_trig, wick_ext, entry_p, en_det, si_det)
+
+
 class PrecisionScalpPipeline:
     """
     Unified Dual-Timeframe SMC Confluence Engine (5M & 3M Symmetric).
@@ -151,35 +373,47 @@ class PrecisionScalpPipeline:
         })
 
         # =========================================================================
-        # LEVEL 2: 5M STRUCTURAL LEVEL DETECTOR (MAJOR HL / LH ZONE)
+        # LEVEL 2: 5M STRUCTURAL LEVEL DETECTOR & WAVE CHECK
         # =========================================================================
-        has_5m_level = False
-        confluence_5m = "Awaiting 5M Zone"
-        key_5m_level = price
+        # 1. 5M STRUCTURE & WAVE CHECK
+        five_min_res = check_5m_structure_and_waves(
+            df_or_candles_5m=candles_5m,
+            is_buy=is_buy_setup,
+            current_price=price
+        )
+        five_min_structure_valid, five_min_wave = five_min_res
 
-        if level_1_passed:
-            has_5m_level, confluence_5m, key_5m_level = cls._check_5m_structural_levels(
-                candles_5m=candles_5m,
-                is_buy=is_buy_setup,
-                current_price=price
-            )
+        has_5m_level = five_min_res.has_level
+        confluence_5m = five_min_res.confluence
+        key_5m_level = five_min_res.key_level
 
-        level_2_passed = bool(level_1_passed and has_5m_level)
-        if level_2_passed:
-            level_2_detail_en = f"Level 2 Verified ({confluence_5m}): Major 5M Reversal Zone tapped at ${key_5m_level:.{precision}f} in {'Discount' if is_buy_setup else 'Premium'}."
-            level_2_detail_si = f"Level 2 තහවුරුයි ({confluence_5m}): ප්‍රධාන 5M Reversal මට්ටම ${key_5m_level:.{precision}f} හිදී ස්පර්ශ විය ({'Discount' if is_buy_setup else 'Premium'})."
-        else:
+        level_2_passed = False
+        level_2_detail_en = ""
+        level_2_detail_si = ""
+
+        if not five_min_structure_valid:
+            # 5M Level එක Break වී ඇත්නම් Trade එක සම්පූර්ණයෙන්ම අවලංගුයි
+            level_2_detail_en = "5M Structural Break Detected - Setup Invalidated 🛑"
+            level_2_detail_si = "5M ව්‍යුහාත්මක බිඳවැටීමක් හඳුනාගෙන ඇත - Setup එක සම්පූර්ණයෙන්ම අවලංගුයි 🛑"
+        elif five_min_wave > 4:
+            level_2_detail_en = "5M Macro Wave 5+ Exhaustion Trap - Blocked 🛑"
+            level_2_detail_si = "5M Macro Wave 5+ Exhaustion Trap - අවහිර කර ඇත 🛑"
+        elif not has_5m_level:
             level_2_detail_en = "Level 2 Locked: Price has not tapped any of the 3 5M pathways (5M Breaker, 5M FVG, or 5M Golden Pocket Fib 0.50-0.786). No Trade."
             level_2_detail_si = "Level 2 අවහිරයි: මිල 5M මට්ටම් 3 න් එකක්වත් (5M Breaker, 5M FVG, හෝ 5M Golden Pocket Fib 0.50-0.786) ස්පර්ශ කර නැත. No Trade."
+        else:
+            level_2_passed = bool(level_1_passed and has_5m_level)
+            level_2_detail_en = f"Level 2 Verified ({confluence_5m}): Major 5M Reversal Zone tapped at ${key_5m_level:.{precision}f} in {'Discount' if is_buy_setup else 'Premium'} (Wave {five_min_wave})."
+            level_2_detail_si = f"Level 2 තහවුරුයි ({confluence_5m}): ප්‍රධාන 5M Reversal මට්ටම ${key_5m_level:.{precision}f} හිදී ස්පර්ශ විය (Wave {five_min_wave})."
 
         evaluations.append({
             "step_no": 2,
             "rule_no": 2,
             "gate_no": 2,
-            "title": "Level 2: 5M Structural Level Detector (Major HL / LH Zone)",
-            "title_si": "පියවර 2: 5M ව්‍යුහාත්මක කලාප අනාවරකය (5M Breaker, FVG, Fib 0.50-0.786)",
+            "title": "Level 2: 5M Structural Level & Wave Check (Major HL / LH Zone)",
+            "title_si": "පියවර 2: 5M ව්‍යුහාත්මක කලාප සහ Wave පරීක්ෂාව (5M Breaker, FVG, Fib 0.50-0.786)",
             "passed": level_2_passed,
-            "status": "PASS" if level_2_passed else ("LOCKED" if not level_1_passed else "PENDING"),
+            "status": "PASS" if level_2_passed else ("LOCKED" if (not five_min_structure_valid or five_min_wave > 4 or not level_1_passed) else "PENDING"),
             "detail": level_2_detail_en,
             "detail_si": level_2_detail_si
         })
@@ -220,9 +454,15 @@ class PrecisionScalpPipeline:
         # =========================================================================
         # LEVEL 4: 3M WAVE 1-4 MICRO SNIPER RETRACEMENT (MICRO HL / LH ZONE)
         # =========================================================================
-        # Dynamic Wave Counting
-        wave_count, wave_label = cls._get_dynamic_wave_structure(candles_3m, is_buy=is_buy_setup, current_price=price)
-        wave_ok = bool(wave_count <= 4 and "5+" not in wave_label and "BLOCKED" not in wave_label.upper())
+        # 2. 3M MICRO WAVE CHECK (5M ආරක්ෂිත නම් පමණක්)
+        three_min_wave = get_3m_micro_wave_count(
+            df_or_candles_3m=candles_3m,
+            is_buy=is_buy_setup,
+            current_price=price
+        )
+        three_min_wave_lbl = getattr(three_min_wave, "wave_label", f"Wave {int(three_min_wave)}")
+        wave_ok = bool(three_min_wave <= 4 and "5+" not in three_min_wave_lbl and "BLOCKED" not in three_min_wave_lbl.upper())
+        is_pullback_wave = bool(three_min_wave in [2, 4])
 
         has_3m_micro = False
         confluence_3m = "None"
@@ -237,19 +477,24 @@ class PrecisionScalpPipeline:
             )
 
         wave_3m_disp = f"Wave 5+ (Blocked)" if not wave_ok else (
-            f"{wave_label} ({confluence_3m})" if has_3m_micro else str(wave_label)
+            f"{three_min_wave_lbl} ({confluence_3m})" if has_3m_micro else str(three_min_wave_lbl)
         )
 
-        level_4_passed = bool(level_3_passed and wave_ok and has_3m_micro)
+        level_4_passed = bool(level_3_passed and wave_ok and is_pullback_wave and has_3m_micro)
+
         if not wave_ok:
-            level_4_detail_en = f"Level 4 Blocked: {wave_label} Exhaustion. Waves >= 5 are 100% strictly blocked to prevent top/bottom traps."
-            level_4_detail_si = f"Level 4 අවහිරයි: {wave_label} Exhaustion. Wave >= 5 සඳහා Entries 100% ක් තහනම් වේ."
+            level_4_detail_en = f"Level 4 Blocked: {three_min_wave_lbl} Exhaustion Trap. Waves >= 5 are 100% strictly blocked."
+            level_4_detail_si = f"Level 4 අවහිරයි: {three_min_wave_lbl} Exhaustion Trap. Wave >= 5 සඳහා Entries 100% ක් තහනම් වේ."
+        elif not is_pullback_wave:
+            target_wave = "Wave 2" if three_min_wave <= 1 else "Wave 4"
+            level_4_detail_en = f"Level 4 Pending: Currently in {three_min_wave_lbl} Impulse. Awaiting {target_wave} Micro Pullback."
+            level_4_detail_si = f"Level 4 රැඳී සිටී: දැනට පවතින්නේ {three_min_wave_lbl} වේගවත් චලනයකයි. {target_wave} Retracement එකක් බලාපොරොත්තුවෙන්."
         elif level_4_passed:
-            level_4_detail_en = f"Level 4 Verified ({wave_3m_disp}): Retracement tap confirmed at ${level_3m_price:.{precision}f} (Wave 1-4 Sniper Zone)."
-            level_4_detail_si = f"Level 4 තහවුරුයි ({wave_3m_disp}): Micro Retracement ස්පර්ශය ${level_3m_price:.{precision}f} හිදී තහවුරුයි."
+            level_4_detail_en = f"Level 4 Verified ({wave_3m_disp}): 5M & 3M Symmetric Agreement on {three_min_wave_lbl} at ${level_3m_price:.{precision}f}."
+            level_4_detail_si = f"Level 4 තහවුරුයි ({wave_3m_disp}): 5M සහ 3M දෙකම {three_min_wave_lbl} මත එකඟ විය (${level_3m_price:.{precision}f})."
         else:
-            level_4_detail_en = f"Level 4 Pending: {wave_label} Retracement awaiting tap on 3M Breaker, 3M FVG, or 3M Fib 0.50-0.618."
-            level_4_detail_si = f"Level 4 රැඳී සිටී: {wave_label} Retracement 3M Breaker, FVG, හෝ Fib 0.50-0.618 ස්පර්ශය බලාපොරොත්තුවෙන්."
+            level_4_detail_en = f"Level 4 Pending: {three_min_wave_lbl} Retracement awaiting tap on 3M Breaker, 3M FVG, or 3M Fib 0.50-0.618."
+            level_4_detail_si = f"Level 4 රැඳී සිටී: {three_min_wave_lbl} Retracement 3M Breaker, FVG, හෝ Fib 0.50-0.618 ස්පර්ශය බලාපොරොත්තුවෙන්."
 
         evaluations.append({
             "step_no": 4,
@@ -272,12 +517,14 @@ class PrecisionScalpPipeline:
         trig_en = ""
         trig_si = ""
 
-        if level_4_passed:
-            is_triggered, rej_wick_ext, trig_entry, trig_en, trig_si = cls._check_3m_two_candle_reversal_trigger(
-                candles_3m=candles_3m,
+        # 5M සහ 3M දෙකම එකඟ වූ විට Entry Confirmation (three_min_wave in [2, 4])
+        if level_4_passed and is_pullback_wave:
+            two_cand_res = check_2_candle_execution(
+                df_or_candles_3m=candles_3m,
                 is_buy=is_buy_setup,
                 current_price=price
             )
+            is_triggered, rej_wick_ext, trig_entry, trig_en, trig_si = two_cand_res
 
         level_5_passed = bool(level_4_passed and is_triggered)
         market_entry_price = trig_entry if level_5_passed else price
@@ -345,7 +592,7 @@ class PrecisionScalpPipeline:
         )
 
         curr_phase_meta = PRECISION_SCALP_STEPS_CATALOGUE[min(current_phase, len(PRECISION_SCALP_STEPS_CATALOGUE) - 1)]
-        is_ready = bool(level_5_passed and passed_count == 5 and wave_ok)
+        is_ready = bool(level_5_passed and passed_count == 5 and wave_ok and is_pullback_wave and five_min_structure_valid)
 
         # Confidence Score based on passing levels
         if is_ready:
@@ -369,6 +616,15 @@ class PrecisionScalpPipeline:
         elif news_block:
             entry_area_str = "No Entry (USD High-Impact News Lockout)"
             retracement_status_display = "Gate 1: Macro Wait / USD News Lockout 🛡️"
+        elif not five_min_structure_valid:
+            entry_area_str = "No Entry (5M Structural Break Detected - Setup Invalidated 🛑)"
+            retracement_status_display = "5M Structural Break Detected - Setup Invalidated 🛑"
+        elif five_min_wave > 4:
+            entry_area_str = "No Entry (5M Macro Wave 5+ Exhaustion Trap - Blocked 🛑)"
+            retracement_status_display = "5M Macro Wave 5+ Exhaustion Trap - Blocked 🛑"
+        elif not wave_ok or three_min_wave > 4:
+            entry_area_str = f"No Entry ({three_min_wave_lbl} Exhaustion Trap - Blocked 🛑)"
+            retracement_status_display = f"Gate 2: {three_min_wave_lbl} Exhaustion Trap - Blocked 🛑"
         elif current_phase == 0:
             entry_area_str = "No Entry (15M Macro Structure Neutral/Chop)"
             retracement_status_display = "Gate 1: Macro Wait / 15M Anchor"
@@ -378,12 +634,13 @@ class PrecisionScalpPipeline:
         elif current_phase == 2:
             entry_area_str = f"Awaiting 3M CHoCH Shift ({confluence_5m})"
             retracement_status_display = "Gate 2: Awaiting 3M CHoCH Shift"
-        elif not wave_ok:
-            entry_area_str = f"No Entry ({wave_label} Exhaustion Blocked 🛑)"
-            retracement_status_display = f"Gate 2: {wave_label} Exhaustion - Blocked 🛑"
+        elif not is_pullback_wave:
+            target_w = "Wave 2" if three_min_wave <= 1 else "Wave 4"
+            entry_area_str = f"Awaiting {target_w} Micro Pullback ({three_min_wave_lbl} Impulse Active)"
+            retracement_status_display = f"Gate 3: Awaiting {target_w} Micro Pullback"
         elif current_phase == 3:
-            entry_area_str = f"Awaiting 3M Micro Confluence Retrace ({wave_label})"
-            retracement_status_display = f"Gate 3: Retrace to 3M Confluence ({wave_label})"
+            entry_area_str = f"Awaiting 3M Micro Confluence Retrace ({three_min_wave_lbl})"
+            retracement_status_display = f"Gate 3: Retrace to 3M Confluence ({three_min_wave_lbl})"
         elif current_phase == 4:
             entry_area_str = f"Awaiting 3M 2-Candle Reversal (Wick >= 35% & Body Break)"
             retracement_status_display = "Gate 4: 3M Wick Rejection (>=35%) & Next Body Close Shift..."
@@ -439,8 +696,12 @@ class PrecisionScalpPipeline:
             "trend_15m": t15m_trend,
             "confluence_5m": confluence_5m,
             "wave_3m_level": wave_3m_disp,
-            "wave_count": wave_count,
-            "wave_label": wave_label,
+            "wave_count": int(three_min_wave),
+            "wave_label": three_min_wave_lbl,
+            "five_min_structure_valid": five_min_structure_valid,
+            "five_min_wave": five_min_wave,
+            "three_min_wave": int(three_min_wave),
+            "is_pullback_wave": is_pullback_wave,
             "key_5m_level": key_5m_level,
             "choch_3m_level": choch_3m_level,
             "reversal_sweep_wick": rej_wick_ext,
@@ -462,8 +723,12 @@ class PrecisionScalpPipeline:
             "trend_3m": ("BULLISH" if is_buy_setup and level_3_passed else ("BEARISH" if is_sell_setup and level_3_passed else "NEUTRAL")),
             "confluence_5m": confluence_5m,
             "wave_3m_level": wave_3m_disp,
-            "wave_count": wave_count,
-            "wave_label": wave_label,
+            "wave_count": int(three_min_wave),
+            "wave_label": three_min_wave_lbl,
+            "five_min_structure_valid": five_min_structure_valid,
+            "five_min_wave": five_min_wave,
+            "three_min_wave": int(three_min_wave),
+            "is_pullback_wave": is_pullback_wave,
             "timeframe": "3m",
             "entry_price_area": entry_area_str,
             "entry_price": market_entry_price if is_ready else None,
@@ -763,10 +1028,33 @@ class PrecisionScalpPipeline:
         m_lvls = []
 
         # 1. 3M Breaker Block Re-test
-        if choch_level > 0:
-            if (abs(curr_p - choch_level) / choch_level <= 0.0025) or any(abs(float(c["low" if is_buy else "high"]) - choch_level) / choch_level <= 0.0025 for c in recent_3m[-5:]):
-                m_hits.append("3M Breaker")
-                m_lvls.append(choch_level)
+        breaker_tap_3m = False
+        breaker_lvl_3m = 0.0
+        if choch_level > 0 and ((abs(curr_p - choch_level) / choch_level <= 0.0025) or any(abs(float(c["low" if is_buy else "high"]) - choch_level) / choch_level <= 0.0025 for c in recent_3m[-5:])):
+            breaker_tap_3m = True
+            breaker_lvl_3m = choch_level
+        else:
+            if is_buy:
+                for i in range(2, len(highs) - 3):
+                    if highs[i] >= max(highs[max(0, i-2):i]) and highs[i] > max(highs[i+1:min(len(highs), i+3)]):
+                        cand_sh = highs[i]
+                        if any(float(c["close"]) > cand_sh for c in recent_3m[i+1:-1]):
+                            if (abs(curr_p - cand_sh) / cand_sh <= 0.0025) or any(abs(float(c["low"]) - cand_sh) / cand_sh <= 0.0025 for c in recent_3m[-5:]):
+                                breaker_tap_3m = True
+                                breaker_lvl_3m = cand_sh
+                                break
+            else:
+                for i in range(2, len(lows) - 3):
+                    if lows[i] <= min(lows[max(0, i-2):i]) and lows[i] < min(lows[i+1:min(len(lows), i+3)]):
+                        cand_sl = lows[i]
+                        if any(float(c["close"]) < cand_sl for c in recent_3m[i+1:-1]):
+                            if (abs(curr_p - cand_sl) / cand_sl <= 0.0025) or any(abs(float(c["high"]) - cand_sl) / cand_sl <= 0.0025 for c in recent_3m[-5:]):
+                                breaker_tap_3m = True
+                                breaker_lvl_3m = cand_sl
+                                break
+        if breaker_tap_3m:
+            m_hits.append("3M Breaker")
+            m_lvls.append(breaker_lvl_3m)
 
         # 2. 3M FVG Tap
         for i in range(len(recent_3m) - 1, max(2, len(recent_3m) - 8), -1):
@@ -937,7 +1225,8 @@ class PrecisionScalpPipeline:
         if bos_count > 4:
             return 5, "Wave 5+ (Blocked)"
         elif is_pullback:
-            return (4 if bos_count >= 2 else 2), "Wave 2 / 4"
+            w_num = 4 if bos_count >= 2 else 2
+            return w_num, f"Wave {w_num}"
         elif bos_count == 2:
             return 3, "Wave 3"
         elif bos_count == 1:

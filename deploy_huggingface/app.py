@@ -257,11 +257,22 @@ def resolve_coin_pipeline(c: dict):
     is_running = any(k in status_str.upper() for k in ["RUNNING", "IN TRADE", "BE ACHIEVED", "POSITION RUNNING"])
     is_actionable = bool(((is_valid and step_num >= 5) or is_running) and "ABORT" not in status_str.upper() and e_disp != "-")
 
+    five_min_valid = bool(c.get("five_min_structure_valid", last_res.get("five_min_structure_valid", pipe.get("five_min_structure_valid", True))))
+    five_min_w = int(c.get("five_min_wave") or last_res.get("five_min_wave") or pipe.get("five_min_wave") or 1)
+    is_pullback = bool(c.get("is_pullback_wave", last_res.get("is_pullback_wave", pipe.get("is_pullback_wave", True))))
+
     if news_active or "NEWS" in status_str.upper():
         step_num = 0
         active_status = "Gate 1: Macro Wait / USD News Lockout 🛡️"
+    elif not five_min_valid or "5M STRUCTURAL BREAK" in status_str.upper():
+        active_status = "5M Structural Break Detected - Setup Invalidated 🛑"
+    elif five_min_w > 4 or "5M MACRO WAVE 5+" in status_str.upper():
+        active_status = "5M Macro Wave 5+ Exhaustion Trap - Blocked 🛑"
     elif is_wave_blocked:
         active_status = f"Gate 2: {w_3m} Exhaustion - Blocked 🛑"
+    elif not is_pullback and step_num >= 3:
+        target_w = "Wave 2" if wave_num <= 1 else "Wave 4"
+        active_status = f"Gate 3: Awaiting {target_w} Micro Pullback"
     elif is_actionable:
         act_cmd = "INSTANT MARKET BUY" if is_buy else "INSTANT MARKET SELL"
         active_status = f"🎯 {act_cmd} | Entry: {e_disp} | SL: {sl_disp} | TP: {tp_disp}"
