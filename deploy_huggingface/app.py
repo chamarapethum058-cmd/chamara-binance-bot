@@ -27,8 +27,8 @@ import time
 import pandas as pd
 
 # Falcon Cloud Engine Build Version (Forces Hugging Face Container Rebuild)
-BUILD_VERSION = "2026.10.10-v143.0-TIMER-10S-GATE0-UNLOCK"
-# Space Force-Restart Timestamp: 2026-10-10T14:48:00+05:30
+BUILD_VERSION = "2026.10.10-v144.0-DYNAMIC-WAVE-UNBLOCK-GATE0"
+# Space Force-Restart Timestamp: 2026-10-10T15:32:00+05:30
 
 
 
@@ -161,17 +161,31 @@ def resolve_coin_pipeline(c: dict):
     last_res = c.get("last_result") if isinstance(c.get("last_result"), dict) else {}
     pipe = last_res.get("pipeline") if isinstance(last_res.get("pipeline"), dict) else {}
     
-    # 0. Regime check (ADX 14 & BB Squeeze) - Unlocked Squeeze for ADX >= 16
+    # 0. Bias (Gate 1): 15M Macro Directional Bias (BULLISH / BEARISH)
+    t15m = str(c.get("trend_15m") or last_res.get("trend_15m") or "NEUTRAL").upper().strip()
+    t5m = str(c.get("trend_5m") or last_res.get("trend_5m") or "NEUTRAL").upper().strip()
+    is_trending = bool(t15m in ["BULLISH", "BEARISH"])
+
+    if t15m == "BULLISH":
+        bias_disp = "BULLISH 🟢 (Buy Only)"
+    elif t15m == "BEARISH":
+        bias_disp = "BEARISH 🔴 (Sell Only)"
+    elif "BULL" in t15m or "BULL" in t5m:
+        bias_disp = f"BULLISH ({t15m})"
+    elif "BEAR" in t15m or "BEAR" in t5m:
+        bias_disp = f"BEARISH ({t15m})"
+    else:
+        bias_disp = "NEUTRAL ⚪"
+
+    # Regime check (ADX 14 & BB Squeeze) - Unblocked for Trending Coins
     m_reg = c.get("market_regime") or last_res.get("market_regime") or pipe.get("market_regime")
     adx_val = float(c.get("adx_14") or last_res.get("adx_14") or pipe.get("adx_14") or 0.0)
     is_sq = bool(c.get("is_bb_squeeze") or last_res.get("is_bb_squeeze") or pipe.get("is_bb_squeeze") or False)
     
-    if m_reg and "CHOPPY" in m_reg.upper() and adx_val >= 16.0:
+    if is_trending or adx_val >= 14.0:
         regime_disp = "TRENDING EXPANSION ✅"
     elif m_reg:
         regime_disp = m_reg
-    elif adx_val >= 16.0:
-        regime_disp = "TRENDING EXPANSION ✅"
     else:
         regime_disp = "CHOPPY / SQUEEZE (LOCKED)"
 
@@ -189,50 +203,42 @@ def resolve_coin_pipeline(c: dict):
         step_num = int(raw_phase) if raw_phase is not None else 0
     except Exception:
         step_num = 0
-        
-    # 1. Bias (Gate 1): 15M Macro Directional Bias (BULLISH / BEARISH)
-    t15m = str(c.get("trend_15m") or last_res.get("trend_15m") or "NEUTRAL").upper().strip()
-    t5m = str(c.get("trend_5m") or last_res.get("trend_5m") or "NEUTRAL").upper().strip()
-    
-    if t15m == "BULLISH":
-        bias_disp = "BULLISH 🟢 (Buy Only)"
-    elif t15m == "BEARISH":
-        bias_disp = "BEARISH 🔴 (Sell Only)"
-    elif "BULL" in t15m or "BULL" in t5m:
-        bias_disp = f"BULLISH ({t15m})"
-    elif "BEAR" in t15m or "BEAR" in t5m:
-        bias_disp = f"BEARISH ({t15m})"
-    else:
-        bias_disp = "NEUTRAL ⚪"
 
     is_buy = "BULL" in bias_disp or "BUY" in status_str.upper() or "LONG" in str(c.get("direction", "")).upper()
+
+    # Dynamic Wave Counter (Wave 1, Wave 2 / 4, Wave 3, Wave 5+ (Blocked))
+    wave_lbl = c.get("wave_label") or last_res.get("wave_label") or pipe.get("wave_label")
     wave_num = int(c.get("wave_count") or last_res.get("wave_count") or pipe.get("wave_count") or 1)
-    wave_disp = f"Wave {wave_num}/4" if wave_num <= 4 else f"Wave {wave_num} (Exhaustion 🛑)"
+    
+    if wave_lbl and str(wave_lbl).strip() and "/4" not in str(wave_lbl):
+        wave_disp = str(wave_lbl).strip()
+    else:
+        # Dynamic fallback based on real wave_num
+        if wave_num > 4:
+            wave_disp = "Wave 5+ (Blocked)"
+        elif wave_num == 3:
+            wave_disp = "Wave 3"
+        elif wave_num in [2, 4]:
+            wave_disp = "Wave 2 / 4"
+        else:
+            wave_disp = "Wave 1"
 
     # Active Tier Extraction (Tier 1: FVG, Tier 2: Breaker, Tier 3: Golden Pocket 0.50-0.786)
     active_tier = c.get("active_tier") or last_res.get("active_tier") or pipe.get("active_tier") or ""
 
     # 2. Sequential Hard-Lock Pipeline Status & Live Gate State
+    is_wave_blocked = bool(wave_num > 4 or "5+" in wave_disp or "BLOCKED" in wave_disp.upper() or "EXHAUSTION" in status_str.upper())
+
     if news_active or "NEWS" in status_str.upper():
         step_num = 1
         pipeline_status = "[Gate 1]: 🛡️ Macro Wait / News Lockout"
         live_state = "Gate 1: Macro Wait / USD News Lockout 🛡️"
         active_tier_disp = "USD News Lockout"
-    elif ("CHOPPY" in regime_disp.upper() or step_num == 0) and adx_val < 16.0:
-        step_num = 0
-        pipeline_status = "[Gate 0]: 🛑 Market Choppy / Range Blocked"
-        live_state = "Gate 0: Market Choppy / Range Blocked 🛑"
-        active_tier_disp = "Volatility Squeeze Locked"
-    elif step_num == 0 and adx_val >= 16.0:
-        step_num = 1
-        pipeline_status = f"[Gate 1]: 🧭 15M Anchor ({bias_disp})"
-        live_state = f"Gate 1: 15M Macro Trend ({bias_disp})"
-        active_tier_disp = "Awaiting 15M Anchor"
-    elif wave_num > 4 or "EXHAUSTION" in status_str.upper() or "WAVE 5" in status_str.upper():
+    elif is_wave_blocked:
         step_num = 2
-        pipeline_status = f"[Gate 2]: 🛑 Wave {wave_num} Exhaustion - Blocked"
-        live_state = f"Gate 2: Wave {wave_num} Exhaustion - Blocked 🛑"
-        active_tier_disp = f"Wave {wave_num} Exhaustion - Locked"
+        pipeline_status = f"[Gate 2]: 🛑 {wave_disp} Exhaustion - Blocked"
+        live_state = f"Gate 2: {wave_disp} Exhaustion - Blocked 🛑"
+        active_tier_disp = f"{wave_disp} Exhaustion - Locked"
     elif "ABORT" in status_str.upper() or "ABORT" in str(c.get("status", "")).upper() or "ABORT" in str(pipe.get("status", "")).upper():
         step_num = 5
         pipeline_status = f"[Gate 5]: 🚫 {status_str}"
@@ -270,13 +276,14 @@ def resolve_coin_pipeline(c: dict):
             pipeline_status = "[Gate 3]: ⏳ Mid-Range Floating (Locked)"
             live_state = "Gate 3: Waiting for Tier 1-3 Mitigation"
     elif step_num == 2:
-        pipeline_status = f"[Gate 2]: 🔢 Wave {wave_num}/4 Active"
-        live_state = f"Gate 2: Wave {wave_num}/4 Impulse Verified"
-        active_tier_disp = f"Wave {wave_num}/4 Active"
-    elif step_num == 1:
+        pipeline_status = f"[Gate 2]: 🔢 {wave_disp} Active"
+        live_state = f"Gate 2: {wave_disp} Impulse Verified"
+        active_tier_disp = f"{wave_disp} Active"
+    elif step_num == 1 or is_trending:
+        step_num = 1
         pipeline_status = f"[Gate 1]: 🧭 15M Anchor ({bias_disp})"
-        live_state = f"Gate 1: Waiting for 15M Macro Alignment ({bias_disp})"
-        active_tier_disp = "Awaiting 15M Macro Alignment"
+        live_state = f"Gate 1: 15M Macro Trend ({bias_disp})"
+        active_tier_disp = "Awaiting 15M Anchor"
     else:
         step_num = 0
         pipeline_status = "[Gate 0]: 🛑 Market Choppy / Range Blocked"

@@ -126,34 +126,45 @@ class PrecisionScalpPipeline:
         evaluations: List[Dict[str, Any]] = []
 
         # =========================================================================
-        # GATE 0: Choppiness & Consolidation Filter (ARKM Fix - Unlocked Squeeze)
+        # 15M MACRO STRUCTURE & DYNAMIC WAVE COUNTER (Evaluated upfront)
+        # =========================================================================
+        t15m_trend, t15m_seq, t15m_sh, t15m_sl = cls._detect_15m_structure(candles_15m, price)
+        is_trending_market = (t15m_trend in ["BULLISH", "BEARISH"])
+        is_buy_candidate = (t15m_trend == "BULLISH")
+
+        # Dynamic Wave Analysis (Evaluated on 15M / 5M / 3M DataFrame)
+        wave_candles = candles_15m if len(candles_15m) >= 15 else (candles_5m if len(candles_5m) >= 15 else candles_3m)
+        wave_count, wave_label = cls._get_dynamic_wave_structure(wave_candles, is_buy=is_buy_candidate, current_price=price)
+
+        # =========================================================================
+        # GATE 0: Choppiness & Consolidation Filter (UNBLOCK PIPELINE EXECUTION)
         # =========================================================================
         adx_candles = candles_15m if len(candles_15m) >= 28 else candles_5m
         adx_val = cls._calculate_adx_14(adx_candles)
         sq_candles = candles_15m if len(candles_15m) >= 20 else candles_5m
         is_bb_sq, current_bw = cls._check_bb_squeeze(sq_candles)
 
-        # UNLOCK GATE 0 (Over-strict squeeze relaxed):
-        # 1. BB-Width Squeeze check bypassed for trending coins (ADX >= 16.0)
-        # 2. Squeeze threshold reduced by 50% for extreme compression only (< 0.325%)
-        # 3. Trending coins with ADX >= 16 pass directly to Gate 1 and Gate 2
-        is_severe_compression = bool(current_bw < 0.00325 and adx_val < 16.0)
-        gate_0_passed = bool(adx_val >= 16.0 or not is_severe_compression)
+        # UNBLOCK GATE 0 (Over-strict squeeze relaxed):
+        # 1. Trending coins with confirmed 15M direction pass Gate 0 immediately
+        # 2. Relaxed ADX >= 14.0 or normal band width >= 0.30% passes
+        # 3. Only coins with NO trend, low ADX (< 14), and extreme squeeze (< 0.30%) are locked
+        is_severe_compression = bool(current_bw < 0.0030 and adx_val < 14.0 and not is_trending_market)
+        gate_0_passed = bool(is_trending_market or adx_val >= 14.0 or not is_severe_compression)
         market_regime = "TRENDING EXPANSION ✅" if gate_0_passed else "CHOPPY / SQUEEZE (LOCKED)"
 
         if not gate_0_passed:
-            gate_0_detail_en = f"Gate 0: Market Choppy / Range Blocked 🛑 (ADX={adx_val:.1f} < 16 or severe compression {current_bw*100:.2f}%)."
-            gate_0_detail_si = f"Gate 0: Market Choppy / Range Blocked 🛑 (ADX={adx_val:.1f} < 16 හෝ දැඩි Squeeze {current_bw*100:.2f}%). Choppy sideways market සම්පූර්ණයෙන්ම අවහිරයි."
+            gate_0_detail_en = f"Gate 0: Market Choppy / Range Blocked 🛑 (ADX={adx_val:.1f} < 14, Squeeze {current_bw*100:.2f}%, No Macro Trend)."
+            gate_0_detail_si = f"Gate 0: Market Choppy / Range Blocked 🛑 (ADX={adx_val:.1f} < 14 හෝ දැඩි Squeeze {current_bw*100:.2f}%). පැහැදිලි Trend එකක් නැති බැවින් අවහිරයි."
         else:
-            gate_0_detail_en = f"Gate 0 Verified: Trending Volatility confirmed (ADX={adx_val:.1f} >= 16, Squeeze Unlocked)."
-            gate_0_detail_si = f"Gate 0 තහවුරුයි: ප්‍රමාණවත් වෙළඳපල චලනයක් පවතී (ADX={adx_val:.1f} >= 16). Squeeze නිදහස් කර Trend Expansion සක්‍රීයයි."
+            gate_0_detail_en = f"Gate 0 Verified: Trending Volatility confirmed (ADX={adx_val:.1f}, Regime={market_regime}, 15M={t15m_trend})."
+            gate_0_detail_si = f"Gate 0 තහවුරුයි: ප්‍රමාණවත් වෙළඳපල චලනයක් පවතී (ADX={adx_val:.1f}, 15M={t15m_trend}). Pipeline ක්‍රියාත්මකයි."
 
         evaluations.append({
             "step_no": 0,
             "rule_no": 0,
             "gate_no": 0,
             "title": "Gate 0: Choppiness & Consolidation Filter",
-            "title_si": "පියවර 0: වෙළඳපල කලාපය සහ තදවීම පෙරහන (ADX >= 22 & Bollinger Squeeze Lock)",
+            "title_si": "පියවර 0: වෙළඳපල කලාපය සහ තදවීම පෙරහන (ADX >= 14 & Bollinger Squeeze Lock)",
             "passed": gate_0_passed,
             "status": "PASS" if gate_0_passed else "LOCKED",
             "detail": gate_0_detail_en,
@@ -165,19 +176,18 @@ class PrecisionScalpPipeline:
         # =========================================================================
         news_block = bool(is_news_locked)
         news_ev_str = active_news_event or "USD High-Impact News (CPI/NFP/FOMC)"
-        t15m_trend, t15m_seq, t15m_sh, t15m_sl = cls._detect_15m_structure(candles_15m, price)
 
         gate_1_passed = False
         gate_1_detail_en = ""
         gate_1_detail_si = ""
 
-        if not gate_0_passed:
-            gate_1_detail_en = "Gate 1 Locked: Waiting for Gate 0 Volatility Breakout (Market currently Choppy/Squeeze)."
-            gate_1_detail_si = "Gate 1 අක්‍රියයි: Gate 0 Volatility Breakout එකක් සිදුවන තෙක් බලා සිටී (වෙළඳපල Choppy/Squeeze තත්ත්වයේය)."
-        elif news_block:
+        if news_block:
             gate_1_detail_en = f"Gate 1 Blocked: USD High-Impact News Window active ({news_ev_str} +/-60 min). Signal Engine 100% OFF."
             gate_1_detail_si = f"Gate 1 අවහිරයි: USD ප්‍රධාන ආර්ථික පුවත් අවදානම සක්‍රීයයි ({news_ev_str}). Telegram Signal Engine 100% ක් අක්‍රිය කර ඇත."
-        elif t15m_trend not in ["BULLISH", "BEARISH"]:
+        elif not gate_0_passed:
+            gate_1_detail_en = "Gate 1 Locked: Waiting for Gate 0 Volatility Breakout (Market currently Choppy/Squeeze)."
+            gate_1_detail_si = "Gate 1 අක්‍රියයි: Gate 0 Volatility Breakout එකක් සිදුවන තෙක් බලා සිටී (වෙළඳපල Choppy/Squeeze තත්ත්වයේය)."
+        elif not is_trending_market:
             gate_1_detail_en = "Gate 1 Pending: 15M Macro Structure is Neutral/Consolidating. Clear HH/HL (Buy) or LL/LH (Sell) anchor required."
             gate_1_detail_si = "Gate 1 රැඳී සිටී: 15M ප්‍රධාන ව්‍යුහය පැහැදිලි නැත. HH/HL (Buy) හෝ LL/LH (Sell) නැංගුරමක් අවශ්‍යයි."
         else:
@@ -197,33 +207,32 @@ class PrecisionScalpPipeline:
             "detail_si": gate_1_detail_si
         })
 
-        active_direction = t15m_trend if gate_1_passed else None
+        active_direction = t15m_trend if gate_1_passed else (t15m_trend if is_trending_market else None)
         is_buy_setup = (active_direction == "BULLISH")
         is_sell_setup = (active_direction == "BEARISH")
 
         # =========================================================================
-        # GATE 2: Mathematical Wave 1-4 Counter Engine (INJ Blow-off Top Fix)
+        # GATE 2: Mathematical Wave 1-4 Counter Engine (Dynamic Wave Counter)
         # =========================================================================
-        wave_count = 1
-        wave_ok = True
+        # Re-verify wave structure with exact setup direction
+        wave_count, wave_label = cls._get_dynamic_wave_structure(wave_candles, is_buy=is_buy_setup, current_price=price)
+        wave_ok = bool(wave_count <= 4 and "5+" not in wave_label and "BLOCKED" not in wave_label.upper())
         gate_2_passed = False
         gate_2_detail_en = ""
         gate_2_detail_si = ""
 
         if gate_1_passed:
-            wave_count = cls._get_current_wave_count(candles_3m, is_buy=is_buy_setup)
-            wave_ok = bool(wave_count <= 4)
             if not wave_ok:
                 gate_2_passed = False
-                gate_2_detail_en = f"Gate 2: Wave {wave_count} Exhaustion - Blocked 🛑"
-                gate_2_detail_si = f"Gate 2: Wave {wave_count} Exhaustion - Blocked 🛑 (Wave 5 හෝ ඊට වැඩි බැවින් සියලුම Long සහ Short entries 100% ක් Hard-Block කර ඇත)."
+                gate_2_detail_en = f"Gate 2: {wave_label} Exhaustion - Blocked 🛑"
+                gate_2_detail_si = f"Gate 2: {wave_label} Exhaustion - Blocked 🛑 (Wave 5 හෝ ඊට වැඩි බැවින් සියලුම Long සහ Short entries 100% ක් Hard-Block කර ඇත)."
             else:
                 gate_2_passed = True
-                gate_2_detail_en = f"Gate 2 Verified: Wave {wave_count} active (Strictly within Wave 1-4 boundary). Trend blow-off exhaustion cleared."
-                gate_2_detail_si = f"Gate 2 තහවුරුයි: Wave {wave_count} සක්‍රීයයි (Wave 1-4 සීමාව තුළයි). Trend Exhaustion අවදානමක් නැත."
+                gate_2_detail_en = f"Gate 2 Verified: {wave_label} active (Strictly within Wave 1-4 boundary). Trend blow-off exhaustion cleared."
+                gate_2_detail_si = f"Gate 2 තහවුරුයි: {wave_label} සක්‍රීයයි (Wave 1-4 සීමාව තුළයි). Trend Exhaustion අවදානමක් නැත."
         else:
-            gate_2_detail_en = "Gate 2 Locked: Waiting for Gate 1 Macro Anchor confirmation."
-            gate_2_detail_si = "Gate 2 අක්‍රියයි: Gate 1 Macro Anchor තහවුරු වන තෙක් බලා සිටී."
+            gate_2_detail_en = f"Gate 2 Analyzed: {wave_label}. Waiting for Gate 1 Macro Anchor confirmation."
+            gate_2_detail_si = f"Gate 2 විශ්ලේෂණය: {wave_label}. Gate 1 Macro Anchor තහවුරු වන තෙක් බලා සිටී."
 
         evaluations.append({
             "step_no": 2,
@@ -232,7 +241,7 @@ class PrecisionScalpPipeline:
             "title": "Gate 2: Mathematical Wave 1-4 Counter Engine",
             "title_si": "පියවර 2: ගණිතමය Wave 1-4 ගණක එන්ජිම (Wave 1-4 Allowed / Wave >= 5 Blocked)",
             "passed": gate_2_passed,
-            "status": "PASS" if gate_2_passed else ("LOCKED" if (not gate_1_passed or not wave_ok) else "PENDING"),
+            "status": "PASS" if gate_2_passed else ("LOCKED" if (not wave_ok or not gate_1_passed) else "PENDING"),
             "detail": gate_2_detail_en,
             "detail_si": gate_2_detail_si
         })
@@ -688,6 +697,7 @@ class PrecisionScalpPipeline:
             "adx_14": adx_val,
             "is_bb_squeeze": is_bb_sq,
             "wave_count": wave_count,
+            "wave_label": wave_label,
             "fib_level": fib_val,
             "equilibrium_price": eq_price,
             "active_tier": active_tier,
@@ -729,13 +739,14 @@ class PrecisionScalpPipeline:
             "adx_14": adx_val,
             "is_bb_squeeze": is_bb_sq,
             "wave_count": wave_count,
+            "wave_label": wave_label,
             "fib_level": fib_val,
             "equilibrium_price": eq_price,
             "active_tier": active_tier,
             "active_tier_level": active_tier_level,
             "trend_15m": t15m_trend,
-            "trend_5m": ("BULLISH" if mss_5m_ok and is_buy_setup else ("BEARISH" if mss_5m_ok and is_sell_setup else t15m_trend)),
-            "trend_3m": ("BULLISH" if choch_3m_ok and is_buy_setup else ("BEARISH" if choch_3m_ok and is_sell_setup else "NEUTRAL")),
+            "trend_5m": t15m_trend,
+            "trend_3m": ("BULLISH" if is_buy_setup and gate_5_passed else ("BEARISH" if is_sell_setup and gate_5_passed else "NEUTRAL")),
             "zone_type": "DISCOUNT" if is_buy_setup else "PREMIUM",
             "setup_model": "HARD_LOCKED_SMC_GATE_PIPELINE",
             "reasoning": f"{reasoning_eng}\n\n---\n\n**සිංහල පරිවර්තනය (Sinhala Translation):**\n{reasoning_sin}",
@@ -964,38 +975,85 @@ class PrecisionScalpPipeline:
             return is_premium, equilibrium, fib_level, range_high, range_low
 
     @staticmethod
-    def _get_current_wave_count(candles_3m: List[Dict[str, Any]], is_buy: bool) -> int:
+    def _get_dynamic_wave_structure(candles: List[Dict[str, Any]], is_buy: bool, current_price: float = 0.0) -> Tuple[int, str]:
         """
-        Mathematical Wave 1-4 Counter Engine (Gate 2 - INJ Blow-off Top Fix):
-        Detects Swing Highs (HH) and Swing Lows (HL) via Structural Extrema,
-        and counts BOS expansion impulses:
-        impulse_count = len([p for p in swing_points if p.type == 'BOS_EXPANSION'])
-        If current_wave > 4 (Wave 5+): 100% hard-blocked.
+        Dynamic Wave Counter Engine (Fractal Extrema & Break of Structure BOS):
+        * 1st BOS expansion = "Wave 1"
+        * 2nd BOS expansion = "Wave 3"
+        * Pullbacks = "Wave 2 / 4"
+        * BOS > 4 = "Wave 5+ (Blocked)"
         """
-        if not candles_3m or len(candles_3m) < 8:
-            return 1
+        if not candles or len(candles) < 10:
+            return 1, "Wave 1"
 
-        window = candles_3m[-30:]
-        highs = [float(c["high"]) for c in window]
-        lows = [float(c["low"]) for c in window]
-        closes = [float(c["close"]) for c in window]
+        highs = [float(c["high"]) for c in candles]
+        lows = [float(c["low"]) for c in candles]
+        closes = [float(c["close"]) for c in candles]
+        curr_p = float(current_price) if current_price > 0 else closes[-1]
 
-        impulse_count = 0
-        if is_buy:
-            for i in range(2, len(highs) - 2):
-                if highs[i] >= max(highs[i-2:i]) and highs[i] > max(highs[i+1:i+3]):
-                    # Check if subsequent candles pushed past this swing high (BOS expansion)
-                    if any(closes[k] > highs[i] for k in range(i+1, min(i+6, len(closes)))):
-                        impulse_count += 1
+        # 1. Detect Fractal Swing Points (ZigZag Extrema)
+        swing_highs = []
+        swing_lows = []
+        for i in range(2, len(highs) - 2):
+            if highs[i] >= max(highs[i-2:i]) and highs[i] > max(highs[i+1:i+3]):
+                swing_highs.append((i, highs[i]))
+            if lows[i] <= min(lows[i-2:i]) and lows[i] < min(lows[i+1:i+3]):
+                swing_lows.append((i, lows[i]))
+
+        # 2. Count Break of Structure (BOS) Expansions
+        bos_count = 0
+        if is_buy and len(swing_highs) >= 2:
+            last_broken_sh_idx = -1
+            for idx, sh_p in swing_highs:
+                if any(closes[k] > sh_p for k in range(idx + 1, len(closes))):
+                    if idx > last_broken_sh_idx:
+                        bos_count += 1
+                        last_broken_sh_idx = idx
+        elif not is_buy and len(swing_lows) >= 2:
+            last_broken_sl_idx = -1
+            for idx, sl_p in swing_lows:
+                if any(closes[k] < sl_p for k in range(idx + 1, len(closes))):
+                    if idx > last_broken_sl_idx:
+                        bos_count += 1
+                        last_broken_sl_idx = idx
         else:
-            for i in range(2, len(lows) - 2):
-                if lows[i] <= min(lows[i-2:i]) and lows[i] < min(lows[i+1:i+3]):
-                    # Check if subsequent candles pushed below this swing low (BOS expansion)
-                    if any(closes[k] < lows[i] for k in range(i+1, min(i+6, len(closes)))):
-                        impulse_count += 1
+            if is_buy and len(swing_highs) >= 2:
+                bos_count = sum(1 for i in range(1, len(swing_highs)) if swing_highs[i][1] > swing_highs[i-1][1])
+            elif not is_buy and len(swing_lows) >= 2:
+                bos_count = sum(1 for i in range(1, len(swing_lows)) if swing_lows[i][1] < swing_lows[i-1][1])
 
-        current_wave = max(1, min(impulse_count + 1, 6))
-        return current_wave
+        # 3. Pullback / Retracement Detection
+        recent_sh = max(highs[-10:]) if len(highs) >= 10 else max(highs)
+        recent_sl = min(lows[-10:]) if len(lows) >= 10 else min(lows)
+        span = recent_sh - recent_sl
+        is_pullback = False
+        if span > 0:
+            depth = ((recent_sh - curr_p) if is_buy else (curr_p - recent_sl)) / span
+            if 0.18 <= depth <= 0.82:
+                is_pullback = True
+
+        # 4. Map to exact specification:
+        # 1st BOS = "Wave 1"
+        # 2nd BOS = "Wave 3"
+        # Pullbacks = "Wave 2 / 4"
+        # BOS > 4 = "Wave 5+ (Blocked)"
+        if bos_count > 4:
+            return 5, "Wave 5+ (Blocked)"
+        elif is_pullback:
+            return (4 if bos_count >= 2 else 2), "Wave 2 / 4"
+        elif bos_count == 2:
+            return 3, "Wave 3"
+        elif bos_count == 1:
+            return 1, "Wave 1"
+        elif bos_count in [3, 4]:
+            return 5, "Wave 5+ (Blocked)"
+        else: # bos_count == 0
+            return 1, "Wave 1"
+
+    @staticmethod
+    def _get_current_wave_count(candles_3m: List[Dict[str, Any]], is_buy: bool) -> int:
+        num, _ = PrecisionScalpPipeline._get_dynamic_wave_structure(candles_3m, is_buy)
+        return num
 
     @staticmethod
     def _count_pullback_waves(candles_3m: List[Dict[str, Any]], is_buy: bool) -> int:

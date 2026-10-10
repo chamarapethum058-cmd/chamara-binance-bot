@@ -641,6 +641,7 @@ async def analyze_single_coin_task(coin: dict, semaphore: asyncio.Semaphore):
             retr_disp = str(result.get("retracement_status_display") or "").strip()
             market_regime = str(result.get("market_regime") or "TRENDING EXPANSION ✅")
             wave_cnt = int(result.get("wave_count") or 1)
+            wave_label = str(result.get("wave_label") or f"Wave {wave_cnt}")
             active_tier_name = str(result.get("active_tier") or "Tier 1: 3M FVG")
             
             if active_pos:
@@ -649,16 +650,16 @@ async def analyze_single_coin_task(coin: dict, semaphore: asyncio.Semaphore):
                     status = f"🔒 Position Running ({pos_dir})"
                 else:
                     status = f"🚀 Running to Targets ({pos_dir})"
-            elif current_phase == 0 or "CHOPPY" in market_regime.upper():
+            elif current_phase == 0 or ("CHOPPY" in market_regime.upper() and t15m_val not in ["BULLISH", "BEARISH"]):
                 status = "Gate 0: Market Choppy / Range Blocked 🛑"
-                entry_price = "No Entry (ADX < 16 / Squeeze Locked)"
+                entry_price = "No Entry (ADX < 14 / Squeeze Locked)"
             elif news_locked:
                 status = "Gate 1: Macro Wait / News Lockout"
                 entry_price = f"No Entry (USD News Lockout: {active_news_ev})"
             elif current_phase == 1:
-                status = "Gate 1: Macro Wait / 15M Anchor"
-            elif current_phase == 2 or wave_cnt > 4:
-                status = f"Gate 2: Wave {wave_cnt} Exhaustion - Blocked 🛑" if wave_cnt > 4 else f"Gate 2: Wave {wave_cnt}/4 Active"
+                status = f"Gate 1: Macro Wait / 15M Anchor ({t15m_val})"
+            elif current_phase == 2 or wave_cnt > 4 or "5+" in wave_label:
+                status = f"Gate 2: {wave_label} Exhaustion - Blocked 🛑" if (wave_cnt > 4 or "5+" in wave_label) else f"Gate 2: {wave_label} Active"
             elif current_phase == 3:
                 status = retr_disp if retr_disp else f"Gate 3: Retrace to 3-Tier Cascade ({active_tier_name})"
             elif current_phase == 4:
@@ -669,6 +670,8 @@ async def analyze_single_coin_task(coin: dict, semaphore: asyncio.Semaphore):
                 status = "Gate 6: Micro-Wick SL Armed (0.25%-0.65%) 🛡️"
             elif result.get("is_valid", False) and step_7_passed:
                 status = f"🎯 SMC Confirmed 2-Candle Market Execution! Triggering {'Long' if is_long else 'Short'} Scalp 📌"
+            elif t15m_val in ["BULLISH", "BEARISH"]:
+                status = f"Gate 1: Macro Wait / 15M Anchor ({t15m_val})"
             else:
                 status = "Gate 0: Market Choppy / Range Blocked 🛑"
 
@@ -836,6 +839,7 @@ async def analyze_single_coin_task(coin: dict, semaphore: asyncio.Semaphore):
                 "adx_14": result.get("adx_14"),
                 "is_bb_squeeze": result.get("is_bb_squeeze"),
                 "wave_count": result.get("wave_count"),
+                "wave_label": result.get("wave_label"),
                 "fib_level": result.get("fib_level"),
                 "setup_path": result.get("setup_path"),
                 "setup_route": result.get("setup_route"),
@@ -852,7 +856,7 @@ async def analyze_single_coin_task(coin: dict, semaphore: asyncio.Semaphore):
 
 async def run_smc_tracker_loop():
     logger.info("SMC Background Tracker Loop Started with Deduplication Engine & Live Concurrent Execution.")
-    semaphore = asyncio.Semaphore(3)
+    semaphore = asyncio.Semaphore(8)
     
     # Clean stale historical statuses on first startup loop and seed default coins if empty
     try:
