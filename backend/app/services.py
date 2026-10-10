@@ -1670,17 +1670,12 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                 logger.info(f"15M 24h Structure for {sym}: State is {trend_state} (Active_SH={active_sh:.4f}, Active_SL={active_sl:.4f}).")
                 return trend_state
 
-            # Calculate EMA20 and EMA50 to determine institutional trend direction
-            k20 = 2.0 / (20 + 1)
-            k50 = 2.0 / (50 + 1)
-            ema20 = closes[0]
-            ema50 = closes[0]
-            for c in closes:
-                ema20 = (c * k20) + (ema20 * (1 - k20))
-                ema50 = (c * k50) + (ema50 * (1 - k50))
-
+            # Pure Swing Structure and Equilibrium Midpoint
             current_close = closes[-1]
-            
+            swing_high_p = max(highs)
+            swing_low_p = min(lows)
+            mid_range = (swing_high_p + swing_low_p) / 2.0
+
             # Explicit BOS (Break of Structure) Detection
             is_bos_bullish = False
             is_bos_bearish = False
@@ -1723,7 +1718,7 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                     is_lower_highs = True
                     is_higher_lows = False
 
-            # BOS-Driven Trend Hierarchy (Rules 13, 15, 16, 37, 53 & 60)
+            # BOS-Driven Pure Structure Hierarchy
             if is_higher_lows and not is_lower_highs and is_bos_bullish:
                 bias_state = "BULLISH"
             elif is_lower_highs and not is_higher_lows and is_bos_bearish:
@@ -1736,22 +1731,14 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                 bias_state = "BULLISH"
             elif is_bos_bearish and not is_bos_bullish:
                 bias_state = "BEARISH"
-            elif current_close >= ema50 and ema20 >= ema50:
+            elif current_close >= mid_range:
                 bias_state = "BULLISH"
-            elif current_close <= ema50 and ema20 <= ema50:
-                bias_state = "BEARISH"
-            elif current_close >= ema50:
-                bias_state = "BULLISH"
-            elif current_close < ema50:
-                bias_state = "BEARISH"
-            elif current_close >= ema20:
-                bias_state = "BULLISH"
-            elif current_close < ema20:
+            elif current_close < mid_range:
                 bias_state = "BEARISH"
             else:
                 bias_state = fallback_bias
 
-            logger.info(f"Dynamic structure detection for {sym} ({timeframe}): State tracks to {bias_state} (BOS_Bull={is_bos_bullish}, BOS_Bear={is_bos_bearish}, EMA20={ema20:.2f}, EMA50={ema50:.2f}, Close={current_close:.2f}).")
+            logger.info(f"Dynamic structure detection for {sym} ({timeframe}): State tracks to {bias_state} (BOS_Bull={is_bos_bullish}, BOS_Bear={is_bos_bearish}, Close={current_close:.2f}).")
             return bias_state
 
         except Exception as e:
@@ -2006,7 +1993,7 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                     "has_15m_bearish_choch": False,
                     "last_15m_lh": None,
                     "last_15m_hl": None,
-                    "ema50_15m": None,
+                    "mid_15m": None,
                     "trend_15m": "NEUTRAL",
                     "rule_83_sequence": "NEUTRAL",
                     "rule_83_initial_regime": "NEUTRAL",
@@ -2029,11 +2016,8 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
             c15_lows = [c["low"] for c in c15_24h]
             c15_opens = [c["open"] for c in c15_24h]
 
-            # Calculate 15M EMA50
-            k50 = 2.0 / 51.0
-            ema50_15m = c15_closes[0]
-            for cl in c15_closes:
-                ema50_15m = (cl * k50) + (ema50_15m * (1 - k50))
+            # 15M Dealing Range Equilibrium (50%)
+            mid_15m = (max(c15_highs) + min(c15_lows)) / 2.0
 
             # 2. Sequential Mapping of all HH, HL, LL, LH chronologically without skipping (Point 2)
             raw_pivots = []
@@ -2073,8 +2057,8 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
             sl_15m = [p for p in sequential_swings if p["label"] in ["HL", "LL"]]
 
             curr_close = c15_closes[-1]
-            is_below_ema50 = curr_close < ema50_15m
-            is_above_ema50 = curr_close > ema50_15m
+            is_below_mid = curr_close < mid_15m
+            is_above_mid = curr_close > mid_15m
 
             # Last confirmed swing points
             last_15m_lh = sh_15m[-1]["price"] if sh_15m else max(c15_highs[-15:])
@@ -2137,11 +2121,11 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                     else:
                         break
 
-            # If price is below 15M EMA50, markup is suppressed unless fresh bullish choch occurred!
-            if is_below_ema50:
+            # If price is below 15M Equilibrium midpoint, markup is suppressed unless fresh bullish choch occurred!
+            if is_below_mid:
                 is_15m_markup_active = bool(has_15m_bullish_choch and is_bullish_bos)
                 is_15m_markdown_active = True
-            elif is_above_ema50:
+            elif is_above_mid:
                 is_15m_markdown_active = bool(has_15m_bearish_choch and is_bearish_bos)
                 is_15m_markup_active = True
             else:
@@ -2149,11 +2133,11 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                 is_15m_markdown_active = bool(consec_lh_15m >= 2 or has_15m_bearish_choch or is_bearish_bos)
 
             # Decide active sequence (Point 6: LL_LH vs HH_HL)
-            if has_15m_bullish_choch and not is_below_ema50:
+            if has_15m_bullish_choch and not is_below_mid:
                 active_sequence = "HH_HL"
-            elif has_15m_bearish_choch or is_below_ema50 or is_bearish_bos:
+            elif has_15m_bearish_choch or is_below_mid or is_bearish_bos:
                 active_sequence = "LL_LH"
-            elif is_above_ema50 or is_bullish_bos:
+            elif is_above_mid or is_bullish_bos:
                 active_sequence = "HH_HL"
             elif is_15m_markdown_active and not is_15m_markup_active:
                 active_sequence = "LL_LH"
@@ -2164,14 +2148,14 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
             elif recent_bull_count > recent_bear_count:
                 active_sequence = "HH_HL"
             else:
-                active_sequence = "LL_LH" if is_below_ema50 else "HH_HL"
+                active_sequence = "LL_LH" if is_below_mid else "HH_HL"
 
             # Point 3 & 4: Transition Verification via CHoCH
             choch_verified = True
             if initial_regime == "HH_HL" and active_sequence == "LL_LH":
-                choch_verified = bool(has_15m_bearish_choch or is_bearish_bos or is_below_ema50)
+                choch_verified = bool(has_15m_bearish_choch or is_bearish_bos or is_below_mid)
             elif initial_regime == "LL_LH" and active_sequence == "HH_HL":
-                choch_verified = bool(has_15m_bullish_choch or is_bullish_bos or is_above_ema50)
+                choch_verified = bool(has_15m_bullish_choch or is_bullish_bos or is_above_mid)
 
             # Point 7: BOS Continuation Verification
             bos_continued = bool(is_bearish_bos if active_sequence == "LL_LH" else is_bullish_bos) or True
@@ -2438,7 +2422,7 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                 "has_15m_bearish_choch": has_15m_bearish_choch,
                 "last_15m_lh": last_15m_lh,
                 "last_15m_hl": last_15m_hl,
-                "ema50_15m": ema50_15m,
+                "mid_15m": mid_15m,
                 "trend_15m": trend_15m_out,
                 # Rule 83 Primary Foundation Step fields
                 "rule_83_sequence": active_sequence,
@@ -2500,7 +2484,7 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                 "has_15m_bearish_choch": False,
                 "last_15m_lh": None,
                 "last_15m_hl": None,
-                "ema50_15m": None,
+                "mid_15m": None,
                 "trend_15m": "NEUTRAL",
                 "rule_83_sequence": "NEUTRAL",
                 "rule_83_initial_regime": "NEUTRAL",
@@ -2526,7 +2510,7 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
         """
         Dedicated 5-Minute Market Structure Analysis:
         - Evaluates true 5M Trend independently using 5M candles (up to 120 candles).
-        - Computes 5M EMA20 & EMA50.
+        - Computes 5M Equilibrium Dealing Range.
         - Identifies 5M swing highs & swing lows (pivots).
         - Detects 5M consecutive Higher Lows (Markup) vs Lower Highs (Markdown).
         - Detects 5M Bullish/Bearish CHoCH (candle body close breaking prior swing extreme).
@@ -2557,8 +2541,7 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                     "has_5m_bearish_choch": False,
                     "last_5m_sh": None,
                     "last_5m_sl": None,
-                    "ema50_5m": None,
-                    "ema20_5m": None
+                    "mid_5m": None
                 }
 
             c5 = candles_5m[-120:] if len(candles_5m) >= 120 else candles_5m
@@ -2567,14 +2550,8 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
             c5_lows = [float(c["low"]) for c in c5]
             c5_opens = [float(c["open"]) for c in c5]
 
-            # Calculate 5M EMA20 and EMA50
-            k20 = 2.0 / 21.0
-            k50 = 2.0 / 51.0
-            ema20_5m = c5_closes[0]
-            ema50_5m = c5_closes[0]
-            for cl in c5_closes:
-                ema20_5m = (cl * k20) + (ema20_5m * (1 - k20))
-                ema50_5m = (cl * k50) + (ema50_5m * (1 - k50))
+            # 5M Equilibrium Midpoint (50% Dealing Range)
+            mid_5m = (max(c5_highs) + min(c5_lows)) / 2.0
 
             # 5M Swings (Pivots)
             swing_highs_5m = []
@@ -2651,43 +2628,35 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
 
             # 5M EMA Relationships & Price Position Guard
             c5_last_p = c5_closes[-1]
-            is_below_5m_ema50 = c5_last_p < ema50_5m
-            is_below_5m_ema20 = c5_last_p < ema20_5m
-            is_above_5m_ema50 = c5_last_p > ema50_5m
-            is_above_5m_ema20 = c5_last_p > ema20_5m
+            is_below_5m_mid = c5_last_p < mid_5m
+            is_above_5m_mid = c5_last_p > mid_5m
 
             # Active Markup / Markdown State:
-            # If price is below 5M EMA50, 2 flat candles CANNOT trigger markup!
-            # It requires true Bullish CHoCH body close breaking the swing high or genuine breakout above EMA50.
-            if is_below_5m_ema50:
-                is_5m_markup = bool(has_5m_bullish_choch and (pivot_hh_5m or is_above_5m_ema50))
-                is_5m_markdown = True  # Trading below 5M EMA50 is inherently Markdown
-            elif is_above_5m_ema50:
-                is_5m_markdown = bool(has_5m_bearish_choch and (pivot_ll_5m or is_below_5m_ema50))
-                is_5m_markup = True   # Trading above 5M EMA50 is inherently Markup
+            if is_below_5m_mid:
+                is_5m_markup = bool(has_5m_bullish_choch and (pivot_hh_5m or is_above_5m_mid))
+                is_5m_markdown = True
+            elif is_above_5m_mid:
+                is_5m_markdown = bool(has_5m_bearish_choch and (pivot_ll_5m or is_below_5m_mid))
+                is_5m_markup = True
             else:
                 is_5m_markup = bool(consec_hl_5m >= 2 or is_v_bottom_5m or (pivot_hl_5m and not pivot_lh_5m) or (pivot_hh_5m and pivot_hl_5m))
                 is_5m_markdown = bool(consec_lh_5m >= 2 or is_v_top_5m or (pivot_lh_5m and not pivot_hl_5m) or (pivot_ll_5m and pivot_lh_5m))
 
-            # Determine true 5M Trend with strict EMA50 and BOS priority:
-            if has_5m_bullish_choch and (is_above_5m_ema50 or pivot_hh_5m):
+            # Determine true 5M Trend with strict BOS and Equilibrium priority:
+            if has_5m_bullish_choch and (is_above_5m_mid or pivot_hh_5m):
                 trend_5m = "BULLISH"
-            elif has_5m_bearish_choch and (is_below_5m_ema50 or pivot_ll_5m):
+            elif has_5m_bearish_choch and (is_below_5m_mid or pivot_ll_5m):
                 trend_5m = "BEARISH"
-            elif is_below_5m_ema50 or is_5m_bearish_bos or (is_5m_markdown and not has_5m_bullish_choch):
+            elif is_below_5m_mid or is_5m_bearish_bos or (is_5m_markdown and not has_5m_bullish_choch):
                 trend_5m = "BEARISH"
-            elif is_above_5m_ema50 or is_5m_bullish_bos or (is_5m_markup and not has_5m_bearish_choch):
-                trend_5m = "BULLISH"
-            elif ema20_5m <= ema50_5m:
-                trend_5m = "BEARISH"
-            elif ema20_5m >= ema50_5m:
+            elif is_above_5m_mid or is_5m_bullish_bos or (is_5m_markup and not has_5m_bearish_choch):
                 trend_5m = "BULLISH"
             elif pivot_hh_5m:
                 trend_5m = "BULLISH"
             elif pivot_ll_5m:
                 trend_5m = "BEARISH"
             else:
-                trend_5m = "BULLISH" if c5_closes[-1] >= c5_opens[0] else "BEARISH"
+                trend_5m = "BULLISH" if is_above_5m_mid else "BEARISH"
 
             # 5M Breaker Block Detection (Rule 86 - Unicorn Edition):
             # Bullish Market: A failed Bearish Order Block (down candle) broken aggressively upward with displacement body close.
@@ -2750,12 +2719,10 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                 "has_5m_bearish_choch": has_5m_bearish_choch,
                 "is_5m_bearish_bos": is_5m_bearish_bos,
                 "is_5m_bullish_bos": is_5m_bullish_bos,
-                "is_below_5m_ema50": is_below_5m_ema50,
-                "is_below_5m_ema20": is_below_5m_ema20,
+                "is_below_5m_mid": is_below_5m_mid,
                 "last_5m_sh": last_5m_sh,
                 "last_5m_sl": last_5m_sl,
-                "ema50_5m": ema50_5m,
-                "ema20_5m": ema20_5m,
+                "mid_5m": mid_5m,
                 "rule_86_5m_breaker_found": breaker_5m_found,
                 "rule_86_5m_breaker_type": breaker_5m_type,
                 "rule_86_5m_breaker_price": breaker_5m_price,
@@ -2773,8 +2740,7 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
                 "has_5m_bearish_choch": False,
                 "last_5m_sh": None,
                 "last_5m_sl": None,
-                "ema50_5m": None,
-                "ema20_5m": None
+                "mid_5m": None
             }
 
     @classmethod
@@ -4336,11 +4302,8 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
         elif direction in ["BULLISH", "BEARISH"]:
             daily_bias = direction
         else:
-            k20 = 2.0 / 21
-            s_ema20 = s_closes[0]
-            for sc in s_closes:
-                s_ema20 = (sc * k20) + (s_ema20 * (1 - k20))
-            is_sess_downtrend = s_closes[-1] < s_ema20 or (len(s_highs) >= 6 and max(s_highs[-3:]) < max(s_highs[-6:-3]))
+            s_mid = (max(s_highs) + min(s_lows)) / 2.0
+            is_sess_downtrend = s_closes[-1] < s_mid or (len(s_highs) >= 6 and max(s_highs[-3:]) < max(s_highs[-6:-3]))
             daily_bias = "BEARISH" if is_sess_downtrend else "BULLISH"
 
         active_fvgs_count = len(bullish_fvgs_24h) if daily_bias == "BULLISH" else len(bearish_fvgs_24h)
@@ -5432,7 +5395,7 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
         import asyncio
         from datetime import datetime, timezone, timedelta
         from app.market import get_candles
-        from app.precision_scalp import PrecisionScalpPipeline
+        from app.strategy import PureSMCEngine, PrecisionScalpPipeline
 
         # 1. Fetch Multi-Timeframe Candles (15M Macro, 5M Structure & Base, 3M Micro-Shift)
         candles_15m = payload.get("candles_15m") or []
@@ -5519,8 +5482,8 @@ OUTPUT JSON ONLY. Do not wrap in markdown blocks other than clean json formattin
         except Exception:
             pass
 
-        # 3. Execute Unified 7-Step Precision Scalp Pipeline
-        analysis = PrecisionScalpPipeline.evaluate(
+        # 3. Execute Unified Pure SMC Pipeline
+        analysis = PureSMCEngine.evaluate(
             symbol=sym,
             price=price,
             candles_15m=candles_15m,

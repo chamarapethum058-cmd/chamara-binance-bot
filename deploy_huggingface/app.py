@@ -27,8 +27,8 @@ import time
 import pandas as pd
 
 # Falcon Cloud Engine Build Version (Forces Hugging Face Container Rebuild)
-BUILD_VERSION = "2026.10.10-v145.0-DUAL-TIMEFRAME-5M-3M-SMC"
-# Space Force-Restart Timestamp: 2026-10-10T17:45:00+05:30
+BUILD_VERSION = "2026.10.10-v146.0-PURE-5M-3M-SMC-STATE-MACHINE"
+# Space Force-Restart Timestamp: 2026-10-10T18:15:00+05:30
 
 
 
@@ -137,16 +137,15 @@ else:
 async def test_telegram():
     try:
         msg = (
-            "🦅 <b>Falcon 24/7 Cloud Engine Online! (v128.0 Anti-Waterfall Shield Active)</b>\n\n"
+            "🦅 <b>Falcon 24/7 Pure SMC Engine Online! (Dual 5M/3M Confluence & Wave 1-4 Sniper Active)</b>\n\n"
             "Hugging Face Spaces scanner is live and monitoring Falcon coins 24/7.\n"
-            "• <b>Master Falcon Rules:</b> 1 - 91 (All 91 Rules Active & Audited)\n"
-            "• <b>Anti-Waterfall Shield:</b> 5M EMA50/20 & Bearish BOS Hard-Block active (Rule 16/56)\n"
-            "• <b>Strict 15M + 5M Alignment:</b> Zero Counter-Trend Execution\n"
-            "• <b>Falcon Institutional SMC Engine:</b> High-Velocity 80%+ Confluence Unanimous Agreement\n"
-            "• <b>Real Structural Targets:</b> TP 2 (1:4.0R Confirmed Swing Liquidity) & TP 1 (1:2.0R 50% Auto-Close) +1.0R Break-Even\n"
-            "• <b>Instant Execution:</b> Market Price Execution on Verified 80%+ SMC Signals\n\n"
+            "• <b>Level 1 (15M Macro Anchor):</b> Pure 15M Fractal Structure (BULLISH -> BUY_ONLY, BEARISH -> SELL_ONLY)\n"
+            "• <b>Level 2 (5M Structural Level & Wave Guard):</b> 5M Waves 1-4, BOS Invalidation, Breaker/FVG/Fib Tap\n"
+            "• <b>Level 3 (3M CHoCH Shift):</b> 3M Change of Character Body Break\n"
+            "• <b>Level 4 (3M Micro Wave 2/4):</b> Pullback Retracement to 3M Breaker/FVG/Fib (Wave >= 5 Blocked)\n"
+            "• <b>Level 5 (2-Candle Reversal):</b> Rejection Wick >= 35%, Body Break & Close, SL 0.15% beyond Wick, Fixed 1:2.0R TP\n\n"
             "<b>සිංහල පරිවර්තනය (Sinhala):</b>\n"
-            "Falcon 24/7 Cloud Engine එක සාර්ථකව සක්‍රීය විය! සියලුම Falcon ආයතනික SMC නීති, Dual Entry Engine (Model 1 Fast-Track Sniper සහ Model 2 Conservative Retest), 80%+ Confluence එකඟතාව (BUY නම් BUY, SELL නම් SELL 100% එකඟතාව), Strict 15M+5M Macro Alignment, සහ සැබෑ Swing Liquidity මත පදනම් වූ 1:2 / 1:4 RR Targets සජීවීව ක්‍රියාත්මක වේ. තහවුරු වූ ආයතනික වෙළඳ සංඥා පමණක් ක්ෂණිකව Telegram වෙත නිකුත් කෙරේ."
+            "Falcon 24/7 Pure SMC Engine එක සාර්ථකව සක්‍රීය විය! පිරිසිදු 5M & 3M ද්විත්ව කාලරාමු අභිසාරී පද්ධතිය, 15M Macro Anchor, 5M Breaker/FVG/Fib Zone, 3M CHoCH Shift, සහ Wave 2/4 Retracement සමඟින් ඉටිපන්දම් 2 ක Reversal Entry (0.15% SL, 1:2.0R TP) සජීවීව ක්‍රියාත්මක වේ."
         )
         success = await TelegramService.send_message(msg)
         if success:
@@ -363,7 +362,7 @@ def get_watchlist_summary_html():
     </div>"""
 
 
-WATCHLIST_COLUMNS = ["Symbol (.P)", "15M Macro", "5M Confluence", "3M Wave / Level", "Active Status"]
+WATCHLIST_COLUMNS = ["Symbol (.P)", "15M Trend", "5M Zone (Breaker/FVG/Fib)", "3M Wave", "State Machine Status"]
 
 def get_watchlist_data():
     db = SessionLocal()
