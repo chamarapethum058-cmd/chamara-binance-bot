@@ -11,7 +11,10 @@
 ## 2. Antigravity Engine Master Specification Rules
 The following system instructions must be strictly followed when analyzing, validating, or executing trade setups:
 1. **ERL vs IRL tracking protocol**: Lock all analytical evaluations inside a strict External Range Liquidity (ERL) vs Internal Range Liquidity (IRL) tracking protocol.
-2. **Equilibrium Matrix Calculation**: Bypassed for SMC setups. Do not restrict Long signals in Premium or Short signals in Discount.
+2. **Equilibrium & Dealing Range Protocol**:
+   - **Buy (Long) Setups**: Strictly restricted to the **Discount Zone (<= 50% Equilibrium)** or verified Demand Base Reversals (Rule 74). Buying in the upper Premium Resistance zone while making Lower Highs is 100% STRICTLY FORBIDDEN (Anti-Ceiling Trap - Rules 12 & 56).
+   - **Sell (Short) Setups**: Strictly restricted to the **Premium Zone (>= 50% Equilibrium)** or verified Supply Base Reversals (Rule 74). Selling in the lower Discount Support zone while making Higher Lows is 100% STRICTLY FORBIDDEN (Anti-Floor Trap - Rules 12 & 56).
+   - **Sinhala Translation (සිංහල පරිවර්තනය)**: Buy Setups ලබා දිය යුත්තේ Discount Zone (Equilibrium එකෙන් පහළ) හෝ තහවුරු වූ Demand Base එකකින් පමණි. වෙළඳපල Range එකේ උඩම Premium Resistance කලාපය තුළ Lower Highs සාදන විට Buy කිරීම 100% ක්ම තහනම් වේ (Rules 12 & 56). Sell Setups ලබා දිය යුත්තේ Premium Zone (Equilibrium එකෙන් ඉහළ) හෝ Supply Base එකකින් පමණි.
 3. **Rigorous Verification Sequence**: Confirm HTF Daily Bias -> Map PDH/PDL and PWH/PWL magnets -> Validate a PDL/SSL Sweep strictly during London or New York AM Killzones (2AM-5AM / 7AM-10AM NY Time) -> Verify MSS/CISD shift on M15/M5 chart paired with unmitigated FVG/Order Block/Breaker/Mitigation/Rejection array before delivering an actionable entry.
 4. **UI checklist tree structure**: The system UI must display a clear structural tree detailing:
    - HTF Trend
@@ -113,20 +116,20 @@ The bot must strictly enforce the following high-impact news rules:
 > 3. **1M Timeframe:** Inducement (IDM) and its Sweep confirms final continuation.
 > 4. **Sinhala Translation (සිංහල පරිවර්තනය):** 1H Timeframe එකෙහි PDH/PDL මඟින් Key Levels සලකුණු කර Macro Market Direction (Bullish/Bearish) තීරණය කරන අතර, 15M හි CH/CHoCH සහ Sweep මඟින් Order Block එක සලකුණු කරයි. 1M හි Inducement Sweep මඟින් අඛණ්ඩතාව තහවුරු කරයි.
 
-## 16. Multi-Timeframe POI Reversal & 1m Confirmation Protocol (New Rule)
+## 16. Multi-Timeframe POI Reversal & 1m Markup/Markdown Precedence Protocol (Updated Master Rule)
 > [!IMPORTANT]
-> **1M TIMEFRAME STRUCTURE EXECUTION RULES:**
-> 1. **Step 1 (Bypass Macro Lockout):** The requirement that 1-Hour (1H) and 15-Minute (15M) trends must align is completely removed.
-> 2. **Step 2 (1m Structure Determination):** The setup execution direction (daily bias) is determined strictly by the active **1-minute (1m) timeframe structure**:
->    - **BUY Side:** If 1m trend is `BULLISH` -> Search for Buy Limit setups at the 1m OB/FVG.
->    - **SELL Side:** If 1m trend is `BEARISH` -> Search for Sell Limit setups at the 1m OB/FVG.
-> 3. **Step 3 (Micro Confirmation & Entry):** Within the 1m structure, search for recent Swing High/Low sweeps (liquidity sweeps), MSS/CHoCH, and FVG/OB confluences to execute the Limit Order entry.
->    - **Stop Loss:** Placed strictly above/below the 1m high/low swing extreme (incorporating the Rule 25 buffer).
->    - **Take Profit:** Target the next local 1m/15m swing extreme (within the dynamic 1:2 to 1:4 RR boundary).
-> 4. **Sinhala Translation (සිංහල පරිවර්තනය):** 1H සහ 15M ප්‍රවණතා ගැලපීමේ අවශ්‍යතාවය සම්පූර්ණයෙන්ම ඉවත් කර ඇත. වෙළඳාම් ඇතුළත් කිරීම් (Entries) සිදු කරනු ලබන්නේ සක්‍රීය **1-minute (1m) කාල රාමුවේ ව්‍යුහය (structure)** මත පදනම්වය:
->    - 1m trend එක `BULLISH` නම් -> Buy Limit setups ද,
->    - 1m trend එක `BEARISH` නම් -> Sell Limit setups ද,
->    - 1m චාර්ට් එකෙහි සිදුවන Choch, OB, FVG ආදිය පරීක්ෂා කර ඇතුල්වීම් සිදුකරයි.
+> **1M TIMEFRAME STRUCTURE & MARKUP/MARKDOWN PRECEDENCE RULES:**
+> 1. **1m Markup / Markdown Precedence Over HTF Bias:**
+>    - When the 1-minute (1m) chart demonstrates an active **Markup Phase** (consecutive Higher Lows breaking local swing highs off a Demand Base), the 1m Bullish trend takes 100% absolute precedence over any lagging 1H/15m Bearish bias. 
+>    - **Shorting / Sell Limits during an active 1m Higher Lows expansion is STRICTLY LOCKED OUT (`No Entry (Anti-Counter-Markup Lock)`).** The system MUST search ONLY for Buy Limit setups at the 1m Demand FVG.
+>    - Conversely, when the 1m chart demonstrates an active **Markdown Phase** (consecutive Lower Highs breaking local swing lows off a Supply Base), Buying during an active 1m Lower Highs dump is STRICTLY LOCKED OUT (`No Entry (Anti-Counter-Markdown Lock)`). The system MUST search ONLY for Sell Limit setups at the 1m Supply FVG.
+> 2. **Step 2 (Micro Confirmation & Limit Entry Placement):**
+>    - Within the active 1m structure, place limit orders strictly at the unmitigated 1m FVG / OB boundary with the **Rule 62 0.04% spread buffer**.
+>    - **Stop Loss:** Placed strictly outside the 1m swing extreme incorporating the **Rule 19/25/43 0.10% safe buffer**.
+>    - **Take Profit:** Target the next structural liquidity extreme within the dynamic 1:2.0 to 1:4.0 RR boundary (Rule 72).
+> 3. **Sinhala Translation (සිංහල පරිවර්තනය):**
+>    - 1-Minute Chart එකෙහි Demand Base එකකින් පසු එක දිගට Higher Lows සාදමින් මිල ඉහළ යන විට (Markup Phase), 1H හෝ 15M Bearish Bias එක කුමක් වුවත්, 1-Minute Bullish Trend එකට 100% ක පූර්ණ ප්‍රමුඛතාවය හිමිවේ. **එවැනි අවස්ථාවලදී SELL දීම 100% ක්ම තහනම් වන අතර (Hard-Blocked), 1m Demand FVG එකෙන් 'BUY LIMIT' පමණක් ලබා දිය යුතුය.**
+>    - මිල එක දිගට Lower Highs සාදමින් පහළට කඩා වැටෙන විට (Markdown Phase), BUY දීම 100% ක්ම තහනම් වන අතර, 1m Supply FVG එකෙන් 'SELL LIMIT' පමණක් ලබා දිය යුතුය.
 
 ## 17. Counter-Bias Invalidation Protocol before Mitigation (New Rule)
 > [!IMPORTANT]
@@ -176,12 +179,13 @@ The bot must strictly enforce the following high-impact news rules:
 > 2. If even a single TCS confirmation or parameter check fails, the setup must be immediately suppressed and locked out of execution (returning "No Entry"). No overrides are allowed.
 > 3. **Sinhala Translation (සිංහල පරිවර්තනය):** මෙම TCS රීතිවලින් පරිබාහිරව හෝ කිසිදු රීතියක් මඟහැර (bypass) කිසිදු අයුරකින් ඇතුළත් වීම් (entries) නිර්දේශ කිරීම හෝ සිදු කිරීම නොකළ යුතුය. එක් නීතියක් හෝ අසාර්ථක වුවහොත් එම setup එක වහාම අවලංගු කර lockout කළ යුතුය.
 
-## 23. Fibonacci Golden & OTE Zone Optimization Protocol (New Rule)
+## 23. High-Velocity Breakaway FVG & Closest Zone Execution Protocol (Updated & Merged)
 > [!IMPORTANT]
-> **FIBONACCI GOLDEN/OTE RETRACEMENT RULES:**
-> 1. **Strict Fibonacci Retracement Alignment:** The calculated entry price for any setup must fall strictly within the high-probability Fibonacci retracement Golden Zone or Optimal Trade Entry (OTE) zone (between 50.0% and 88.6% retracement of the active swing dealing range).
-> 2. **Automatic Pullback Price Optimization:** If the structural entry price (e.g. from FVG or Order Block) falls outside this 50.0% - 88.6% range (too shallow or too deep), the system must automatically adjust/optimize the recommended entry price to the 61.8% Golden Ratio retracement level of the dealing range to ensure optimal risk-to-reward.
-> 3. **Sinhala Translation (සිංහල පරිවර්තනය):** නිර්දේශිත ඇතුල්වීමේ (Entry) මිල සැමවිටම Fibonacci Golden Zone හෝ OTE කලාපය (50.0% - 88.6% retracement) අතර පිහිටිය යුතුය. එයින් පරිබාහිර වුවහොත්, පද්ධතිය ස්වයංක්‍රීයව ඇතුල්වීමේ මිල 61.8% මට්ටමට වෙනස් කරයි.
+> **CLOSEST BREAKAWAY FVG & HIGH-VELOCITY SCALPING RULES:**
+> 1. **1m/3m/5m Scalping Zone Prioritization:** For high-velocity 1-minute, 3-minute, and 5-minute scalping setups, the system must strictly prioritize the **Closest Unmitigated Fair Value Gap (FVG) or Order Block** located within 0.08% to 0.20% of current market price (incorporating the 0.04% Rule 62 proximity buffer). Deep 61.8%–78.6% Fibonacci retracements are strictly bypassed for fast scalping to prevent missed breakout momentum trades.
+> 2. **5-8 Minute Guaranteed Fast Fill:** Placing the entry at the closest breakaway FVG ensures orders are touched and filled within 5 to 8 minutes on shallow pullbacks, strictly catching momentum waves with 1:2, 1:3, and 1:4 RR targets.
+> 3. **HTF Dealing Range Retracements (15m/1H):** Deep 50.0%–78.6% Golden Zone retracements are strictly reserved for higher timeframes (15m / 1H macro swings) and slow market consolidation phases.
+> 4. **Sinhala Translation (සිංහල පරිවර්තනය):** 1-Minute / 3-Minute අධිවේගී Scalping වෙළඳාම් සඳහා, 61.8% ක ගැඹුරු Fibonacci මට්ටම් වලට මිල එනතුරු බලා නොසිට, වත්මන් මිලට ආසන්නයෙන්ම (0.08% - 0.20% දුරින්) හැදෙන **ආසන්නතම 1m FVG / Order Block සීමාවෙන් 0.04% Buffer එක සහිතව කෙළින්ම Entry එක ලබා දිය යුතුය**. එමඟින් විනාඩි 5-8 කදී Order එක fill වී Trade එක miss වීම 100% ක්ම වැළකේ. ගැඹුරු 61.8% Fibonacci මට්ටම් භාවිත කරන්නේ 15m සහ 1H Macro Swings සඳහා පමණි.
 
 ## 24. Volume Profile POC Retest Alignment Protocol (New Rule)
 > [!IMPORTANT]
@@ -442,4 +446,533 @@ The bot must strictly enforce the following high-impact news rules:
 > 1. **Prioritize Closest Zone:** When determining the structural limit entry price, the system must scan visible candles for unmitigated FVG or OB zones. If multiple zones exist, it must strictly prioritize the unmitigated zone (whether FVG or OB) that is closest to the current market price.
 > 2. **Mitigation Retest Level:** The entry price should be placed at the boundary of this closest unmitigated zone (the top edge for Buy setups, or bottom edge for Sell setups) rather than forcing entries at the deepest swing extremes, preventing missed trades.
 > 3. **Bilingual Requirement (සිංහල පරිවර්තනය):** ලිමිට් ඇණවුමක් තැබීමේදී, වත්මන් මිලට ආසන්නයෙන්ම පවතින unmitigated FVG හෝ OB සීමාව හඳුනාගෙන, ඇතුල්වීමේ මිල (Entry price) සැමවිටම එම ආසන්නතම සීමාවෙහි සැකසිය යුතුය. වෙළඳපල හැරී යාමකදී (pullback) සාමාන්‍යයෙන් ආසන්නතම Fair Value Gap (FVG) එක ස්පර්ශ කරන බැවින්, දුරින් ඇති මට්ටම් වෙනුවට ළඟම ඇති කලාපයට ප්‍රමුඛතාවය දිය යුතුය.
+
+## 53. Strict Anti-Counter-BOS Trend Lock Protocol (New Rule)
+> [!IMPORTANT]
+> **ANTI-COUNTER-BOS TREND LOCK RULES:**
+> 1. **No Trading Against Active BOS:** If the active timeframe structure shows a confirmed Bullish Break of Structure (BOS) sequence or Bullish CHoCH (Higher Highs and Higher Lows), all Sell / Short setups are 100% strictly forbidden and locked out (`is_valid = false`, returning `No Entry (Anti-Counter-BOS Lock)`).
+> 2. **Bearish BOS Restriction:** If the active structure shows a confirmed Bearish Break of Structure (BOS) sequence or Bearish CHoCH (Lower Lows and Lower Highs), all Buy / Long setups are 100% strictly forbidden and locked out (`is_valid = false`, returning `No Entry (Anti-Counter-BOS Lock)`).
+> 3. **Bilingual Requirement (සිංහල පරිවර්තනය):** සක්‍රීය චාර්ට් එකෙහි Break of Structure (BOS) ප්‍රවණතාවයට පටහැනිව කිසිදු Trade එකක් නිර්දේශ කිරීම සම්පූර්ණයෙන්ම තහනම් වේ. චාර්ට් එකෙහි Bullish BOS (ඉහළට කැඩීම්) සලකුණු වන්නේ නම් Sell setups ද, Bearish BOS (පහළට කැඩීම්) සලකුණු වන්නේ නම් Buy setups ද ස්වයංක්‍රීයව අවහිර කර `No Entry (Anti-Counter-BOS Lock)` ලෙස සටහන් කළ යුතුය.
+
+## 54. Unswept Liquidity Magnet & EQH/EQL Proximity Filter Protocol (New Rule)
+> [!IMPORTANT]
+> **UNSWEPT LIQUIDITY MAGNET & EQH/EQL FILTER RULES:**
+> 1. **Draw on Liquidity (DOL) Magnet Protection:** The system must scan for unswept Equal Highs (EQH) or Buy-Side Liquidity pools located within 0.1% to 0.6% directly above current price. If unswept Equal Highs exist above, Short / Sell entries are strictly prohibited because the algorithm will naturally pull price upwards to sweep those highs first.
+> 2. **Equal Lows (EQL) Magnet Protection:** The system must scan for unswept Equal Lows (EQL) or Sell-Side Liquidity pools located within 0.1% to 0.6% directly below current price. If unswept Equal Lows exist below, Long / Buy entries are strictly prohibited because the market will naturally sweep those lows first.
+> 3. **Reversal Timing:** Reversal trade setups are ONLY permissible AFTER the respective liquidity pool (EQH or EQL) has been cleanly swept by a manipulation wick.
+> 4. **Bilingual Requirement (සිංහල පරිවර්තනය):** වත්මන් මිලට 0.1% - 0.6% අතර ආසන්නයෙන් ඉහළින් නොකැඩුණු Equal Highs (EQH) හෝ පහළින් Equal Lows (EQL) පවතී නම්, වෙළඳපල චුම්භකයක් මෙන් එම මට්ටම් Sweep කිරීමට ඇදී යන බැවින්, ඊට විරුද්ධව Trades ගැනීම තහනම් වේ. Reversal එකක් ගත යුත්තේ එම Highs/Lows සීමාවන් සම්පූර්ණයෙන්ම Sweep වීමෙන් පසුව පමණි.
+
+## 55. Institutional Inducement (IDM) Retest & Order Flow Confluence Protocol (New Rule)
+> [!IMPORTANT]
+> **INSTITUTIONAL INDUCEMENT (IDM) RETEST RULES (MENTORFX GUIDES):**
+> 1. **Inducement Trap Recognition:** In an active Bullish trend, minor red pullback candles are classified as Inducement (IDM) traps created by market makers to bait retail sellers. The system must NEVER trigger a Sell setup on an uptrend pullback.
+> 2. **Mitigation Retest Execution:** The system must wait for the Inducement low to be swept, and advise a **Buy Limit (Long)** entry when price mitigates the underlying Demand Order Block / Fair Value Gap (FVG), targeting the unswept external swing high.
+> 3. **Bearish Inducement Mirror:** In an active Bearish trend, minor green pullback candles are classified as Inducement traps. The system must wait for the Inducement high to be swept and advise a **Sell Limit (Short)** entry at the Supply Order Block / FVG, targeting the external swing low.
+> 4. **Bilingual Requirement (සිංහල පරිවර්තනය):** ඔබගේ SMC MentorFX PDF මාර්ගෝපදේශ 2 හි සඳහන් පරිදි, Uptrend එකකදී පහළට එන කුඩා Pullback යනු විකුණුම්කරුවන් කොටු කරගන්නා Inducement (IDM) උගුල් වේ. එවැනි අවස්ථාවලදී කිසිවිටෙක Sell නොකර, එම Inducement එක Sweep වී පහළ ඇති Demand Order Block / FVG එක ස්පර්ශ වූ පසු සුපිරි **Buy Limit (Long)** එන්ට්‍රියක් ලබා ගත යුතුය. Downtrend එකකදී ඊට ප්‍රතිවිරුද්ධව ක්‍රියා කළ යුතුය.
+
+## 56. Equal Extremes (EQH / EQL) Liquidity Target Protocol (New Rule)
+> [!IMPORTANT]
+> **EQUAL EXTREMES LIQUIDITY TARGET RULES:**
+> 1. **Equal Highs as Targets Only:** When Equal Highs (EQH - 2 or more wicks at the same horizontal price level) are detected, they must strictly be used as the **Take Profit Target for Buy / Long setups**. Entering Short / Sell setups at Equal Highs is 100% strictly forbidden because institutional market makers intentionally hunt and sweep Equal Highs.
+> 2. **Equal Lows as Targets Only:** When Equal Lows (EQL - 2 or more wicks at the same horizontal price level) are detected, they must strictly be used as the **Take Profit Target for Sell / Short setups**. Entering Long / Buy setups at Equal Lows is 100% strictly forbidden.
+> 3. **Bilingual Requirement (සිංහල පරිවර්තනය):** චාර්ට් එකෙහි එකම මට්ටමේ Wicks කිහිපයක් සහිත Equal Highs (EQH) හෝ Equal Lows (EQL) පවතින විට, ඒවා සැමවිටම භාවිතා කළ යුත්තේ **Take Profit ඉලක්කයන් (TP Targets)** ලෙස පමණි. Equal Highs අසලදී කිසිවිටෙක Sell නොකළ යුතු අතර, Equal Lows අසලදී කිසිවිටෙක Buy නොකළ යුතුය.
+
+## 57. Post-Sweep V-Shape Expansion & Directional Lock Protocol (New Rule)
+> [!IMPORTANT]
+> **POST-SWEEP V-SHAPE EXPANSION RULES:**
+> 1. **Directional Expansion Lock:** When price sweeps a major session extreme (session low/high) and forms an aggressive V-shaped displacement candle with a confirmed CHoCH, the market is in an **Institutional Expansion Leg**.
+> 2. **Anti-Reversal Lockout:** During this post-sweep expansion phase, all counter-trend setups in the opposing direction are strictly locked out (`is_valid = false`, returning `No Entry (Post-Sweep Expansion Lock)`).
+> 3. **Expansion Trend Following:** The system must strictly wait for a pullback to the nearest unmitigated Order Block / FVG and advise entries strictly aligned with the expansion direction (Buying dips after low sweep, Selling rallies after high sweep).
+> 4. **Bilingual Requirement (සිංහල පරිවර්තනය):** මිල ප්‍රධාන Session Lows (පහළ සීමාවන්) Sweep කර Bullish CHoCH එකක් දුන් පසු, වෙළඳපල ක්ෂණිකව ඉහළට Expansion (Pump) වන බැවින්, Sell Trade ගැනීම සම්පූර්ණයෙන්ම තහනම් වේ. එවිට කළ යුත්තේ පහළට එන Pullback එකකදී Demand Order Block එකෙන් **Buy Limit** එකක් ගෙන ඉහළට යන expansion එකෙන් ලාභ ගැනීමයි.
+
+## 58. Higher Low (HL) / Lower High (LH) Structural Validation & Strict 1:2, 1:3, 1:4 RR Allocation Protocol (New Rule)
+> [!IMPORTANT]
+> **HL/LH VALIDATION & STRICT 1:2, 1:3, 1:4 RR RULES:**
+> 1. **Higher Low Uptrend Confirmation:** In a Bullish trend, pullbacks that hold above the previous swing low are validated as **Higher Lows (HL)**. Entries must be placed at the Demand Order Block / FVG with the Stop Loss placed safely 0.1% below that Higher Low.
+> 2. **Lower High Downtrend Confirmation:** In a Bearish trend, pullbacks that hold below the previous swing high are validated as **Lower Highs (LH)**. Entries must be placed at the Supply Order Block / FVG with the Stop Loss placed safely 0.1% above that Lower High.
+> 3. **Strict 1:2, 1:3, 1:4 Take Profit Ratio Allocation:** All setups must strictly allocate dynamic Take Profit targets according to the institutional 3-tier boundary:
+>    - **TP1 (Conservative / Partial Take Profit):** Exactly **1:2.0 Risk-to-Reward (RR)**.
+>    - **TP2 (Primary Target / Structural Target):** Exactly **1:3.0 Risk-to-Reward (RR)**.
+>    - **TP3 (Extended Runner / Liquidity Sweep):** Exactly **1:4.0 Risk-to-Reward (RR)**.
+>    - Targets beyond 1:4.0 RR (such as 1:5.0) are strictly prohibited for 10–15 minute high-velocity scalping.
+>    - **TP Target Lock (Strict):** Under no circumstances should the system calculate or output TP targets of 1:5.0+ RR. Every valid setup must strictly output TP1 at 1:2.0 RR, TP2 at 1:3.0 RR, and TP3 at 1:4.0 RR.
+> 4. **Bilingual Requirement (සිංහල පරිවර්තනය):** Uptrend එකකදී පෙර Low එකට වඩා ඉහළින් හැදෙන Higher Lows (HL) මඟින්ද, Downtrend එකකදී පෙර High එකට වඩා පහළින් හැදෙන Lower Highs (LH) මඟින්ද සුපිරි තහවුරු කිරීමක් ලබා දෙයි. Take Profit ඉලක්ක දැඩිව **1:2.0 (TP1), 1:3.0 (TP2), සහ 1:4.0 (TP3)** ලෙස පමණක් ගණනය කළ යුතු අතර, විනාඩි 10-15 Scalping සඳහා 1:5 හෝ ඊට වැඩි ඈත ඉලක්ක තැබීම තහනම් වේ.
+
+## 59. Active Demand / Supply Order Block Proximity Lock Protocol (New Rule)
+> [!IMPORTANT]
+> **DEMAND / SUPPLY PROXIMITY LOCK RULES:**
+> 1. **Demand Zone Anti-Sell Lock:** If price has mitigated or bounced off an unmitigated **Demand Order Block (Blue Zone)** within the last 20 candles, all Sell / Short setups are 100% strictly forbidden and locked out (`is_valid = false`, returning `No Entry (Demand Zone Active - Buy Only)`).
+> 2. **Supply Zone Anti-Buy Lock:** If price has mitigated or bounced off an unmitigated **Supply Order Block (Red Zone)** within the last 20 candles, all Buy / Long setups are 100% strictly forbidden and locked out (`is_valid = false`, returning `No Entry (Supply Zone Active - Sell Only)`).
+> 3. **Bilingual Requirement (සිංහල පරිවර්තනය):** මිල මෑතකදී නිල් පැහැති Demand Order Block එකක වැදී (bounce වී) ඉහළට ගමන් කරන්නේ නම්, Sell Trade ගැනීම 100% ක් තහනම් වේ (`No Entry (Demand Zone Active - Buy Only)`). මිල රතු පැහැති Supply Order Block එකක වැදී පහළට ගමන් කරන්නේ නම්, Buy Trade ගැනීම 100% ක් තහනම් වේ.
+
+## 60. Consecutive Higher Lows (HL) / Lower Highs (LH) Trend Lockout Protocol (New Rule)
+> [!IMPORTANT]
+> **CONSECUTIVE HL/LH TREND LOCKOUT RULES:**
+> 1. **3-Consecutive Higher Lows Lock:** If 3 or more consecutive Higher Lows are detected in the active timeframe lookback (e.g. Low 1 < Low 2 < Low 3), the market is in an undeniable **Institutional Markup Phase**. All Sell setups must be auto-suppressed and locked out (`is_valid = false`, returning `No Entry (Consecutive Higher Lows - Buy Only)`).
+> 2. **3-Consecutive Lower Highs Lock:** If 3 or more consecutive Lower Highs are detected in the lookback (e.g. High 1 > High 2 > High 3), the market is in an undeniable **Institutional Markdown Phase**. All Buy setups must be auto-suppressed and locked out (`is_valid = false`, returning `No Entry (Consecutive Lower Highs - Sell Only)`).
+> 3. **Bilingual Requirement (සිංහල පරිවර්තනය):** චාර්ට් එකෙහි එක දිගට Higher Lows 3ක් හෝ ඊට වැඩි ගණනක් පඩිපෙළක් මෙන් ඉහළට සෑදෙන්නේ නම්, මාකට් එකේ Top එක අල්ලන්න ගොස් Sell කිරීම සම්පූර්ණයෙන්ම තහනම් වේ. එවිට ලබා දෙන්නේ Buy Trade පමණි.
+
+## 61. Pre-Expansion Base Compression Breakout Protocol (New Rule)
+> [!IMPORTANT]
+> **PRE-EXPANSION BASE COMPRESSION RULES:**
+> 1. **Accumulation Base Recognition:** When price moves sideways in a tight range for 15+ candles directly sitting above a Demand Zone or below a Supply Zone, the algorithm classifies this as **Pre-Expansion Base Compression (PO3 Accumulation)**.
+> 2. **Base Limit Execution:** The system must place the Limit Order directly at the base support (for Buys) or base resistance (for Sells) with Stop Loss placed safely 0.1% beyond the base extreme, capturing the explosive 1:2, 1:3, and 1:4 RR expansion wave.
+> 3. **Bilingual Requirement (සිංහල පරිවර්තනය):** Demand Zone එකක් උඩ මිල කැන්ඩල් 15කට වඩා එකම සීමාවක පැත්තට ගමන් කරන්නේ නම් (Consolidation), එය දැවැන්ත පිපිරීමකට (Explosion) පෙර සිදුවන Accumulation එකක් බැවින්, ඊට විරුද්ධව Sell නොකර එහි Support මට්ටමෙන් සුපිරි **Buy Limit** එකක් ලබා දෙයි.
+
+## 62. Institutional Sniper Entry & Mitigation Front-Run Buffer Protocol (New Rule)
+> [!IMPORTANT]
+> **SNIPER ENTRY & MITIGATION FRONT-RUN BUFFER RULES:**
+> 1. **Zone Outer Edge Alignment:** The calculated Limit Entry price must strictly target the outer mitigation boundary or the 50% Consequent Encroachment (Mean Threshold) of the key Fair Value Gap (FVG) or Order Block (OB).
+> 2. **0.04% Proximity Spread Buffer (Guaranteed Touch):** To guarantee that the price physically touches and fills the pending Limit Order before reversing away (eliminating the issue of missing entries by a fraction of a pip due to front-running and spread), the recommended Limit Entry price must incorporate a **0.04% proximity spread buffer**:
+>    - **Buy Limit Entry:** Placed at `target_boundary * 1.0004` (shifted 0.04% closer to current price).
+>    - **Sell Limit Entry:** Placed at `target_boundary * 0.9996` (shifted 0.04% closer to current price).
+> 3. **Bilingual Requirement (සිංහල පරිවර්තනය):** Limit Order එකක් දමන විට, මිල හරියටම එම Entry Point එක touch කර (ස්පර්ශ කර) ආපසු හැරී යන බව සහතික කිරීම සඳහා, 0.04% ක Proximity Spread Buffer එකක් ඇතුළත් කළ යුතුය (Buy Limit එක 0.04% ක් ඉහළටද, Sell Limit එක 0.04% ක් පහළටද තබා Entry එක miss වීම 100% ක්ම වළක්වයි).
+
+## 63. LuxAlgo Strong Low / Weak High Directional Lock Protocol (New Rule)
+> [!IMPORTANT]
+> **STRONG LOW / WEAK HIGH DIRECTIONAL LOCK RULES:**
+> 1. **Strong Low Directional Lock:** When LuxAlgo prints or confirms a **`Strong Low`** in the active timeframe lookback, the market bias is **HARD-LOCKED TO BUY (LONG) ONLY**. All Sell / Short setups are 100% strictly forbidden and locked out (`is_valid = false`, returning `No Entry (Strong Low Active - Buy Only)`).
+> 2. **Weak High as Take Profit Target Only:** In an active Uptrend, a **`weak High`** is an institutional liquidity magnet designed to be swept and broken. The system must STRICTLY use the Weak High as the **Take Profit target for Buy setups**, and is 100% strictly prohibited from using the Weak High as an area to enter a Short or place a Stop Loss.
+> 3. **Strong High Directional Lock:** When LuxAlgo confirms a **`Strong High`**, the market bias is **HARD-LOCKED TO SELL (SHORT) ONLY**. All Buy setups are 100% strictly forbidden and locked out. The Take Profit must target the **`Weak Low`**.
+> 4. **Bilingual Requirement (සිංහල පරිවර්තනය):** LuxAlgo Indicator එකෙහි **`Strong Low`** එකක් සලකුණු වී ඇති විට, මාකට් එක උඩට යන බව ආයතනිකව තහවුරු වී ඇති බැවින්, Sell Trade ගැනීම 100% ක් තහනම් වේ. එවිට **`weak High`** (දුර්වල High) එක භාවිතා කළ යුත්තේ **Buy Trade එකක Take Profit Target එකක් ලෙස පමණි**. කිසිවිටෙක Weak High එකක් මත Stop Loss තබා Sell නොකළ යුතුය.
+
+## 64. Active Demand Zone Anti-Short Hard-Lock (New Rule)
+> [!IMPORTANT]
+> **DEMAND ZONE ANTI-SHORT HARD-LOCK RULES:**
+> 1. **Blue Demand Box Defense:** If price has touched, wicked into, or bounced off an active **Demand Zone (Blue Box)** within the last 30 candles, **SHORTING IS 100% FORBIDDEN IN THE SYSTEM**.
+> 2. **Buy-From-Demand Exclusivity:** When price is at or near Demand, the system exclusively calculates **Buy Limit (Long)** entries at the Demand boundary, placing Stop Loss safely below the Strong Low.
+> 3. **Bilingual Requirement (සිංහල පරිවර්තනය):** මිල නිල් පැහැති Demand Zone එකක් උඩ තිබෙන විට හෝ එහි වැදී bounce වී ඇති විට, ආයතනික ගැනුම්කරුවන් වෙළඳපල මිලදී ගන්නා බැවින්, **Sell Trade ලබා දීම පද්ධතියෙන් 100% ක්ම Hard-Lock කර තහනම් කර ඇත**. එවිට ලැබෙන්නේ Demand එකෙන් ඉහළට යන Buy Limit පමණි.
+
+## 65. Absolute Ban on "Picking the Top" (Anti-Counter-Expansion Protocol) (New Rule)
+> [!IMPORTANT]
+> **ABSOLUTE BAN ON PICKING TOPS RULES:**
+> 1. **No Counter-Trend Predictions:** The AI and backend engine are **STRICTLY PROHIBITED from predicting a market top or shorting an active Bullish BOS sequence**.
+> 2. **Mandatory Bearish CHoCH Requirement:** A Bearish Reversal setup is ONLY permissible IF AND ONLY IF price sweeps the external high, breaks and closes below the last Higher Low with a confirmed **Bearish CHoCH displacement candle body**, AND prints a fresh **Supply Zone (Red Box)**. Without this verified structural shift, Shorting is 100% blocked.
+> 3. **Bilingual Requirement (සිංහල පරිවර්තනය):** මාකට් එක එක දිගට උඩට යද්දී 'Top එක අල්ලන්න' සිතා Sell දැමීම පද්ධතියෙන් සම්පූර්ණයෙන්ම තහනම් කර ඇත. Reversal Sell Trade එකක් ලබා දිය හැක්කේ, මිල ඉහළට ගොස් පෙර Higher Low එක කඩාගෙන පහළට ගොස් **Bearish CHoCH එකක් සහ රතු Supply Zone එකක් නිර්මාණය කළහොත් පමණි**.
+
+## 67. Master Major/Minor Structure, BPR (Balanced Price Range) & HTF-to-LTF 5-Step Execution Protocol (New Rule)
+> [!IMPORTANT]
+> **MASTER MAJOR/MINOR STRUCTURE, BPR & 5-STEP EXECUTION RULES:**
+> 1. **Major vs. Minor Structure Identification:**
+>    - **Major Structure:** Represents the primary macro highway (Higher Highs & Higher Lows for Uptrend; Lower Highs & Lower Lows for Downtrend).
+>    - **Minor Structure:** Internal corrective waves/pullbacks within the major trend leg.
+>    - **Avoid Minor Trap:** Never mistake a Minor CHoCH for a full trend reversal. A valid macro reversal strictly requires breaking the **Major Swing Low/High with a Thick Candle Body Close**.
+> 2. **BPR (Balanced Price Range) & High-Accuracy V/A Formations:**
+>    - **Definition:** Formed when an FVG created in one direction is immediately overlapped and covered by an opposite FVG in the reverse direction.
+>    - **High Probability Shapes:** Bullish BPR formed in an aggressive **'V' Shape** and Bearish BPR formed in an **'A' Shape** possess the highest statistical accuracy. The system prioritizes entries mitigating these BPR zones.
+> 3. **5-Step HTF-to-LTF Alignment Execution Model (1H paired with 5m/1m):**
+>    - **Step 1 (HTF Structure):** Identify 1-Hour (1H) Market Structure (Bullish or Bearish).
+>    - **Step 2 (HTF Zone):** Mark the active 1-Hour Fair Value Gap (HTF FVG) or Key POI.
+>    - **Step 3 (Zone Tap & Timeframe Shift):** When price reaches and mitigates the 1H FVG, switch to the Lower Timeframe (5-Minute or 1-Minute).
+>    - **Step 4 (LTF CHoCH Confirmation):** Wait for a confirmed **LTF CHoCH (Change of Character)** where the last Higher Low / Lower High is broken by a **Thick Candle Body Close** (not a mere wick).
+>    - **Step 5 (Sniper Limit Entry):** Take the Limit Entry directly at the newly formed **LTF FVG / BPR boundary** (with Rule 62 0.04% proximity buffer).
+> 4. **Execution Parameters:**
+>    - **Stop Loss:** Placed safely beyond the entry swing extreme with the 0.10% safety buffer.
+>    - **Take Profit:** Target the nearest local Major High/Low or dynamic **1:2.0 (TP1), 1:3.0 (TP2), and 1:4.0 (TP3) RR** ratios.
+> 5. **Bilingual Requirement (සිංහල පරිවර්තනය):**
+>    - **1. Major සහ Minor Structure:** Major Structure යනු ප්‍රධාන ගමන් මාර්ගයයි (HH/HL හෝ LH/LL). Minor Structure යනු ඒ තුළ සිදුවන කුඩා තරංග (Waves/Pullbacks) වේ. Minor CHoCH එකක් දැක සම්පූර්ණ Trend එක හැරුණා යැයි නොසිතිය යුතුය. සැබෑ Reversal එකකට Major Low/High එක Thick Body Candle එකකින් බිඳිය යුතුය.
+>    - **2. BPR (Balanced Price Range):** එක් පැත්තකට හැදුණු FVG එකක් ඊට විරුද්ධ පැත්තට හැදෙන FVG එකකින් ආවරණය වීම BPR එකකි. 'V' Shape හෝ 'A' Shape BPR වල නිරවද්‍යතාවය (Accuracy) උපරිම වේ.
+>    - **3. පියවර 5ක Entry ක්‍රියාවලිය (1H සමඟ 5m/1m):**
+>      * පියවර 1: 1-Hour Chart එකෙන් ප්‍රධාන Market Structure (Bullish/Bearish) හඳුනාගන්න.
+>      * පියවර 2: 1-Hour FVG / Key Zone එක Mark කරගන්න.
+>      * පියවර 3: මිල 1H FVG එකට පැමිණි පසු 5-Minute / 1-Minute චාර්ට් එකට මාරු වන්න.
+>      * පියවර 4: කුඩා Timeframe එකේ අවසන් Low/High එක Thick Candle Body එකකින් කඩාගෙන යන **CHoCH එකක්** හැදෙන තුරු සිටින්න.
+>      * පියවර 5: CHoCH එකෙන් පසු හැදෙන **LTF FVG / BPR එකෙන් 0.04% Buffer එක සහිතව Limit Entry එක ලබා ගන්න**.
+>      * Stop Loss: Swing Extreme එකට එපිටින් 0.1% buffer එක සහිතව.
+>      * Target: ළඟම Major High/Low හෝ 1:2, 1:3, 1:4 RR ඉලක්ක.
+
+## 68. Stale Setup Auto-Expiry (15m Max Limit) & Macro Crash Lockout Protocol (New Rule)
+> [!IMPORTANT]
+> **STALE SETUP EXPIRY & MACRO CRASH LOCKOUT RULES:**
+> 1. **15-Minute Strict Setup Expiration:** All 1-minute scalping trade setups are strictly valid for a maximum window of **15 minutes** from generation time. If the pending limit order is not touched and filled within 15 minutes, the setup is deemed **STALE & EXPIRED**. The trader must immediately cancel the pending limit order on Binance to avoid entering an expired setup under altered market conditions.
+> 2. **Macro Crash Anti-Long Hard-Lock:** If the Higher Timeframe (15m / 1H) is in an active crash / downtrend sequence (making consecutive Lower Highs and Lower Lows), all Buy (Long) scalp setups are **100% HARD-BLOCKED**, even if minor 1m green rejection wicks appear. The system exclusively issues **Sell (Short) Limit orders** at the Lower High Breakaway FVGs until an institutional 1H Demand zone with Thick Body Bullish CHoCH is verified.
+> 3. **Bilingual Requirement (සිංහල පරිවර්තනය):**
+>    - **1. විනාඩි 15න් Setup එක කල් ඉකුත් වීම (Auto-Expiry):** දෙන සෑම 1-Minute Scalp Setup එකක්ම වලංගු වන්නේ විනාඩි 15ක උපරිම කාලයකට පමණි. විනාඩි 15ක් ඇතුළත Order එක Fill නොවුණහොත්, එම Trade එක කල් ඉකුත් වූ (Stale) එකක් බැවින් වහාම Binance එකෙන් Cancel කළ යුතුය. පැයකට පසු පැරණි Setup වලට Trade දැමීමෙන් වළකින්න.
+>    - **2. Downtrend Crash වලදී Buy සම්පූර්ණයෙන්ම තහනම් කිරීම:** 15m හෝ 1H Chart එක එක දිගට පහළට කඩා වැටෙන විට (Downtrend), කුඩා 1-Minute කොළ ඉටිපන්දම් වලට Buy ගැනීම 100% ක් තහනම් කර ඇත. එවැනි අවස්ථාවලදී පද්ධතිය ලබා දෙන්නේ **පහළට බහින Trend එක දිගේ යන Sell (Short) Limit පමණි**.
+
+## 69. Bidirectional Macro Trend Lockout & 5-15 Minute Fast Fill Execution Protocol (New Rule)
+> [!IMPORTANT]
+> **BIDIRECTIONAL TREND LOCKOUT & 5-15 MINUTE FAST FILL RULES:**
+> 1. **Bidirectional Trend Anti-Counter Lock:**
+>    - **In Macro Uptrend (15m/1H making Higher Highs / Higher Lows):** All Sell (Short) setups are **100% HARD-BLOCKED**. The system exclusively calculates **Buy Limit (Long)** entries off Demand / Higher Low FVGs.
+>    - **In Macro Downtrend (15m/1H making Lower Highs / Lower Lows):** All Buy (Long) setups are **100% HARD-BLOCKED**. The system exclusively calculates **Sell Limit (Short)** entries off Supply / Lower High FVGs.
+> 2. **Guaranteed 5 to 15-Minute Fast Entry Fill:**
+>    - The calculated Limit Entry price must strictly target the **Closest Unmitigated 1m Breakaway FVG / Order Block boundary** located within **0.08% to 0.20%** of current market price (incorporating the 0.04% Rule 62 buffer).
+>    - This guarantees that orders are physically touched and filled within **5 to 8 minutes (max 10-15 minutes)**, completely eliminating long multi-hour waiting periods.
+> 3. **Ultra-Tight Stop Loss & Strict RR Targets:**
+## 70. The Falcon Golden Sniper Model (The Perfect Ethereum Master Blueprint) (New Rule)
+> [!IMPORTANT]
+> **THE GOLDEN SNIPER ENTRY BLUEPRINT (THE ETHEREUM 10:23 MASTER PATTERN):**
+> 1. **The 4-Step Golden Sequence:**
+>    - **Step 1 (Base Defense):** Price taps a verified **Blue Demand Box** and establishes an institutional **Strong Low**.
+>    - **Step 2 (Displacement Shift):** A strong green expansion candle prints a **Bullish CHoCH** breaking the last Lower High with a **Thick Candle Body Close**.
+>    - **Step 3 (Breakaway FVG Entry):** The Limit Entry is calculated at the top boundary of the newly formed **1-Minute Breakaway FVG** with the **0.04% Rule 62 proximity buffer** (guaranteeing fill within 5-15 mins).
+>    - **Step 4 (Stop Loss & Target Alignment):** Stop Loss is placed strictly **0.10% below the Blue Demand Box / Strong Low** (`min(low, demand_box) * 0.9990`), and Take Profit is placed directly at the **Weak High** / local Equal Highs (delivering strict 1:2.0, 1:3.0, 1:4.0 RR with zero drawdown).
+> 2. **Bearish Mirror Model:**
+>    - Price taps a Red Supply Box establishing a **Strong High** -> Thick Body Bearish CHoCH -> Sell Limit at 1m Breakaway FVG (with 0.04% buffer) -> SL 0.10% above Supply Box -> TP at the **Weak Low** (1:3.0 RR).
+> 3. **Bilingual Requirement (සිංහල පරිවර්තනය):**
+>    - **පරිපූර්ණ රන් ආදර්ශය (The Golden Sniper Template):** මෙම Ethereum (ETH) Chart එකෙහි සිදුවූ ආකාරයට:
+>      1. මිල නිල් පැහැති Demand Zone එකේ වැදී **Strong Low** එක තහවුරු කරයි.
+>      2. Thick Candle Body එකකින් **Bullish CHoCH** එකක් සාදයි.
+>      3. CHoCH එකෙන් පසු හැදෙන **1m Breakaway FVG එකෙන් 0.04% Buffer එක සහිතව Limit Entry එක ලබා දෙයි** (විනාඩි 5-15 න් Fill වේ).
+>      4. Stop Loss එක Demand Box එකට එපිටින් **0.10% Buffer එක සහිතව තබන අතර, Take Profit එක කෙළින්ම Weak High එක ඉලක්ක කරයි**.
+>      5. මෙම ආකෘතිය (Model) පද්ධතියේ ප්‍රමුඛතම ස්ථිර Entry Blueprint එක ලෙස සදාකාලිකව ක්‍රියාත්මක වේ!
+
+## 71. Selected Execution Timeframe Precision Anchor Protocol (New Rule)
+> [!IMPORTANT]
+> **SELECTED EXECUTION TIMEFRAME ANCHOR RULES:**
+> 1. **Timeframe Selection as the Final Anchor:**
+>    - Whichever timeframe is selected in the **"EXECUTION TIMEFRAME"** dropdown (e.g., `1m`, `3m`, `5m`, `15m`), that timeframe serves as the **Exclusive Final Entry Execution Anchor**.
+>    - Even if Higher Timeframes (1H / 15m / 5m) are referenced for Macro Bias and Key POIs, the final **Liquidity Sweep, Displacement CHoCH, Breakaway FVG / BPR, Limit Entry price, Stop Loss, and Take Profit MUST BE CAUGHT AND EXECUTED STRICTLY ON THE CANDLES OF THE SELECTED TIMEFRAME** (e.g., 1-Minute candles when `1m (Scalp Entry)` is selected).
+> 2. **No Timeframe Mixing in Final Entry:**
+>    - When `1m (Scalp Entry)` is selected, the engine must NEVER wait for a 15m candle close or 5m FVG to enter; it must immediately trigger off the active **1-minute Breakaway FVG** with the 0.04% buffer for ultra-fast 5-15 minute execution.
+>    - When `15m (Primary Structure)` is selected, the entry is anchored strictly to the 15-minute FVG/OB.
+> 3. **Bilingual Requirement (සිංහල පරිවර්තනය):**
+>    - **තෝරාගත් Timeframe එක මත පමණක් Entry එක ගැනීම:** ඔබ Dropdown එකෙන් තෝරන Timeframe එක කුමක්ද (උදා: `1m (Scalp Entry)` නම්):
+>      - 1H සහ 15m මඟින් Macro Bias එක සහ Key POIs බැලුවද, **අවසාන Trade Entry එක, CHoCH එක, Breakaway FVG එක, Stop Loss එක සහ Take Profit එක ගණනය කර catch කරගත යුත්තේ ඔබ තේරූ 1-Minute Timeframe එකේ Candles වලින් පමණි!**
+>      - 1-Minute තෝරා ඇති විට 5m හෝ 15m Candle Closes එනතුරු බලා නොසිට, **1-Minute Chart එකේ හැදෙන ආසන්නතම 1m FVG එකෙන්ම 0.04% Buffer එක සහිතව Entry එක ලබා දිය යුතුය**.
+
+## 72. Structural Confirmation Target & Minimum 1:2.0 RR Hard-Filter Protocol (New Rule)
+> [!IMPORTANT]
+> **DYNAMIC STRUCTURAL CONFIRMATION TARGET & 1:2.0 MINIMUM RR RULES:**
+> 1. **No Blind/Fixed 1:4.0 RR Forcing:**
+>    - The system must never force a rigid, arbitrary 1:4.0 RR target onto a market structure if the natural liquidity or opposing Point of Interest (POI) terminates earlier.
+>    - The Take Profit must be dynamically set **strictly at the confirmed structural terminus** (the Weak High / Equal Highs / Supply Zone for Buys; the Weak Low / Equal Lows / Demand Zone for Sells).
+> 2. **Minimum 1:2.0 RR Hard Lockout Filter:**
+>    - Before approving any trade setup, the engine must measure the exact distance between the Entry Price and the confirmed Structural Target against the Stop Loss risk:
+>      - **If Confirmed Reward / Risk < 1:2.0:** The setup is **100% HARD-BLOCKED and LOCKED OUT** (`is_valid = false`, `No Entry (Confirmed RR < 1:2.0)`). It is strictly forbidden to enter low-reward trades with insufficient runway.
+>      - **If Confirmed Reward / Risk >= 1:2.0:** The trade is approved, and the primary Take Profit target is set **EXACTLY at that confirmed structural level** (e.g. 1:2.20 RR, 1:2.80 RR, 1:3.40 RR).
+> 3. **Bilingual Requirement (සිංහල පරිවර්තනය):**
+>    - **තහවුරු වූ Structural Target එක සහ අවම 1:2.0 RR නීතිය:**
+>      - කිසිවිටෙක අන්ධ ලෙස 1:4.0 RR බලෙන් නොතබා, **මිල ගමන් කිරීමට තහවුරු වූ සැබෑ ආයතනික ඉලක්කය (Weak High / Equal Highs / Opposing POI) වෙත Take Profit එක තැබිය යුතුය**.
+>      - එම තහවුරු වූ ඉලක්කයට ඇති දුර **1:2.0 RR අනුපාතයට වඩා අඩු නම්, එම Trade එක 100% ක්ම Lockout කර අවලංගු කළ යුතුය (`No Entry (Confirmed RR < 1:2.0)`)**.
+>      - තහවුරු වූ දුර **1:2.0 RR හෝ ඊට වැඩි නම් පමණක් Trade එක ලබා දිය යුතුය**.
+
+## 73. Strict Falcon Rule Integrity & Non-Bypass Absolute Enforcement Protocol (New Master Rule)
+> [!IMPORTANT]
+> **MASTER NON-BYPASS MANDATE & CONSTITUTIONAL INTEGRITY RULES:**
+> 1. **Zero-Bypass Principle:**
+>    - Under NO circumstances may the AI engine, programmatic scanners, or background trackers bypass, bend, or ignore any of the 72 Falcon Rules.
+>    - If even a single condition fails (e.g., Bearish CHoCH active under Rule 13/58, missing 0.10% SL buffer under Rule 25/69, confirmed RR < 1:2.0 under Rule 72, or Resistance/Support trap under Rule 12/56), the setup MUST be immediately suppressed with `is_valid = false` and returned as `No Entry`.
+> 2. **Timeframe Precedence Hard-Lock:**
+>    - Macro Market Structure (15m/1H) ALWAYS overrides LTF (1m/3m) noise. A 1m bounce during a 15m/1H Downtrend is STRICTLY treated as a Lower High Pullback to Sell, never a Buy setup.
+> 3. **Mathematical Verification Supremacy:**
+>    - The system must never rely on AI imagination or arbitrary numbers. All Entry, SL (0.10% buffer past Demand/Supply box), and Take Profit (confirmed structural target) levels must be mathematically verified in Python before reaching the frontend.
+> 4. **Bilingual Requirement (සිංහල පරිවර්තනය):**
+>    - **නීති කඩකිරීම් හෝ මඟහැරීම් 100% ක්ම තහනම් කිරීමේ ප්‍රධාන ප්‍රඥප්තිය:**
+>      - කිසිදු හේතුවක් මත හෝ තත්ත්වයක් යටතේ නීති 1 සිට 72 දක්වා වූ කිසිදු නීතියක් මඟහැර (bypass) කිසිදු Trade Setup එකක් ලබා දීම 100% ක්ම තහනම් වේ.
+>      - එක් නීතියක් හෝ අසාර්ථක වුවහොත් (උදා: Bearish CHoCH එකක් තිබියදී Buy සෙවීම, SL Buffer එක නොමැති වීම, RR < 1:2.0 වීම), එම Setup එක වහාම අවලංගු කර `No Entry` ලෙස ලබා දිය යුතුය.
+>      - 15m සහ 1H Macro Trend එක 1-Minute Micro Noise එකට වඩා ඉහළින් ක්‍රියාත්මක වන අතර, සියලුම Entry, SL, සහ TP අගයන් Python ගණිත සමීකරණ මඟින් තහවුරු විය යුතුය.
+
+## 74. Major Demand Base Sweep & PO3 Instant Reversal Protocol (New Master Rule)
+> [!IMPORTANT]
+> **MAJOR DEMAND/SUPPLY BASE SWEEP & PO3 REVERSAL RULES:**
+> 1. **Demand Base / Double Bottom Liquidity Sweep Detection:**
+>    - When price sweeps or tests the Major Session Lows / Double Bottom (within 0.15% of the 200-candle absolute low) and immediately prints a 1-minute Bullish CHoCH with strong green displacement:
+>      - The old Bearish Macro trend is **IMMEDIATELY OVERRIDDEN AND TERMINATED**.
+>      - The execution bias instantly switches to **BULLISH (Buy Limit at the 1m Demand FVG)** to catch the PO3 Distribution expansion.
+>      - Stop Loss is placed strictly below the Double Bottom low with the 0.10% safe buffer (Rule 25 & 69).
+>      - Take Profit is targeted directly at the upper Equal Highs / Weak Highs for a minimum 1:2.0 to 1:4.0 RR winner.
+> 2. **Supply Base / Double Top Liquidity Sweep Detection:**
+>    - When price sweeps or tests the Major Session Highs / Double Top (within 0.15% of the 200-candle absolute high) and immediately prints a 1-minute Bearish CHoCH with strong red displacement:
+>      - The old Bullish Macro trend is **IMMEDIATELY OVERRIDDEN AND TERMINATED**.
+>      - The execution bias instantly switches to **BEARISH (Sell Limit at the 1m Supply FVG)** to catch the PO3 Distribution downward expansion.
+>      - Stop Loss is placed strictly above the Double Top high with the 0.10% safe buffer (Rule 25 & 69).
+> 3. **Bilingual Requirement (සිංහල පරිවර්තනය):**
+>    - **ප්‍රධාන Demand Base Sweep සහ PO3 Reversal නීතිය:**
+>      - මිල ප්‍රධාන Session Lows / Double Bottom එකක් (පසුගිය ඉටිපන්දම් 200 ක අවම සීමාව) Sweep කර, 1-Minute Chart එකෙහි Bullish CHoCH කොළ ඉටිපන්දමක් සෑදූ සැනින්:
+>        - පරණ Macro Bearish Trend එක ක්ෂණිකව අවලංගු වී, **Direction එක 'BULLISH' ලෙස මාරු විය යුතුය!**
+>        - පද්ධතිය Sell දීම සම්පූර්ණයෙන්ම නවතා, **1m Demand FVG එකෙන් Buy Limit එක ලබා දී ඉහළ Equal Highs වෙත Take Profit එක ලබා දිය යුතුය**.
+## 75. Adaptive Scalp SL & Fresh Displacement Anchor Architecture (New Master Rule)
+> [!IMPORTANT]
+> **ADAPTIVE SCALP SL & FRESH DISPLACEMENT ANCHOR RULES:**
+> 1. **Displacement Origin Anchoring:**
+>    - Stop Loss for 1m/3m scalping setups must NEVER be placed at distant 60-candle peaks that inflate risk beyond 0.35%.
+>    - Instead, anchor SL strictly outside the fresh 15-candle displacement origin / manipulation sweep wick with a 0.10% safe buffer.
+> 2. **0.25% Tight Scalp Risk Cap:**
+>    - Total SL risk distance is capped between 0.18% and 0.28% of the entry price.
+>    - This guarantees Take Profit 1:2.0 to 1:4.0 targets require only a 0.40% to 0.75% price move, enabling trades to complete within 10 to 25 minutes.
+> 3. **Sinhala Translation (සිංහල පරිවර්තනය):**
+>    - **Adaptive Scalp SL සහ Fresh Displacement Anchor නීතිය:**
+>      - 1-Minute Scalping සඳහා Stop Loss එක ඈත ඉටිපන්දම් 60 කඳු මුදුන් වල නොතබා, FVG සහ Displacement හැදුණු ආසන්නතම ඉටිපන්දම් 15 ක Fresh Manipulation Wick එකට යන්තම් 0.10% ක් එපිටින් 0.18% - 0.25% ක Tight Risk Cap එකකින් තැබිය යුතුය. එවිට Judas Wick වලින් SL කැපීම වැළකී, විනාඩි 10-25 කින් 1:3 RR TP එකට පහසුවෙන් ළඟා විය හැක.
+
+## 76. 15M Institutional BOS Continuation & Trend Momentum Mandate (New Master Rule)
+> [!IMPORTANT]
+> **15M INSTITUTIONAL BOS CONTINUATION & TREND MOMENTUM RULES:**
+> 1. **15M BOS Continuation Requirement:**
+>    - Trade setups must align with the active 15M Break of Structure (BOS).
+>    - If 15M confirmed Bullish BOS (breaking prior 15m swing highs), only Buy Limits at 1m Demand FVGs are permitted. Selling is 100% hard-blocked (Rule 53 Anti-Counter-BOS Lock).
+>    - If 15M confirmed Bearish BOS (breaking prior 15m swing lows), only Sell Limits at 1m Supply FVGs are permitted. Buying is 100% hard-blocked (Rule 53 Anti-Counter-BOS Lock).
+> 2. **Anti-Micro-CHoCH Trap Filter:**
+>    - Minor 1m/5m pullbacks or counter-wicks must never be mistaken for macro reversals without confirmed 15M BOS/CHoCH.
+> 3. **Sinhala Translation (සිංහල පරිවර්තනය):**
+>    - **15-Minute සැබෑ BOS Continuation සහ Trend Momentum නීතිය:**
+>      - 1m/5m බොරු CHoCH හෝ කුඩා Pullback වලට නොරැවටී, 15-Minute චාර්ට් එකෙහි සැබෑ BOS (Break of Structure) එකක් සාදා ඇති දිශාවට පමණක් Trades ලබා දිය යුතුය.
+>      - 15m Bullish BOS එකක් පවතින විට Sell කිරීම 100% ක්ම තහනම් වන අතර, 15m Bearish BOS එකක් පවතින විට Buy කිරීම 100% ක්ම තහනම් වේ.
+
+## 77. Dynamic +1.0R Break-Even Position Protection Protocol (New Master Rule)
+> [!IMPORTANT]
+> **DYNAMIC +1.0R BREAK-EVEN POSITION PROTECTION RULES:**
+> 1. **Zero-Risk Lockout at +1.0R:**
+>    - When price moves in favor of the active position and reaches the +1.0R target level (equal to 1x the initial SL risk distance), the system mandates immediately shifting the Stop Loss to the Entry Price (Break-Even).
+>    - This fully protects the user against downside risk and sudden market reversals.
+> 2. **Sinhala Translation (සිංහල පරිවර්තනය):**
+>    - **+1.0R Break-Even Position Protection නීතිය:**
+>      - මිල ගනුදෙනුවේ වාසියට ගමන් කර +1.0R ලාභ මට්ටමට ළඟා වූ වහාම, Stop Loss එක Entry Price වෙත ගෙනැවිත් (Break-Even) වෙළඳාම 100% ක්ම අවදානම් රහිත (Zero-Risk) බවට පත් කළ යුතුය.
+
+## 78. 3-State Multi-Timeframe Machine Architecture (1H Direction Hard-Lock → 15M POI Wait → 5M Sweep/MSS Trigger) (New Master Rule)
+> [!IMPORTANT]
+> **3-STATE MULTI-TIMEFRAME MACHINE ARCHITECTURE RULES:**
+> 1. **State 0: 1H Direction Filter (Hard-Lock):**
+>    - If 1H is in an Uptrend (BULLISH) -> System is strictly BUY_ONLY. Selling/Shorting is 100% Hard-Blocked (`No Entry (Anti-Counter-BOS Lock - Buy Only)`). Under NO circumstances should any minor 5M pullback or CHoCH flip the trend to BEARISH.
+>    - If 1H is in a Downtrend (BEARISH) -> System is strictly SELL_ONLY. Buying/Longing is 100% Hard-Blocked (`No Entry (Anti-Counter-BOS Lock - Sell Only)`). Under NO circumstances should any minor 5M bounce or CHoCH flip the trend to BULLISH.
+> 2. **State 1: 15M Key POI (Point of Interest) Detection:**
+>    - Do not buy at the top (Ceiling Trap) or sell at the bottom (Floor Trap).
+>    - If BUY_ONLY: Identify the nearest 15M/5M Unmitigated Demand Zone (FVG or Order Block below price). Trigger remains INACTIVE (Awaiting Retrace) until price retraces into the Demand POI.
+>    - If SELL_ONLY: Identify the nearest 15M/5M Unmitigated Supply Zone (FVG or Order Block above price). Trigger remains INACTIVE (Awaiting Retrace) until price retraces into the Supply POI.
+> 3. **State 2: 5M Execution Engine (The Trigger):**
+>    - Activates ONLY after price enters/taps the 15M POI:
+>      - **Liquidity Sweep Wick:** Sweep of a recent 5M swing extreme with sharp rejection wick (Wick-to-Body ratio >= 1.5:1 or wick >= 35%).
+>      - **Strong MSS Body Close:** Thick body candle close breaking the recent swing extreme (Choch / Displacement shift).
+>      - **Valid FVG Formation:** Unmitigated Fair Value Gap created by the displacement move.
+> 4. **Sniper Buffers and Targets:**
+>    - **Buy Limit Entry:** `FVG_Top * 1.0004` (+0.04% spread buffer, Rule 34 & 62).
+>    - **Sell Limit Entry:** `FVG_Bottom * 0.9996` (-0.04% spread buffer, Rule 34 & 62).
+>    - **Stop Loss:** Outside the Sweep Low/High extreme with 0.10% safe buffer (`Sweep_Low * 0.9990` for Longs, `Sweep_High * 1.0010` for Shorts, Rule 19 & 25).
+>    - **Targets:** TP1 at 1:1 Break-Even trigger, TP2 at strict 1:2.0 RR target.
+>    - **Confidence Filter:** Strict >= 80% minimum confirmation threshold.
+> 5. **Sinhala Translation (සිංහල පරිවර්තනය):**
+>    - **1H Direction Hard-Lock → 15M POI Retrace → 5M Sweep/MSS Trigger ත්‍රිත්ව කාලරාමු පද්ධති නීතිය:**
+>      - **පියවර 1 (State 0 - 1H Direction Hard-Lock):** 1H එක BULLISH නම් පද්ධතිය BUY_ONLY පමණක් වේ. 5M කුඩා Red Candle එකක් හෝ False CHoCH එකක් ආ පමණින් Trend එක Bearish වලට මාරු නොවිය යුතුය. SELL දීම 100% ක්ම තහනම්ය (Hard-Blocked). 1H එක BEARISH නම් පද්ධතිය SELL_ONLY පමණක් වේ. කිසිම හේතුවක් මත BUY නොදේ.
+>      - **පියවර 2 (State 1 - 15M POI Retrace):** මිල උඩම මුදුනේදී (Ceiling Trap) Buy කිරීම හෝ පතුලේදී (Floor Trap) Sell කිරීම නැවැත්වීම. 15M/5M Demand/Supply FVG හෝ Order Block එක වෙත මිල Retrace වන තුරු රැඳී සිටීම.
+>      - **පියවර 3 (State 2 - 5M Execution Engine):** මිල POI එක තුළට පැමිණි පසු Liquidity Sweep Wick (Wick-to-Body >= 1.5:1), Strong MSS Body Close, සහ Valid FVG තහවුරු කර ගැනීම.
+>      - **පියවර 4 (Sniper Buffers & SL):** Buy Limit එක +0.04% Buffer (FVG_Top * 1.0004), Sell Limit එක -0.04% Buffer (FVG_Bottom * 0.9996), SL එක Sweep Extreme එකට ඔබ්බෙන් 0.10% Buffer සහිතව තැබීම (Sweep_Low * 0.9990 / Sweep_High * 1.0010), සහ අවම 80% Confidence එකක් තිබීම අනිවාර්ය වේ.
+
+## 79. Dual-Model Dynamic Scalping Architecture (Breakaway Continuation & Premium Reversal Protocol) (New Master Rule)
+> [!IMPORTANT]
+> **DUAL-MODEL DYNAMIC SCALPING ARCHITECTURE RULES:**
+> 1. **Model 1: Breakaway Continuation Buy Model:**
+>    - In active markup momentum where price breaks local swing highs (5M BOS), the system strictly bypasses the distant 24-hour macro 50% Equilibrium requirement to prevent hours of missed trades.
+>    - The active dealing range dynamically resets to the current 5M impulse leg (last 20-30 candles = 1.5 - 2.5 hours).
+>    - Buy Limit is placed at the fresh 5M Demand Breakaway FVG with the +0.04% spread buffer (`FVG_Top * 1.0004`, Rule 34 & 62).
+>    - Stop Loss is anchored strictly below the local Higher Low extreme with 0.10% safe buffer (`Local_Low * 0.9990`, Rule 19 & 25).
+>    - Targets: TP1 at 1:1 Break-Even trigger, TP2 at strict 1:2.0 RR target (Rule 21 & 72).
+> 2. **Model 2: Premium Reversal Short Model (Sell the Drop to Equilibrium):**
+>    - When price sweeps the Highs (BSL / Equal Highs sweep with rejection wick) inside the Premium Zone, and confirms a 5M CHoCH displacement (candle body close below previous local low):
+>    - The system does NOT sit idle waiting for price to drop to 50%!
+>    - Instead, it immediately issues a **SELL LIMIT at the fresh 5M Supply FVG** with -0.04% spread buffer (`FVG_Bottom * 0.9996`, Rule 34 & 62).
+>    - Stop Loss is anchored strictly above the sweep high extreme with 0.10% safe buffer (`Sweep_High * 1.0010`, Rule 19 & 25).
+>    - Take Profit targets the downward drop into the 50% Equilibrium / Demand Base at strict 1:2.0 RR (Rule 21 & 72).
+> 3. **Sinhala Translation (සිංහල පරිවර්තනය):**
+>    - **Breakaway Continuation සහ Premium Reversal ද්විත්ව මාදිලි අධිවේගී Scalping නීතිය (Rule 79):**
+>      - **මාදිලිය 1 (Breakaway Continuation Buy):** මිල අලුත් Highs හදමින් ඉහළ යන ප්‍රබල Uptrend එකකදී, මුළු දවසෙම 50% ගැඹුරු Equilibrium එනකම් පැය ගණන් බලා නොසිට, පසුගිය පැය 1-2 ක Local Wave එකේ හැදුණු ආසන්නතම 5M Breakaway FVG එකෙන් +0.04% Buffer සහිතව BUY LIMIT ලබා දේ. Local Low එකෙන් 0.10% පිටත ආරක්ෂිත SL සහ 1:2.0 RR TP සහිතයි.
+>      - **මාදිලිය 2 (Premium Reversal Short):** මිල Premium උඩම මුදුනේදී High Sweep කර 5M CHoCH එකක් දුන් විට, මිල පහළ 50% ට වැටෙන තුරු නිකන් බලා නොසිට, එම පහළට වැටෙන ගමනෙන් ලාභ ගැනීමට Supply FVG එකෙන් -0.04% Buffer සහිතව SELL LIMIT ලබා දේ. Sweep High එකෙන් 0.10% පිටත ආරක්ෂිත SL සහ පහළ 50% Equilibrium වෙත 1:2.0 RR TP සහිතයි.
+
+## 80. Dynamic LTF Structure Shift Precedence & Anti-Falling-Knife Mandate (New Master Rule)
+> [!IMPORTANT]
+> **DYNAMIC LTF STRUCTURE SHIFT PRECEDENCE & ANTI-FALLING-KNIFE RULES:**
+> 1. **15M/5M CHoCH Precedence over 1H Bias:**
+>    - High-timeframe (1H) candles take up to 60 minutes to close. Structural turns and distribution always originate on lower timeframes (5M and 15M).
+>    - Regardless of whether the 1H trend appears "Bullish", if price sweeps the highs in the Premium zone and prints a confirmed Bearish CHoCH (candle body close breaking a 15M/5M swing low with displacement), the 15M/5M Bearish Shift takes 100% absolute precedence over the lagging 1H bias.
+>    - Buying is 100% strictly forbidden (`No Entry (Anti-Falling-Knife & CHoCH Precedence Lock)`). The system flips bias dynamically to BEARISH and seeks SELL LIMIT entries at the fresh Supply FVG.
+>    - Symmetrically, if 1H appears Bearish but price sweeps lows and prints a confirmed Bullish CHoCH (candle body close breaking 15M/5M swing high with displacement), Selling is 100% strictly forbidden. The system flips bias dynamically to BULLISH and seeks BUY LIMIT entries at the fresh Demand FVG.
+> 2. **Anti-Falling-Knife Protection (Markdown / Markup Wave Lock):**
+>    - During consecutive Lower Highs (active Markdown wave), buying is strictly prohibited even if price is in deep discount. Catching falling knives is 100% locked out.
+>    - A BUY setup is authorized ONLY after a strong green displacement candle closes cleanly above the prior candle's high, breaking the Lower Highs wave.
+>    - Symmetrically, during consecutive Higher Lows (active Markup wave), shorting is strictly prohibited until a red displacement candle breaks the sequence.
+> 3. **Limit Orders Only & Wait for Pullback:**
+>    - Market order execution upon detecting CHoCH is strictly forbidden.
+>    - Entry is placed as a Limit Order at the fresh FVG boundary or 50% Mean Threshold of the Order Block with the 0.04% Rule 62 spread buffer.
+>    - If price runs without pulling back to the limit order, the trade is skipped safely with 0% capital loss.
+> 4. **Sinhala Translation (සිංහල පරිවර්තනය):**
+>    - **15M/5M Structure Shift (CHoCH) ප්‍රමුඛතාවය සහ Anti-Falling-Knife නීතිය (Rule 80):**
+>      - **1. 1H එකට වඩා 15M/5M Structure Shift (CHoCH) එකට ප්‍රමුඛතාවය:** 1H ඉටිපන්දමක් Close වීමට පැයක් ගතවන අතර, වෙළඳපල මුලින්ම හැරෙන්නේ 5M සහ 15M වලිනි. 1H කොතරම් Bullish යැයි පෙනුණද, මුදුනේදී Highs Sweep වී 15M හෝ 5M හි Swing Low එකක් පහළට කැඩුණොත් (Bearish CHoCH), එතැන් පටන් BUY කිරීම 100% ක්ම තහනම් වේ. පද්ධතිය ස්වයංක්‍රීයව BEARISH තත්ත්වයට හැරී Supply FVG වෙතින් SELL LIMIT පමණක් සොයයි. (පතුලේදී Low Sweep වී Bullish CHoCH වූ විට Sell සම්පූර්ණයෙන්ම තහනම් කර BUY LIMIT පමණක් සොයයි).
+>      - **2. පහළට කඩා වැටෙන රැල්ලකදී (Lower Highs Markdown) Buy නොකිරීම:** ඉටිපන්දම් එක දිගට Lower Highs සාදමින් පහළට බසින විට මිල කොතෙක් අඩු (Discount) වුවද BUY නොකරයි (Falling Knife Trap Lockout). කොළ පැහැති ශක්තිමත් ඉටිපන්දමකින් කලින් ඉටිපන්දමේ High එක උඩින් Close වී (Displacement) Lower Highs රැල්ල කැඩෙන තුරු Buy නොදේ.
+>      - **3. Market Order නැතිව Limit Order Retrace එනතුරු රැඳී සිටීම:** CHoCH වූ විගස Market Order වලින් නොපැන, FVG එක සීමාවේ 0.04% Buffer සහිතව Limit Order එකක් දමා මිල එතැනට Retrace වන තුරු රැඳී සිටිය යුතුය. Retrace නොවී ගියහොත් Trade එක අතහැර මුදල් 100% ආරක්ෂා කරයි.
+
+## 81. True Structural Swing Protection & Pullback Re-Entry Protocol (New Master Rule)
+> [!IMPORTANT]
+> **TRUE STRUCTURAL SWING PROTECTION & PULLBACK RE-ENTRY RULES:**
+> 1. **Anti-Micro-Wick Flip Mandate:**
+>    - 2-3 consecutive 5M pullback candles (micro wicks making slightly lower highs / lower lows) must **NEVER flip the trend bias from BULLISH to BEARISH**.
+>    - A trend bias can ONLY flip if the genuine Structural Swing Low (the validated Stop Loss level) is breached with a confirmed displacement candle body close below that swing extreme.
+> 2. **Uptrend Pullback Re-Entry Mandate:**
+>    - In an active Uptrend, price pulling back into Demand/Discount POI/FVG above the structural swing low is strictly evaluated for **BUY Re-Entry (Second Chance Entry)** opportunities.
+>    - Counter-trend SELLING during an uptrend pullback is 100% STRICTLY FORBIDDEN and HARD-LOCKED (`No Entry (Anti-Counter-Uptrend Sell Lock)`).
+>    - Symmetrically, during a confirmed Downtrend, relief rallies into Supply/Premium POI/FVG below the structural swing high are strictly evaluated for **SELL Re-Entry** opportunities. Counter-trend BUYING is 100% strictly forbidden.
+> 3. **Active Trade Directional Lockout:**
+>    - When an alert is active on a symbol and price remains within the trade boundaries (above Stop Loss for Long, or below Stop Loss for Short), opposing trade alerts on that coin are 100% HARD-BLOCKED.
+>    - The system will never issue a Sell alert on a coin while a Long position is live and running above its Stop Loss.
+> 4. **Sinhala Translation (සිංහල පරිවර්තනය):**
+>    - **සැබෑ Structural Swing Extreme ආරක්ෂාව සහ Pullback Re-Entry නීතිය (Rule 81):**
+>      - **1. ඉටිපන්දම් 3 ක Micro Wicks බලා Trend එක වෙනස් කිරීම සම්පූර්ණයෙන්ම නැවැත්වීම:** 5M ඉටිපන්දම් 2-3 ක් පහළට ආ පමණින් Trend එක BEARISH ලෙස Flip නොවිය යුතුය. Trend එක Flip විය හැක්කේ සැබෑ Structural Swing Low එක (අපේ SL මට්ටම) Displacement Candle Body එකකින් පහළට කැඩී ගියහොත් පමණි.
+>      - **2. Uptrend Pullback එකකදී Sell නොව "BUY Re-Entry" පමණක් සෙවීම:** Buy Trend එකක් යන විට මිල පහළ බසින්නේ Sell කිරීමට නොව, Discount එකෙන් අඩු මිලට තවත් Buy එකක් (BUY Re-Entry) ගැනීමටයි. එබැවින් Swing Low එකට ඉහළින් සිදුවන Pullbacks වලදී SELL දීම 100% ක්ම තහනම් වන අතර සෙවිය යුත්තේ Buy Limit පමණි.
+>      - **3. සක්‍රීය Trade එකක් පවතින විට ප්‍රතිවිරුද්ධ Signals 100% Block කිරීම:** යම් Coin එකක Long Trade එකක් ලබාදී මිල තවමත් Stop Loss එකට වඩා ඉහළින් ඇති තාක්, එම Coin එකට කිසිදු හේතුවක් මත SELL Alert ලබා නොදේ. එකම කාසියේ Buy දී තිබියදී Sell දී පරිශීලකයා අතරමං කිරීම 100% ක්ම වළක්වා ඇත.
+
+## 82. 15M Institutional Structure Anchor & Early Invalidation Protection Protocol (New Master Rule)
+> [!IMPORTANT]
+> **15M INSTITUTIONAL STRUCTURE ANCHOR & EARLY INVALIDATION RULES:**
+> 1. **15M Candlestick Body Close Precedence (15M Chart Anchor):**
+>    - Macro Market Structure, Directional Bias, and Reversal are strictly determined by **15M Candlestick Body Closes**.
+>    - 5M micro noise or wicks cannot reverse the 15M trend. The system strictly maps `candles_15m` to detect genuine Swing High breaks (Bullish BOS/CHoCH) or Swing Low breaks (Bearish BOS/CHoCH).
+> 2. **Anti-Blind-SL Hunting (Early Structural Invalidation):**
+>    - Traders DO NOT have to blindly sit and wait to "eat a full Stop Loss" if the trade structure is broken!
+>    - If a 15M candle body closes beyond the structural anchor (below the 15M swing low for Longs, or above the 15M swing high for Shorts), the setup is immediately declared **`STRUCTURALLY INVALIDATED`**.
+>    - An instant Invalidation Alert is sent to Telegram, instructing the trader to exit/cut the position early with minimal loss, protecting capital before price drops to the distant full SL.
+> 3. **Dynamic +1.0R Break-Even Protection (Rule 77):**
+>    - Upon price reaching +1.0R (TP1), Stop Loss is immediately shifted to entry price, eliminating all downside risk (Risk = 0.00%).
+>    - Invalidation alerts automatically instruct moving SL to BE at +1.0R.
+> 4. **Deep Discount FVG Limit Entry (Anti-Ceiling Trap):**
+>    - Entries are strictly limit orders placed at the 15M/5M Discount FVG with the +0.04% Rule 62 buffer, preventing market chasing at the ceiling of pumps.
+> 5. **Sinhala Translation (සිංහල පරිවර්තනය):**
+>    - **15M ආයතනික Structure Anchor සහ Early Invalidation ආරක්ෂණ නීතිය (Rule 82):**
+>      - **1. 15M ඉටිපන්දම් Body Close මඟින් පමණක් Market Structure තීරණය කිරීම:** වෙළඳපල Trend එක සහ Reversal එක තීරණය වන්නේ 15M ඉටිපන්දමක Body එක Close වීම මත පමණි. 5M කුඩා wicks හෝ noise මඟින් 15M Trend එක වෙනස් නොවේ.
+>      - **2. Early Structural Invalidation (සම්පූර්ණ SL වැදීම වැළැක්වීම):** Trend එක කැඩී ගියහොත් සම්පූර්ණ Stop Loss එක වදින තෙක් බලා සිටීමට අවශ්‍ය නැත. 15M ඉටිපන්දමක Body එක අපේ Structural Support/Resistance මට්ටම කඩාගෙන Close වූ වහාම Trade එක 'INVALIDATED' ලෙස සලකා, Telegram එකට Alert එකක් යවා අවම අලාභයකින් Exit වීමට උපදෙස් දේ.
+>      - **3. +1.0R Break-Even ආරක්ෂාව:** TP1 (+1.0R) ළඟා වූ විගස Stop Loss එක Entry මිලට ගෙන ගොස් අවදානම 0% ක් කරයි.
+>      - **4. Ceiling Chasing වැළැක්වීම:** මිල උඩට ගිය පසු Market Orders වලින් නොපැන, 15M/5M Discount FVG එකට Limit Order එකක් දමා අඩු අවදානමකින් ඇතුල් විය යුතුය.
+
+## 83. 15M 24-Hour Sequential Market Structure & CHoCH/BOS Foundation Protocol (Primary Foundation Step / මූලික පියවර 1)
+> [!IMPORTANT]
+> **15M 24-HOUR SEQUENTIAL MARKET STRUCTURE & CHOCH/BOS FOUNDATION RULES (PRIMARY FOUNDATION STEP):**
+> 1. **Mandatory 24-Hour 15M Lookback Window (පැය 24 ක ඉටිපන්දම් 96 අනිවාර්යයෙන්ම විශ්ලේෂණය කිරීම):**
+>    - Analysis must evaluate exactly 24 hours of price action backwards from the current candle on the 15-Minute timeframe (24 hours = exactly 96 candles of 15m).
+> 2. **Chronological Sequential Mapping of all HH, HL, LL, LH (සියලුම Swings එකක් නෑර මාක් කර ගැනීම):**
+>    - Chronologically from the start of the 24-hour window (candle -96) moving forward to the present candle, every single swing high and swing low must be clearly identified and sequentially mapped without skipping any.
+> 3. **Bearish CHoCH Transition Verification for SELL / LL_LH Sequence (HH/HL සිට LL/LH වෙත මාරුවීමේදී CHoCH තහවුරු කිරීම):**
+>    - If the 24-hour period began with HH/HL (Uptrend), and at the current analysis point the market is forming LL/LH (Downtrend), this transition is ONLY recognized as valid institutional structure if a confirmed Bearish CHoCH was formed prior to the LL/LH sequence. That CHoCH serves as mandatory confirmation.
+> 4. **Bullish CHoCH Transition Verification for BUY / HH_HL Sequence (LL/LH සිට HH/HL වෙත මාරුවීමේදී CHoCH තහවුරු කිරීම):**
+>    - Symmetrically for BUY setups: If the 24-hour period began with LL/LH (Downtrend), and at the current analysis point the market is forming HH/HL (Uptrend), this transition is ONLY recognized as valid institutional structure if a confirmed Bullish CHoCH was formed prior to the HH/HL sequence.
+> 5. **Strictly 15-Minute Timeframe (15M කාලරාමුව පමණක් භාවිත කිරීම):**
+>    - All structural evaluations are locked strictly to the 15-minute timeframe.
+> 6. **Direction Dictated by Nearest Active Sequence (ළඟම ඇති ව්‍යුහයට අනුකූලව පමණක් Entry ලබා ගැනීම):**
+>    - Backward from the present candle, examine the nearest active validated sequence:
+>      - If LL/LH sequence -> SELL ENTRY ONLY (Buy is 100% hard-locked: `No Entry (Rule 83 Foundation Lock - 15M LL/LH Downtrend)`).
+>      - If HH/HL sequence -> BUY ENTRY ONLY (Sell is 100% hard-locked: `No Entry (Rule 83 Foundation Lock - 15M HH/HL Uptrend)`).
+> 7. **BOS Continuation Requirement (BOS Continue වී තිබීම අනිවාර්යයි):**
+>    - In the active sequence, subsequent swing extremes must demonstrate confirmed Break of Structure (BOS) continuation in the trend direction.
+> 8. **Mandatory 24-Hour Scope (පැය 24 ක කාල පරාසය අනිවාර්ය කිරීම):**
+>    - 24-hour institutional context across Asian, London, and New York sessions is mandatory.
+> 9. **15M Supreme Authority (වෙනත් කිසිම කාලරාමුවකින් Market Structure තහවුරු කිරීම තහනම්ය):**
+>    - 15-minute chart is the sole and ultimate authority for market structure determination. Lower timeframes (1M, 3M, 5M) cannot override or contradict 15M structure.
+> 10. **Candle Body Close Mandate (Wick Sweep vs Body Close Discretion):**
+>     - For CHoCH (points 3 & 4) and BOS (point 7) to be verified, a 15M candlestick BODY must close beyond the swing extreme. A mere wick beyond the swing extreme is classified strictly as a Liquidity Sweep, NOT a structural break.
+> 11. **Primary Foundation Step (මූලික පියවර):**
+>     - This 10-point protocol is the bot's PRIMARY FOUNDATION STEP ("මූලික පියවර") in every trade analysis. No entry can be generated or evaluated without passing this foundation first.
+> 12. **Sinhala Translation (සිංහල පරිවර්තනය):**
+>     - **15M පැය 24 ආයතනික Market Structure සහ අනුක්‍රමික CHoCH/BOS මූලික පදනම් නීතිය (මූලික පියවර - Rule 83):**
+>       - **1. පැය 24 ක ඉටිපන්දම් 96 ක අනිවාර්ය විශ්ලේෂණය:** විශ්ලේෂණය කරන මොහොතේ සිට ආපස්සට පැය 24 ක කාලය (15M ඉටිපන්දම් 96) අනිවාර්යයෙන්ම පරීක්ෂා කළ යුතුය.
+>       - **2. සියලුම HH, HL, LL, LH එකක් නෑර මාක් කිරීම:** පැය 24 ආරම්භක ඉටිපන්දමේ සිට ඉදිරියට වත්මන් මොහොත දක්වා සියලුම Swing Highs සහ Swing Lows එකක් නෑර අනුක්‍රමිකව ලකුණු කළ යුතුය.
+>       - **3. SELL සඳහා Bearish CHoCH තහවුරු කිරීම:** පැය 24 ආරම්භයේදී HH/HL (Uptrend) තිබී වත්මන් මොහොතේ LL/LH හැදෙන්නේ නම්, LL/LH වලට පෙර අනිවාර්යයෙන්ම Bearish CHoCH එකක් නිර්මාණය වී තහවුරු විය යුතුය.
+>       - **4. BUY සඳහා Bullish CHoCH තහවුරු කිරීම:** පැය 24 ආරම්භයේදී LL/LH (Downtrend) තිබී වත්මන් මොහොතේ HH/HL හැදෙන්නේ නම්, HH/HL වලට පෙර අනිවාර්යයෙන්ම Bullish CHoCH එකක් නිර්මාණය වී තහවුරු විය යුතුය.
+>       - **5. විනාඩි 15 කාලරාමුවෙන් පමණක් බැලීම:** මෙම සියලුම ව්‍යුහයන් පරීක්ෂා කරන්නේ 15-Minute චාර්ට් එකෙන් පමණි.
+>       - **6. ළඟම ව්‍යුහය අනුව Entry ලබා ගැනීම:** වත්මන් මොහොතට ආසන්නතම ව්‍යුහය LL/LH නම් SELL පමණක්ද, HH/HL නම් BUY පමණක්ද ලබා ගනී. විරුද්ධ පැත්තට trade දැමීම 100% තහනම්ය.
+>       - **7. BOS Continue වී තිබීම:** අදාළ ව්‍යුහය තුළ Break of Structure (BOS) අඛණ්ඩව ඉදිරියට ගමන් කර තිබිය යුතුය.
+>       - **8. පැය 24 අනිවාර්ය කිරීම:** සම්පූර්ණ දවසේ Session Liquidity ආවරණය වන පරිදි පැය 24 ම පරීක්ෂා කෙරේ.
+>       - **9. 15M ප්‍රමුඛතාවය:** Market Structure තහවුරු කිරීම 15M එකෙන් පමණක් කළ යුතු අතර වෙනත් කිසිදු Timeframe එකකින් Market Structure තීරණය කිරීම තහනම්ය.
+>       - **10. Candle Body Close අනිවාර්ය කිරීම:** CHoCH සහ BOS තහවුරු වීමට නම් 15M Candlestick Body එකක්ම Extreme එකෙන් එපිටට Close විය යුතුය. Wick එකක් පමණක් ගියහොත් එය Liquidity Sweep එකක් පමණි.
+
+## 84. Triple-Timeframe Triad Alignment & IDM Protocol (HTF 1H + ITF 15M + LTF 3M/1M Foundation)
+> [!IMPORTANT]
+> **TRIPLE-TIMEFRAME TRIAD ALIGNMENT & IDM PROTOCOL RULES (PRIMARY FOUNDATION STEP):**
+> 1. **1H Higher Time Frame (HTF) — Trend & Bias (50 – 100 Candles):**
+>    - Primary Objective: Determine overall macro market direction and key structural boundaries.
+>    - Sequential Mapping: Sequentially map all Swing Highs and Swing Lows using Break of Structure (BOS).
+>    - BOS Candlestick Body Close Mandate: BOS is valid ONLY when a candle BODY closes cleanly above the previous Swing High (Uptrend) or below the previous Swing Low (Downtrend). Wicks breaking prior swings do NOT count as BOS (treated strictly as liquidity sweeps).
+>    - Active Direction: Determined strictly by the nearest active structure to current market price:
+>      - If recent sequence is HH, HL -> Macro Bias is BULLISH (BUY SETUPS ONLY).
+>      - If recent sequence is LL, LH -> Macro Bias is BEARISH (SELL SETUPS ONLY).
+>    - Transition Lockout: If a 1H CHoCH transition is actively forming without confirmed structural follow-through, all trade entries are temporarily locked to prevent counter-trend traps.
+> 2. **15M Intermediate Time Frame (ITF) — Structure, IDM & POI (40 – 80 Candles):**
+>    - Primary Objective: Pinpoint high-probability Points of Interest (POI), Inducement (IDM), and Dealing Range.
+>    - True 15M CHoCH: Candle body close breaking the last Higher Low (Bearish CHoCH) or Lower High (Bullish CHoCH).
+>    - Valid Inducement (IDM) Engine:
+>      - Bullish Market (HL -> HH move): Look at the closest internal swing point to the HH. Inspect that swing's highest candle; if its lower wick is broken by a subsequent candle body, that level is marked as a Valid IDM. Price must retrace to sweep this IDM before continuing upward.
+>      - Bearish Market (LH -> LL move): Look at the closest internal swing point to the LL. Inspect that swing's lowest candle; if its upper wick is broken by a subsequent candle body, that level is marked as a Valid IDM. Price must retrace to sweep this IDM before continuing downward.
+>    - 5-Criteria Valid Order Block (OB): Must satisfy all 5 confluences: (1) BOS, (2) Originates at Swing Point, (3) Liquidity Hunt (Sweep), (4) Imbalance (FVG), (5) Unmitigated.
+>    - Fibonacci Golden Rule (0.618 – 0.66 Retracement):
+>      - Bullish: Measured from swing HL to HH. Golden Pocket = 0.618 to 0.66 retracement zone.
+>      - Bearish: Measured from swing LH to LL. Golden Pocket = 0.618 to 0.66 retracement zone.
+>      - Prime Institutional POI: When a valid 15M Order Block aligns within or overlaps the 0.618 – 0.66 Golden Pocket, it is marked as the Highest-Probability POI.
+> 3. **1M / 3M Lower Time Frame (LTF) — Trigger & Execution (20 – 40 Candles):**
+>    - Primary Objective: Sniper execution with minimal risk and maximum Risk-to-Reward.
+>    - POI Tap & Micro Confirmation: Once price enters the 15M Golden POI, evaluate the 1M or 3M chart for Micro Liquidity Sweep + Micro CHoCH.
+>    - **Mandatory Post-CHoCH Confirmation Gate (No Immediate Raw CHoCH Entries):**
+>      - A trade MUST NEVER be entered immediately on the raw CHoCH candle!
+>      - Bullish Setup: After Bullish CHoCH, the engine MUST wait for the subsequent pullback to print a confirmed **Higher Low (HL)**!
+>      - Bearish Setup: After Bearish CHoCH, the engine MUST wait for the subsequent pullback to print a confirmed **Lower High (LH)**!
+>      - Once the first confirmed HL (Buy) or LH (Sell) forms, place a **Limit Order** at the micro FVG / OB boundary with the Rule 62 0.04% spread buffer.
+>    - Tight Stop Loss (SL): Placed outside the manipulation extreme incorporating the Rule 19 0.10% safe buffer (`swing_low * 0.9990` for Buy, `swing_high * 1.0010` for Sell) + 1.5x ATR.
+>    - Dynamic Take Profit (TP): 1:2.0 to 1:4.0 RR targeting structural liquidity, with +1.0R Break-Even position protection (Rule 77).
+> 4. **100% Triad Alignment Mandate (Zero-Bypass Lockout):**
+>    - All three timeframes MUST agree simultaneously:
+>      - 1H Bullish + 15M Bullish + 1M/3M Bullish -> **BUY LIMIT ONLY**
+>      - 1H Bearish + 15M Bearish + 1M/3M Bearish -> **SELL LIMIT ONLY**
+>    - If any single timeframe disagrees (e.g., 1H is Bullish, 15M is Bullish, but 1M/3M is in a downward pullback and hasn't formed the post-CHoCH HL yet), the trade is **100% HARD-LOCKED** (`No Entry (Rule 84 Triad Alignment Lock)`).
+> 5. **Sinhala Translation (සිංහල පරිවර්තනය):**
+>    - **1H HTF + 15M ITF + 1M/3M LTF ත්‍රිත්ව කාලරාමු සහ IDM මූලික පදනම් නීතිය (Rule 84):**
+>      - **1. 1H Higher Time Frame (HTF) — Trend & Bias (ඉටිපන්දම් 50 - 100):** සමස්ත වෙළඳපල දිශාව තීරණය කිරීම. BOS තහවුරු විය යුත්තේ Candle Body Close එකකින් පමණි (Wick කැඩීම BOS නොවේ). ආසන්නතම ව්‍යුහය HH/HL නම් BUY පමණක්ද, LL/LH නම් SELL පමණක්ද අවසර ලබයි.
+>      - **2. 15M Analysis Time Frame (ITF) — Structure & IDM (ඉටිපන්දම් 40 - 80):** 
+>        - 15M CHoCH: Up trend හි HL කැඩීම Bearish CHoCH ද, Down trend හි LH කැඩීම Bullish CHoCH ද වේ.
+>        - Valid Inducement (IDM): Bullish වෙළඳපලක HL සිට HH දක්වා යාමේදී HH ට ආසන්නතම Swing point එකේ ඉහළම කැන්ඩ්ල් එකේ පහළම wick එක candle body එකකින් කැඩී තිබීම Valid IDM වේ. Bearish වෙළඳපලක LL ට ආසන්නතම swing point එකේ පහළම කැන්ඩ්ල් එකේ ඉහළම wick එක candle body එකකින් කැඩී තිබීම Valid IDM වේ. මිල මෙම IDM Sweep කර නැවත හැරී එයි.
+>        - Valid Order Block: BOS, Swing Point, Liquidity Hunt, Imbalance (FVG), Unmitigated යන කරුණු 5 ම සම්පූර්ණ විය යුතුය.
+>        - Fibonacci Golden Zone (0.618 - 0.66): HL සිට HH දක්වා (Buy) හෝ LH සිට LL දක්වා (Sell) Fibonacci දැමූ විට 0.618 - 0.66 Golden Zone එක සහ Valid OB එක එකට හමුවන තැන Highest-Probability POI වේ.
+>      - **3. 1M / 3M Entry Time Frame (LTF) — Trigger & Confirmation (ඉටිපන්දම් 20 - 40):** 15M Golden POI එකට මිල පැමිණි පසු Micro Sweep සහ CHoCH බලයි. **නමුත් CHoCH හැදුණු සැනින් Trade දෙන්නේ නැත!** Buy සඳහා CHoCH පසු පළමු Higher Low (HL) එක සාදන තෙක්ද, Sell සඳහා Lower High (LH) සාදන තෙක්ද බලා සිටිය යුතුය. ඉන්පසු 0.04% Buffer එක සහිතව 1M/3M FVG/OB වෙතින් Limit Order එක ලබාදේ. Tight SL සහ 1:2.0 සිට 1:4.0 RR ඉලක්ක සහිතව +1.0R Break-Even ලබාදේ.
+>      - **4. ත්‍රිත්ව කාලරාමු 100% සමාන වීමේ නීතිය (Triad Alignment):** 1H, 15M සහ 1M/3M යන කාලරාමු 3 ම එකම දිශාවකට (තුනම Bullish හෝ තුනම Bearish) තිබිය යුතුය. එකක් හෝ නොගැලපේ නම් Trade එක 100% ක් Lock විය යුතුය.
+> 
+## 26. Falcon Master 7-Step Execution Protocol (Ultimate Hard-Locked Edition - Rules 85 to 91)
+> [!IMPORTANT]
+> **THE FALCON MASTER 7-STEP EXECUTION PROTOCOL (ULTIMATE HARD-LOCKED EDITION - RULES 85-91):**
+> The Falcon Engine's real-time market execution is strictly locked into an integrated sequential 7-Step Pipeline (with zero isolated rules, total 91 rules) enforced by 5 Impenetrable Hard Locks:
+> 
+> 1. **Step 1 (Rule 85): Pre-Flight Safety & 15M Macro Direction Anchor:**
+>    - USD High-Impact News lockout active (+/- 60 minutes before/after news release). All new trade setups are 100% suspended during this window.
+>    - 15M Timeframe determines macro direction: 15M Bullish (HH/HL sequence) -> BUY ONLY lock; 15M Bearish (LL/LH sequence) -> SELL ONLY lock. Counter-trend trading against 15M macro trend is 100% strictly forbidden.
+>    - **[HARD LOCK 1 - Anti-Momentum Filter]:** Prior to issuing any setup, the bot must check price velocity approaching our POI. If massive momentum candles (e.g. huge adverse Bullish/Bearish candles with body > 2.0x average candle size) smash into the POI without deceleration, the setup is 100% REJECTED and discarded (`No Entry (Hard Lock 1: Anti-Momentum POI Breach Lock)`). Zero catching of falling knives or runaway momentum candles!
+> 
+> 2. **Step 2 (Rule 86): Setup Direction & 5M Breaker Block Detection:**
+>    - Determine the setup path based on 15M/5M market structure, giving primary priority to the **5M Breaker Block**:
+>      - Bullish Market: A prior Bearish Order Block broken aggressively upward with a displacement candle body is marked as a **5M Bullish Breaker Block**.
+>      - Bearish Market: A prior Bullish Order Block broken aggressively downward with a displacement candle body is marked as a **5M Bearish Breaker Block**.
+>    - This filters out hidden institutional traps and failed order blocks.
+> 
+> 3. **Step 3 (Rule 87): Deep Base Rule & 35% Zone (Unmitigated POI):**
+>    - The identified 5M Breaker Block must reside within the Golden Zone (Equilibrium 50% and Fib 0.618 - 0.66).
+>    - BUY setups must originate strictly inside the bottom 35% Discount Base of the Dealing Range.
+>    - SELL setups must originate strictly inside the top 35% Premium Base of the Dealing Range.
+>    - Late-cycle mid-range trades (35% - 65%) are 100% strictly locked out (`No Entry (Anti-Late-Cycle Lock)`).
+> 
+> 4. **Step 4 (Rule 88): Major ERL Sweep & Alert-Only Protocol (Patience Gate):**
+>    - Major External Range Liquidity (ERL) must be swept (BUY: PDL or Asian Low; SELL: PDH or Asian High).
+>    - Retrace into 5M Breaker Block: Price must retrace cleanly inside the 5M Breaker Block.
+>    - **[HARD LOCK 2 - Alert-Only Entry Block]:** When price arrives at the 5M Breaker Block, the bot MUST NOT issue any Entry / Limit Order signal (Zero Blind Limits!). Instead, the bot MUST ONLY issue an alert: `"POI Reached - Waiting for 3M CHoCH"`. Premature entries at Step 4 are 100% strictly forbidden.
+> 
+> 5. **Step 5 (Rule 89): LTF Confirmation (3M Timeframe Lock) & Post-CHoCH FVG Verification:**
+>    - Once price reaches the 5M Breaker Block, switch to the 3M timeframe for confirmation.
+>    - **[HARD LOCK 3 - Strict 3M Data Feed]:** The Execution Engine is strictly locked to the **3-Minute (3M) Timeframe only**. Generating execution signals from 1m data is 100% FORBIDDEN and HARD-BLOCKED.
+>    - **[HARD LOCK 4 - Post-CHoCH FVG Verification]:** Require a clean candle BODY CLOSE Market Structure Shift (3M MSS/CHoCH) accompanied by high relative volume (RVOL >= 1.35x). Crucially, AFTER the 3M CHoCH break occurs, a brand new **3M FVG (Fair Value Gap)** MUST be formed and verified by the bot. If no new 3M FVG exists post-CHoCH, NO trade signal can be given. Fake wick-only CHoCH breaks are rejected.
+> 
+> 6. **Step 6 (Rule 90): Unicorn Setup Engine & Clear Sky Runway (Limit Entry):**
+>    - All confirmations must pass before releasing the final Trade Signal.
+>    - **[HARD LOCK 5 - Dynamic Limit Placement]:** The Limit Order price MUST be placed strictly on the newly formed **3M FVG** (from Step 5), NOT on the old 5M zone! Use 0.04% Spread Buffer (`* 1.0004` for Buy, `* 0.9996` for Sell).
+>    - **Clear Sky Runway:** The entry must have at least 1.5R to 2.0R unobstructed clear runway to the nearest opposing wall.
+> 
+> 7. **Step 7 (Rule 91): Multi-Stage Risk Management & Logical Exit:**
+>    - Stop Loss (SL) anchored outside the newest 3M Swing Extreme with a 0.10% safety buffer (`* 0.9990` for Buy, `* 1.0010` for Sell).
+>    - TP1: 1:2.0 Risk-to-Reward ratio (50% partial close).
+>    - Break-Even (BE): When profit reaches +1.0R, immediately move SL to Entry (Zero-Risk).
+>    - TP2 Runner: Anchored to the nearest major 5M target (5M HH/LL or Supply/Demand zone) targeting 1:3.0R to 1:4.0R.
+> 
+> 8. **Sinhala Translation (සිංහල පරිවර්තනය):**
+>    - **පියවර 1 (නීතිය 85): ආර්ථික පුවත් පෙරහන සහ 15M ප්‍රධාන දිශාව තීරණය කිරීම:** USD High-Impact පුවත් නිකුත් වීමට පෙර සහ පසු විනාඩි 60 තුළ ට්‍රේඩ් කිරීම සම්පූර්ණයෙන්ම අත්හිටුවයි. 15M Timeframe එකෙන් ප්‍රධාන දිශාව (Bullish -> BUY ONLY, Bearish -> SELL ONLY) තීරණය කර Counter-trend සම්පූර්ණයෙන්ම තහනම් කරයි.
+>      - **[HARD LOCK 1 - Anti-Momentum Filter]:** විශාල Momentum Candles මඟින් අපගේ කලාපය (POI) කඩාගෙන මිල කඩා වැටෙන්නේ/නගින්නේ නම්, එම අවස්ථාවේදී අදාළ Setup එක 100% ක් ප්‍රතික්ෂේප කර අතහැර දමයි.
+>    - **පියවර 2 (නීතිය 86): Setup දිශාව සහ 5M Breaker Block එක හඳුනාගැනීම:** 15M/5M Market Structure මත පදනම්ව 5M Breaker Block හඳුනාගනී (Displacement සහිතව කැඩී ගිය Failed OB එක Breaker Block එක ලෙස සලකුණු කරයි).
+>    - **පියවර 3 (නීතිය 87): Deep Base නීතිය සහ 35% කලාපය (Unmitigated POI) තහවුරු කිරීම:** 5M Breaker Block එක Golden Zone (Eq 50% සහ Fib 0.618–0.66) තුළ පිහිටිය යුතුය. Buy සෙටප් Dealing Range හි පහළම 35% Discount Base එක තුළද, Sell සෙටප් ඉහළම 35% Premium Base එක තුළද පිහිටිය යුතුය (Mid-Range Trading තහනම්ය).
+>    - **පියවර 4 (නීතිය 88): ERL Sweep වීම සහ Alert-Only Protocol (Patience Gate):** ප්‍රධාන ERL (PDL/PDH හෝ Asian Low/High) Sweep විය යුතුය. මිල 5M Breaker Block කලාපය ඇතුළටම පැමිණිය යුතුය.
+>      - **[HARD LOCK 2 - Alert-Only Entry Block]:** මිල 5M කලාපයට පැමිණි පමණින් කිසිදු Entry / Limit Order එකක් නොදෙයි (Zero Blind Limits). ඒ වෙනුවට "POI Reached - Waiting for 3M CHoCH" යනුවෙන් Alert එකක් පමණක් නිකුත් කරයි.
+>    - **පියවර 5 (නීතිය 89): කුඩා කාලරාමුවේ Confirmation එක (3M Timeframe Lock):**
+>      - **[HARD LOCK 3 - Strict 3M Data Feed]:** Execution Engine එක අනිවාර්යයෙන්ම 3-Minute (3M) Timeframe එකට පමණක් ලොක් කර ඇත. 1m Data භාවිතයෙන් සිග්නල් දීම 100% ක් තහනම් කර ඇත.
+>      - **[HARD LOCK 4 - Post-CHoCH FVG Verification]:** 3M Chart එකේ Candle Body Close MSS/CHoCH සිදුවිය යුතු අතර, එම Shift එකෙන් පසු අලුතින්ම 3M FVG එකක් සෑදී ඇති බව තහවුරු විය යුතුය. අලුත් 3M FVG එකක් නැතිනම් සිග්නල් ලබා නොදෙයි.
+>    - **පියවර 6 (නීතිය 90): Unicorn Setup එන්ජිම සහ Clear Sky Target එක (Entry එක ලබා දීම):**
+>      - **[HARD LOCK 5 - Dynamic Limit Placement]:** Limit Order එක තබන්නේ පැරණි 5M කලාපයේ නොව, අලුතින් හැදුණු 3M FVG කලාපය මත 0.04% Spread Buffer එකක් සහිතවය. අවම 1.5R - 2.0R Clear Sky Runway එකක් තිබිය යුතුය.
+>    - **පියවර 7 (නීතිය 91): බහු-අදියර අවදානම් කළමනාකරණය (Risk Management):** 3M Swing Extreme පිටතින් 0.10% Buffer සහිත SL. 1:2.0 RR හිදී TP1 50% ලාභය ලබාගනී (Partial Close). +1.0R ලාභයේදී SL එක Entry මිලට ගෙන යයි (Break-Even). TP2 Runner ඉලක්කය 5M HH/LL හෝ Supply/Demand කලාපය (1:3.0R - 1:4.0R).
 

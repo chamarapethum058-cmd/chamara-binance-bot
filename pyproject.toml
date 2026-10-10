@@ -1,0 +1,34 @@
+[tool.pyrefly]
+python-interpreter-path = "backend/.venv/Scripts/python.exe"
+search-path = [
+    "backend",
+    "backend/app",
+    "deploy_huggingface",
+    "deploy_huggingface/app",
+    "backend/.venv/Lib/site-packages"
+]
+site-package-path = [
+    "backend/.venv/Lib/site-packages",
+    "C:/Users/Welcome/AppData/Local/Programs/Python/Python312/Lib/site-packages"
+]
+project-excludes = [
+    "**/node_modules",
+    "**/__pycache__",
+    "**/.venv",
+    "**/scratch/**/*"
+]
+disable-type-errors-in-ide = true
+permissive-ignores = true
+enabled-ignores = [
+    "type",
+    "pyrefly",
+    "pyright",
+    "mypy",
+    "ty",
+    "pyre",
+    "zuban"
+]
+type-ignore-unknown-tag-behavior = "suppress"
+
+[tool.pyrefly.errors]
+missing-import = "ignore"

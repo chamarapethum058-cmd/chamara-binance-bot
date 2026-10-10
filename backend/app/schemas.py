@@ -103,6 +103,11 @@ class SilverBulletRequest(BaseModel):
     # Advanced 9:00 AM Candle Range parameters
     candle_9am_high: Optional[float] = None
     candle_9am_low: Optional[float] = None
+    
+    # Re-Verify & Auto-Alignment parameter
+    reverify_missed: Optional[bool] = False
+    auto_align: Optional[bool] = False
+    execution_mode: Optional[str] = "SCALP_PRO"
 
 class SilverBulletResponse(BaseModel):
     is_valid: bool
@@ -117,6 +122,7 @@ class SilverBulletResponse(BaseModel):
     tp1_rr: Optional[str] = None
     tp2_target: Optional[float] = None
     tp2_rr: Optional[str] = None
+    breakeven_trigger: Optional[float] = None
     reasoning: Optional[str] = None
     invalidation: Optional[str] = None
     risk_notes: Optional[str] = None
@@ -174,6 +180,8 @@ class SilverBulletResponse(BaseModel):
     
     # Confidence/Confirmation Rate field
     confidence: Optional[int] = None
+    execution_mode: Optional[str] = "SCALP_PRO"
+    confluence_score: Optional[int] = None
     
     # Economic news fields
     news_lockout_active: bool = False
@@ -197,6 +205,31 @@ class SilverBulletResponse(BaseModel):
     # Fibonacci Golden/OTE Zone parameters
     fib_retracement: Optional[float] = None
     fib_zone_ok: Optional[bool] = None
+    
+    # 83-Rule Master Institutional Checklist fields
+    rule_79_model: Optional[str] = None
+    rule_80_status: Optional[str] = None
+    rule_81_status: Optional[str] = None
+    rule_82_status: Optional[str] = None
+    # 7-Step Institutional SMC/ICT Trading Engine fields
+    pipeline: Optional[dict] = None
+    setup_path: Optional[str] = None
+    setup_route: Optional[str] = None
+    setup_model: Optional[str] = None
+    tp1_target: Optional[float] = None
+    tp2_target: Optional[float] = None
+    breakeven_trigger: Optional[float] = None
+    h1_strong_low: Optional[float] = None
+    h1_weak_high: Optional[float] = None
+    h1_strong_high: Optional[float] = None
+    h1_weak_low: Optional[float] = None
+    h1_objective: Optional[str] = None
+    h1_objective_si: Optional[str] = None
+    rule_83_status: Optional[str] = None
+    rules_checklist: Optional[List[dict]] = None
+    total_rules: Optional[int] = None
+    passed_rules_count: Optional[int] = None
+    failed_rules_count: Optional[int] = None
 
 class TradeUpdateRequest(BaseModel):
     entry_price: Optional[float] = None

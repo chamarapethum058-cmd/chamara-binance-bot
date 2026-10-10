@@ -6,7 +6,7 @@ from .config import settings
 # Database engine configuration
 if settings.DATABASE_URL.startswith("sqlite"):
     engine = create_engine(
-        settings.DATABASE_URL, connect_args={"check_same_thread": False}
+        settings.DATABASE_URL, connect_args={"check_same_thread": False, "timeout": 30.0}
     )
 else:
     engine = create_engine(settings.DATABASE_URL)

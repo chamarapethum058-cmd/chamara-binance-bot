@@ -1,0 +1,269 @@
+from pydantic import BaseModel
+from typing import Optional, List
+from datetime import datetime
+
+# Strategy schemas
+class StrategyBase(BaseModel):
+    name: str
+    description: Optional[str] = None
+    content: str
+    is_active: bool = False
+
+class StrategyCreate(StrategyBase):
+    pass
+
+class StrategyResponse(StrategyBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+# Analysis schemas
+class AnalysisRequest(BaseModel):
+    symbol: str
+    timeframe: str
+    custom_strategy_id: Optional[int] = None
+
+class AnalysisResponse(BaseModel):
+    id: int
+    timestamp: datetime
+    symbol: str
+    timeframe: str
+    signal: str
+    confidence: int
+    reasoning: str
+    invalidation: str
+    risk_notes: str
+    chart_data: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+# Preference schemas
+class PreferenceBase(BaseModel):
+    key: str
+    value: str
+
+class PreferenceCreate(PreferenceBase):
+    pass
+
+class PreferenceResponse(PreferenceBase):
+    id: int
+
+    class Config:
+        from_attributes = True
+
+# Chat schemas
+class ChatRequest(BaseModel):
+    message: str
+    symbol: Optional[str] = None
+    timeframe: Optional[str] = None
+    analysis_id: Optional[int] = None
+    history: Optional[List[dict]] = None
+
+
+# Translation schemas
+class TranslateRequest(BaseModel):
+    text: str
+
+
+# Silver Bullet analysis schemas
+class SilverBulletRequest(BaseModel):
+    symbol: Optional[str] = None
+    timeframe: Optional[str] = "1m"
+    scenario_text: Optional[str] = None
+    htf_trend: Optional[str] = None
+    pullback_days: Optional[int] = None
+    pdh: Optional[float] = None
+    pdl: Optional[float] = None
+    daily_open: Optional[float] = None
+    daily_close: Optional[float] = None
+    asian_sweep: Optional[bool] = None
+    demand_mitigation: Optional[bool] = None
+    ltf_shift: Optional[bool] = None
+    current_price: Optional[float] = None
+    
+    # Advanced strategy parameters
+    dealing_range_high: Optional[float] = None
+    dealing_range_low: Optional[float] = None
+    killzone: Optional[str] = None # "LONDON", "NY_AM", "NONE"
+    discount_pd_array: Optional[bool] = None
+    premium_pd_array: Optional[bool] = None
+    ltf_trigger: Optional[str] = None # "MSS", "CISD", "NONE"
+    has_fresh_fvg: Optional[bool] = None
+    high_impact_news: Optional[bool] = None
+    
+    # 9-confluence strategy parameters
+    m1_liquidity_sweep: Optional[bool] = None
+    displacement_choch: Optional[bool] = None
+    fvg_ob_confluence: Optional[bool] = None
+    
+    # Advanced 9:00 AM Candle Range parameters
+    candle_9am_high: Optional[float] = None
+    candle_9am_low: Optional[float] = None
+    
+    # Re-Verify & Auto-Alignment parameter
+    reverify_missed: Optional[bool] = False
+    auto_align: Optional[bool] = False
+    execution_mode: Optional[str] = "SCALP_PRO"
+
+class SilverBulletResponse(BaseModel):
+    is_valid: bool
+    status_message: str
+    market_structure_status: Optional[str] = None
+    daily_bias: Optional[str] = None
+    liquidity_target: Optional[float] = None
+    entry_price_area: Optional[str] = None
+    stop_loss_level: Optional[float] = None
+    target_reward_ratio: Optional[str] = None
+    tp1_target: Optional[float] = None
+    tp1_rr: Optional[str] = None
+    tp2_target: Optional[float] = None
+    tp2_rr: Optional[str] = None
+    breakeven_trigger: Optional[float] = None
+    reasoning: Optional[str] = None
+    invalidation: Optional[str] = None
+    risk_notes: Optional[str] = None
+    
+    # Advanced computed parameters
+    equilibrium_price: Optional[float] = None
+    zone_type: Optional[str] = None # "DISCOUNT", "PREMIUM", "EQUILIBRIUM"
+    daily_open_relation: Optional[str] = None # "ABOVE_OPEN", "BELOW_OPEN", "N/A"
+    killzone_valid: Optional[bool] = None
+    counter_trend_locked: Optional[bool] = None
+    po3_phase: Optional[str] = None
+    
+    # Antigravity Master Spec fields
+    erl_irl_state: Optional[str] = None
+    swept_liquidity_pool: Optional[str] = None
+    mitigated_pd_array_type: Optional[str] = None
+    
+    # Advanced 9AM range filter details
+    is_advanced_setup: Optional[bool] = None
+    advanced_setup_status: Optional[str] = None # "NONE", "9AM_LOW_SWEPT_MSS_PENDING", "9AM_HIGH_SWEPT_MSS_PENDING", "TRIGGERED"
+    
+    # Detailed 10-Step Silver Bullet Confirmation fields
+    sb_step_1_time_window_ok: Optional[bool] = None
+    sb_step_1_details: Optional[str] = None
+    sb_step_2_liquidity_sweep_ok: Optional[bool] = None
+    sb_step_2_details: Optional[str] = None
+    sb_step_3_displacement_mss_ok: Optional[bool] = None
+    sb_step_3_details: Optional[str] = None
+    sb_step_4_fvg_bpr_ok: Optional[bool] = None
+    sb_step_4_details: Optional[str] = None
+    sb_step_5_entry_exec_ok: Optional[bool] = None
+    sb_step_5_details: Optional[str] = None
+    sb_step_6_risk_mgmt_ok: Optional[bool] = None
+    sb_step_6_details: Optional[str] = None
+    sb_step_7_london_asian_sweep_ok: Optional[bool] = None
+    sb_step_7_details: Optional[str] = None
+    sb_step_8_htf_pd_mitigation_ok: Optional[bool] = None
+    sb_step_8_details: Optional[str] = None
+    sb_step_9_ltf_choch_ok: Optional[bool] = None
+    sb_step_9_details: Optional[str] = None
+    sb_step_10_fvg_limit_ok: Optional[bool] = None
+    sb_step_10_details: Optional[str] = None
+    sb_step_11_equilibrium_ok: Optional[bool] = None
+    sb_step_11_details: Optional[str] = None
+    sb_step_12_po3_align_ok: Optional[bool] = None
+    sb_step_12_details: Optional[str] = None
+    sb_step_13_htf_mapped_ok: Optional[bool] = None
+    sb_step_13_details: Optional[str] = None
+    sb_step_14_ltf_tap_ok: Optional[bool] = None
+    sb_step_14_details: Optional[str] = None
+    sb_step_15_dual_entry_ok: Optional[bool] = None
+    sb_step_15_details: Optional[str] = None
+    sb_step_16_htf_align_ok: Optional[bool] = None
+    sb_step_16_details: Optional[str] = None
+    
+    # Confidence/Confirmation Rate field
+    confidence: Optional[int] = None
+    execution_mode: Optional[str] = "SCALP_PRO"
+    confluence_score: Optional[int] = None
+    
+    # Economic news fields
+    news_lockout_active: bool = False
+    active_news_event: Optional[str] = None
+    upcoming_news_events: Optional[List[dict]] = None
+    
+    # SMC Dual Entry fields
+    original_extreme_entry: Optional[float] = None
+    fvg_boundary_entry: Optional[float] = None
+    rsi_value: Optional[float] = None
+    rsi_ok: Optional[bool] = None
+    double_mitigation_ok: Optional[bool] = None
+    rejection_wick_ok: Optional[bool] = None
+    frvp_ok: Optional[bool] = None
+    
+    # 9-confluence strategy parameters
+    m1_liquidity_sweep: Optional[bool] = None
+    displacement_choch: Optional[bool] = None
+    fvg_ob_confluence: Optional[bool] = None
+    
+    # Fibonacci Golden/OTE Zone parameters
+    fib_retracement: Optional[float] = None
+    fib_zone_ok: Optional[bool] = None
+    
+    # 83-Rule Master Institutional Checklist fields
+    rule_79_model: Optional[str] = None
+    rule_80_status: Optional[str] = None
+    rule_81_status: Optional[str] = None
+    rule_82_status: Optional[str] = None
+    # 7-Step Institutional SMC/ICT Trading Engine fields
+    pipeline: Optional[dict] = None
+    setup_path: Optional[str] = None
+    setup_route: Optional[str] = None
+    setup_model: Optional[str] = None
+    tp1_target: Optional[float] = None
+    tp2_target: Optional[float] = None
+    breakeven_trigger: Optional[float] = None
+    h1_strong_low: Optional[float] = None
+    h1_weak_high: Optional[float] = None
+    h1_strong_high: Optional[float] = None
+    h1_weak_low: Optional[float] = None
+    h1_objective: Optional[str] = None
+    h1_objective_si: Optional[str] = None
+    rule_83_status: Optional[str] = None
+    rules_checklist: Optional[List[dict]] = None
+    total_rules: Optional[int] = None
+    passed_rules_count: Optional[int] = None
+    failed_rules_count: Optional[int] = None
+
+class TradeUpdateRequest(BaseModel):
+    entry_price: Optional[float] = None
+    stop_loss: Optional[float] = None
+    take_profit: Optional[float] = None
+    confidence: Optional[int] = None
+    status: Optional[str] = None
+
+class LoggedTradeCreate(BaseModel):
+    symbol: str
+    direction: str
+    entry_price: float
+    stop_loss: float
+    take_profit: float
+    confidence: Optional[int] = None
+    strategy_type: Optional[str] = "SMC"
+    timeframe: Optional[str] = "1m"
+
+class LoggedTradeResponse(BaseModel):
+    id: int
+    symbol: str
+    direction: str
+    entry_price: float
+    stop_loss: float
+    take_profit: float
+    status: str
+    confidence: Optional[int] = None
+    strategy_type: Optional[str] = "SMC"
+    timeframe: Optional[str] = "1m"
+    timestamp: datetime
+
+    class Config:
+        from_attributes = True
+
+
+
+

@@ -1,0 +1,1558 @@
+from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
+from typing import List, Dict, Any, Optional
+import json
+import logging
+
+logger = logging.getLogger(__name__)
+
+from .database import engine, Base, get_db, SessionLocal
+from .models import StrategyModel, AnalysisModel, PreferenceModel, LoggedTradeModel
+from .schemas import (
+    StrategyCreate, StrategyResponse, 
+    AnalysisRequest, AnalysisResponse,
+    PreferenceCreate, PreferenceResponse,
+    ChatRequest, TranslateRequest,
+    SilverBulletRequest, SilverBulletResponse,
+    LoggedTradeCreate, LoggedTradeResponse,
+    TradeUpdateRequest
+)
+from .services import BinanceService, AIService, NewsService
+from .telegram_service import TelegramService
+from .config import settings
+from .tracker import start_tracking, stop_tracking, get_trackers_status
+
+# Create database tables
+Base.metadata.create_all(bind=engine)
+
+app = FastAPI(title="Project Falcon Backend", version="1.0.0")
+
+# CORS middleware configuration
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # For local development
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Initialize default strategy if empty
+@app.on_event("startup")
+def startup_populate():
+    db = SessionLocal()
+    
+    # Check if SMC exists, if not seed it
+    smc_exists = db.query(StrategyModel).filter(StrategyModel.name == "SMC (Smart Money Concepts)").first()
+    if not smc_exists:
+        default_smc = StrategyModel(
+            name="SMC (Smart Money Concepts)",
+            description="Smart Money Concepts strategy analyzing BOS, CHOCH, FVG, and Order Blocks.",
+            content="""# Smart Money Concepts (SMC) Strategy
+
+## 1. Timeframes & Scope
+- Symbol: BTC/USDT, ETH/USDT, SOL/USDT
+- High Timeframe (HTF): 4-Hour (Market Trend / Major Levels)
+- Low Timeframe (LTF): 15-Minute (Entry confirmation and setups)
+
+## 2. Core Trading Indicators & Structural Elements
+- BOS (Break of Structure): Continuation of the trend.
+- CHOCH (Change of Character): Reversal point of the trend.
+- FVG (Fair Value Gap): Candlestick imbalances where price was delivered inefficiently.
+- Order Blocks (OB): Last opposite candle before a strong structural expansion.
+
+## 3. Entry Rules (Long/Bullish Setup)
+1. HTF must be in an overall bullish structure, or tap into a 4H Bullish Order Block / FVG discount zone.
+2. Wait for a Bullish CHOCH (break of swing high) on the 15M chart.
+3. Identify the 15M Bullish Order Block or FVG that caused the CHOCH.
+4. Set limit entry at the open/50% level of that 15M Order Block or at the top of the FVG.
+
+## 4. Exit / Invalidation Rules
+- Stop Loss: Placed directly below the swing low that initiated the CHOCH.
+- Take Profit: Target the nearest key high (liquidity pool) or 4H premium range.
+- Minimum Risk-to-Reward Ratio: 1:3.
+- Invalidation: If price breaches below the swing low before our entry is triggered, the setup is invalid.
+""",
+            is_active=True
+        )
+        db.add(default_smc)
+        db.commit()
+        print("Default SMC strategy populated.")
+        
+    # Check if ICT Silver Bullet exists, if not seed it
+    sb_exists = db.query(StrategyModel).filter(StrategyModel.name == "ICT Silver Bullet").first()
+    if not sb_exists:
+        # Deactivate other strategies to make this one the primary active strategy
+        db.query(StrategyModel).update({StrategyModel.is_active: False})
+        default_sb = StrategyModel(
+            name="ICT Silver Bullet",
+            description="Ultimate scalp trading specification for multi-timeframe bias and execution assistant (London Open, AM Session, PM Session, and 9:00 AM range sweep mechanics).",
+            content="""# ULTIMATE SYSTEM SPECIFICATION DOCUMENT (FINAL PRODUCTION READY)
+## ENGINE LOGIC FOR MULTI-TIMEFRAME BIAS & ICT SILVER BULLET ASSISTANT
+
+### 1. ALGORITHMIC CORE & SYSTEM NATURE
+*   System Foundation: Inner Circle Trader (ICT) & Smart Money Concepts (SMC) frameworks.
+*   Algorithmic Deliverables: The market algorithm moves non-randomly between External Range Liquidity (ERL) and Internal Range Liquidity (IRL). Its mechanics are bounded by:
+    1. Hunt Liquidity (Seek & Destroy retail stop losses).
+    2. Re-balance Inefficiencies (Fair Valuation Engine via FVGs and Liquidity Voids).
+    3. Engineered Liquidity (Generating structural liquidity pools to act as future draws).
+    4. Rebalancing Equilibrium (Systematic pricing flow back and forth between Premium and Discount arrays).
+*   Dealing Range Formation: After previous Buy-Side Liquidity (BSL) and Sell-Side Liquidity (SSL) are completely taken, the system defines a new active dealing range using the absolute swing high and swing low. Draw an exact 50% Equilibrium Line.
+*   System Nature (Scalp Constraints): Setups are high-velocity scalp entries designed to resolve within a maximum holding time of 1 Hour (1H). Risk must be kept tight (Stop Loss: 1.5 - 2.5 points) and target close (1:2 to 1:3 RR targets) to achieve fast execution and quick TP matches near current market price.
+
+---
+
+### 2. DYNAMIC PD-ARRAY MATRIX PROCESSING
+The system must automatically calculate the 50% Equilibrium Line across the active dealing range and map the structural hierarchy of the Premium-to-Discount Array List:
+
+*   Premium Zone (Above 50% Line) -> Allowed Setup: Shorts (Sells) Only. Valid PD Arrays: Old High/Low, Rejection Block, Bearish Order Block, Fair Value Gap (FVG/SIBI), Liquidity Void, Bearish Breaker Block, Bearish Mitigation Block.
+*   Discount Zone (Below 50% Line) -> Allowed Setup: Buys (Longs) Only. Valid PD Arrays: Bullish Mitigation Block, Bullish Breaker Block, Liquidity Void, Fair Value Gap (FVG/BISI), Bullish Order Block, Rejection Block, Old Low/High.
+
+#### Mechanical Footprint Definitions for Coding:
+1.  Order Blocks (OB): Specific candles showing high institutional volume blocks. Sells at highest point of expansion; Buys at lowest point of retracement.
+2.  Breaker Blocks: A failed order block broken through aggressively during an MSS, acting as support/resistance inversion.
+3.  Mitigation Blocks: Similar to a breaker block but specifically formed during a Failure Swing scenario (price fails to create a higher high or lower low before shifting structure aggressively).
+4.  Rejection Blocks: Price zones at the wicks of a swing high/low where liquidity is raided, but candle bodies fail to close.
+
+---
+
+### 3. FRACTAL BIAS & INTRADAY MAGNET TRACKING
+*   Proximity Filter: If price is near BSL, the operational bias is Bullish until taken; if near SSL, it is Bearish until cleared.
+*   The HTF Pullback Rule (GOLD Case Study): If the Daily structure is Bullish but undergoes a 3-day consecutive bearish pullback (Monday to Wednesday) into a HTF Demand array, track the lower timeframe Fractal Order Flow shift. Once Fractal Order Flow aligns bullishly, Daily Bias locks back to Bullish targeting the PDH (Previous Daily High).
+*   Daily Open Vector: Price trading ABOVE Daily Open = Premium Pricing (Filter for Short-Term Bearish reversals). Price trading BELOW Daily Open = Discount Pricing (Filter for High-Probability Buy setups).
+
+---
+
+### 4. THE ICT SILVER BULLET EXECUTION ENGINE
+
+#### A. Strict Silver Bullet Time Ranges (NY Time vs. Local Sri Lankan Time)
+The engine must strictly monitor setups only during these three independent operational windows:
+1.  London Open Silver Bullet: 03:00 AM - 04:00 AM NY Time (12:30 PM - 01:30 PM Sri Lankan Time).
+2.  AM Session Silver Bullet: 10:00 AM - 11:00 AM NY Time (07:30 PM - 08:30 PM Sri Lankan Time) -> Priority Zone: Heavily correlated with NY Stock Exchange open volatility.
+3.  PM Session Silver Bullet: 02:00 PM - 03:00 PM NY Time (11:30 PM - 12:30 AM Sri Lankan Time).
+
+#### B. Timeframe Alignment Matrix
+*   HTF Anchor: 1-Hour (1H) or 15-Minute (15MIN) structure to identify market context and clear Draw on Liquidity points.
+*   LTF Execution: 5-Minute, 3-Minute, or 1-Minute charts (1-Minute chart is the optimal execution layer).
+
+#### C. Normal Scenario Entry Setup Mechanics
+*   1. Liquidity Grab (Stop Hunt) -> Look for a clear sweep of a previous high/low (SSL Sweep or BSL Sweep) with an aggressive move beyond liquidity followed by a strong rejection candle footprint.
+*   2. Market Structure Shift (MSS) -> Price must break a key swing level with strong momentum, confirming smart money directional change.
+*   3. Inefficiency Array -> Locate a Fair Value Gap (BISI for Buy / SIBI for Sell) left inside the displacement leg between the MSS point and the liquidity grab low/high.
+*   4. Trade Execution -> Set a limit order at the midpoint (50% Consequent Encroachment) of the FVG, OR enter at market if price reaches the FVG and shows signs of immediate rejection.
+
+#### D. Advanced Scenario Setup Mechanics (9:00 AM Candlestick Range Filter)
+*   *Application Window:* Applied specifically to the 10:00 AM - 11:00 AM NY Silver Bullet Window.
+*   *Mechanical Filter:* Map the exact 09:00 AM Candle High and 09:00 AM Candle Low on the 1H chart.
+*   Advanced Buy Setup Condition: Price handles execution inside the 10-11 AM window by first driving lower to completely violate/sweep the 09:00 AM Candle Low. This acts as the structural Liquidity Raid. Once MSS/CISD triggers post-sweep, execute the buy setup targeting the 09:00 AM Candle High.
+*   Advanced Sell Setup Condition: Price drives higher inside the 10-11 AM window to violate/sweep the 09:00 AM Candle High (Liquidity Raid). Once mss triggers on the LTF, execute the short target matching the 09:00 AM Candle Low.
+
+---
+
+### 5. RISK PROFILE & POSITION METRICS
+*   Risk Management Constraints: Never risk more than 1% to 2% per trade (0.5% configuration strongly recommended for funded account safety protocols). Ignore all counter-trend setups.
+*   Stop-Loss (SL) Placement Rules:
+    *   For Longs: Mechanically place SL below the lowest Swing Low or the last validated Liquidity Point.
+    *   For Shorts: Mechanically place SL above the highest Swing High or the last validated Liquidity Point.
+    *   *Alternative Local SL:* If structural swing points are too distant, place the SL right below/above the specific FVG candle boundary to optimize risk.
+*   Take-Profit (TP) Target Hierarchy:
+    *   First TP: Nearest local liquidity pool (Major Equal Highs or Equal Lows).
+    *   Second TP: A key higher timeframe liquidity magnet point (PDH/PDL or session highs).
+    *   Final TP: Next remaining unfilled FVG (Algorithmic target).
+""",
+            is_active=True
+        )
+        db.add(default_sb)
+        db.commit()
+        print("Default ICT Silver Bullet strategy populated.")
+    
+    # Seed default Gemini API Key from settings if not set in DB
+    pref = db.query(PreferenceModel).filter(PreferenceModel.key == "gemini_api_key").first()
+    if not pref and settings.GEMINI_API_KEY:
+        db_pref = PreferenceModel(key="gemini_api_key", value=settings.GEMINI_API_KEY)
+        db.add(db_pref)
+        db.commit()
+        print("Default Gemini API Key preference seeded from settings (.env).")
+        
+    # Seed default Telegram Bot Token if not set in DB
+    tel_token_pref = db.query(PreferenceModel).filter(PreferenceModel.key == "telegram_bot_token").first()
+    if not tel_token_pref and settings.TELEGRAM_BOT_TOKEN:
+        db_pref = PreferenceModel(key="telegram_bot_token", value=settings.TELEGRAM_BOT_TOKEN)
+        db.add(db_pref)
+        db.commit()
+        print("Default Telegram Bot Token preference seeded from settings.")
+
+    # Seed default Telegram Chat ID if not set in DB
+    tel_chat_pref = db.query(PreferenceModel).filter(PreferenceModel.key == "telegram_chat_id").first()
+    if not tel_chat_pref and settings.TELEGRAM_CHAT_ID:
+        db_pref = PreferenceModel(key="telegram_chat_id", value=settings.TELEGRAM_CHAT_ID)
+        db.add(db_pref)
+        db.commit()
+        print("Default Telegram Chat ID preference seeded from settings.")
+        
+    db.close()
+    
+    # Start the background SMC watchlist tracker loop
+    from .tracker import start_smc_tracker, start_tcs_tracker
+    start_smc_tracker()
+    start_tcs_tracker()
+
+@app.get("/api/health")
+def health_check():
+    return {"status": "healthy", "service": "Project Falcon API"}
+
+# STRATEGY ENDPOINTS
+@app.get("/api/strategies", response_model=List[StrategyResponse])
+def list_strategies(db: Session = Depends(get_db)):
+    return db.query(StrategyModel).all()
+
+@app.post("/api/strategies", response_model=StrategyResponse)
+def create_strategy(strategy: StrategyCreate, db: Session = Depends(get_db)):
+    # Check if name exists
+    existing = db.query(StrategyModel).filter(StrategyModel.name == strategy.name).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="Strategy with this name already exists"
+        )
+    
+    # If active, deactivate others
+    if strategy.is_active:
+        db.query(StrategyModel).update({StrategyModel.is_active: False})
+        
+    db_strategy = StrategyModel(**strategy.dict())
+    db.add(db_strategy)
+    db.commit()
+    db.refresh(db_strategy)
+    return db_strategy
+
+@app.get("/api/strategies/{strategy_id}", response_model=StrategyResponse)
+def get_strategy(strategy_id: int, db: Session = Depends(get_db)):
+    db_strategy = db.query(StrategyModel).filter(StrategyModel.id == strategy_id).first()
+    if not db_strategy:
+        raise HTTPException(status_code=404, detail="Strategy not found")
+    return db_strategy
+
+@app.put("/api/strategies/{strategy_id}/activate", response_model=StrategyResponse)
+def activate_strategy(strategy_id: int, db: Session = Depends(get_db)):
+    db_strategy = db.query(StrategyModel).filter(StrategyModel.id == strategy_id).first()
+    if not db_strategy:
+        raise HTTPException(status_code=404, detail="Strategy not found")
+    
+    # Deactivate all other strategies
+    db.query(StrategyModel).update({StrategyModel.is_active: False})
+    
+    # Activate selected strategy
+    db_strategy.is_active = True
+    db.commit()
+    db.refresh(db_strategy)
+    return db_strategy
+
+@app.delete("/api/strategies/{strategy_id}")
+def delete_strategy(strategy_id: int, db: Session = Depends(get_db)):
+    db_strategy = db.query(StrategyModel).filter(StrategyModel.id == strategy_id).first()
+    if not db_strategy:
+        raise HTTPException(status_code=404, detail="Strategy not found")
+    
+    # Do not allow deleting the last remaining active strategy
+    if db_strategy.is_active:
+        next_strat = db.query(StrategyModel).filter(StrategyModel.id != strategy_id).first()
+        if next_strat:
+            next_strat.is_active = True
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, 
+                detail="Cannot delete the active strategy when it is the only one."
+            )
+            
+    db.delete(db_strategy)
+    db.commit()
+    return {"detail": "Strategy deleted successfully"}
+
+# PREFERENCE ENDPOINTS
+@app.get("/api/preferences", response_model=List[PreferenceResponse])
+def get_preferences(db: Session = Depends(get_db)):
+    return db.query(PreferenceModel).all()
+
+# Cache for Gemini status to avoid rate limits
+_gemini_status_cache = {"status": "UNKNOWN", "details": "", "timestamp": 0.0}
+
+@app.get("/api/preferences/gemini-status")
+async def get_gemini_status(db: Session = Depends(get_db)):
+    import time
+    global _gemini_status_cache
+    now = time.time()
+    
+    pref = db.query(PreferenceModel).filter(PreferenceModel.key == "gemini_api_key").first()
+    api_key = pref.value if (pref and pref.value) else settings.GEMINI_API_KEY
+    if not api_key:
+        return {
+            "status": "MISSING", 
+            "details": "Gemini API Key is missing. Enter it in Settings to enable AI features. | Gemini API Key එක ඇතුලත් කර නැත."
+        }
+    
+    # If the key has already been verified and is VALID, bypass making a live connection request entirely!
+    if _gemini_status_cache.get("status") == "VALID" and _gemini_status_cache.get("api_key") == api_key:
+        return dict(_gemini_status_cache)
+        
+    try:
+        from google import genai
+        client = genai.Client(api_key=api_key)
+        # Verify key validity using lightweight models.list() to authenticate without burning generation tokens
+        models_iter = client.models.list()
+        _gemini_status_cache = {
+            "status": "VALID",
+            "details": "Gemini API connection is active and valid. | Gemini සම්බන්ධතාවය සක්‍රිය සහ වලංගු වේ.",
+            "timestamp": now,
+            "provider": "GEMINI",
+            "api_key": api_key
+        }
+    except Exception as e:
+        err_str = str(e)
+        print(f"DEBUG GEMINI STATUS CHECK ERROR: {err_str}")
+        if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "quota" in err_str.lower():
+            _gemini_status_cache = {
+                "status": "INVALID",
+                "details": "Gemini API Key has exceeded its quota (429 Rate Limited). Please try a new key or set up billing. | API Key එකෙහි සීමාව ඉක්මවා ඇත (429 Rate Limited).",
+                "timestamp": now,
+                "provider": "GEMINI",
+                "api_key": api_key
+            }
+        elif "401" in err_str or "API_KEY_INVALID" in err_str or "unauthenticated" in err_str.lower() or "invalid API key" in err_str.lower():
+            _gemini_status_cache = {
+                "status": "INVALID",
+                "details": "Gemini API Key is invalid or expired. Please update it in Settings. | API Key එක වැරදි හෝ කල් ඉකුත් වී ඇත.",
+                "timestamp": now,
+                "provider": "GEMINI",
+                "api_key": api_key
+            }
+        else:
+            _gemini_status_cache = {
+                "status": "ERROR",
+                "details": f"API Error: {err_str} | API දෝෂයකි: {err_str}",
+                "timestamp": now,
+                "provider": "GEMINI",
+                "api_key": api_key
+            }
+            
+    return _gemini_status_cache
+
+@app.post("/api/telegram/test")
+async def test_telegram_alert():
+    try:
+        from .services import BinanceService
+        from .chart_service import ChartService
+        # Fetch live BTC klines
+        klines = await BinanceService.fetch_klines("BTCUSDT", "5m", limit=50)
+        curr_price = float(klines[-1][4]) if klines else 65420.0
+        entry = round(curr_price * 0.9990, 2)
+        sl = round(entry * 0.9975, 2)
+        risk = entry - sl
+        tp1 = round(entry + (risk * 1.0), 2)
+        tp2 = round(entry + (risk * 2.0), 2)
+
+        caption, reply_markup = TelegramService.build_trade_alert(
+            symbol="BTCUSDT",
+            direction="LONG",
+            entry_price=entry,
+            stop_loss=sl,
+            tp1=tp1,
+            tp2=tp2,
+            leverage="15x - 20x (Cross)",
+            confidence=92,
+            trend_1h="BULLISH"
+        )
+
+        chart_bytes = ChartService.generate_smc_chart(
+            symbol="BTCUSDT",
+            timeframe="5m",
+            klines=klines,
+            entry=entry,
+            sl=sl,
+            tp1=tp1,
+            tp2=tp2,
+            direction="LONG"
+        )
+
+        if chart_bytes:
+            success = await TelegramService.send_photo(chart_bytes, caption, symbol="BTCUSDT", reply_markup=reply_markup)
+        else:
+            success = await TelegramService.send_message(caption, symbol="BTCUSDT", reply_markup=reply_markup)
+
+        if success:
+            return {"status": "success", "message": "Live BTC test chart alert sent successfully to Telegram."}
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Failed to send test notification. Please verify your Bot Token and Chat ID. | ටෙලිග්‍රෑම් පණිවිඩය යැවීමට නොහැකි විය."
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        import logging
+        logging.error(f"Error in test_telegram_alert: {e}")
+        success = await TelegramService.send_message("🔔 <b>Project Falcon Connection Test</b>\n\nTelegram connection is working! 🚀")
+        if success:
+            return {"status": "success", "message": "Test notification sent successfully to Telegram."}
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to send test notification: {e}"
+        )
+
+from pydantic import BaseModel
+
+class TelegramSendRequest(BaseModel):
+    message: str
+
+@app.post("/api/telegram/send")
+async def send_custom_telegram_message(req: TelegramSendRequest):
+    success = await TelegramService.send_message(req.message)
+    if success:
+        return {"status": "success", "message": "Message sent successfully to Telegram."}
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Failed to send message. Please check your Telegram configurations. | ටෙලිග්‍රෑම් පණිවිඩය යැවීමට නොහැකි විය."
+        )
+
+@app.post("/api/preferences", response_model=PreferenceResponse)
+def set_preference(pref: PreferenceCreate, db: Session = Depends(get_db)):
+    val_to_save = pref.value
+    if pref.key == "gemini_api_key" and val_to_save:
+        val_to_save = val_to_save.strip().replace('"', '').replace("'", "")
+        
+    db_pref = db.query(PreferenceModel).filter(PreferenceModel.key == pref.key).first()
+    if db_pref:
+        db_pref.value = val_to_save
+    else:
+        db_pref = PreferenceModel(key=pref.key, value=val_to_save)
+        db.add(db_pref)
+    db.commit()
+    db.refresh(db_pref)
+    
+    # Invalidate cache if key was updated
+    if pref.key == "gemini_api_key":
+        global _gemini_status_cache
+        _gemini_status_cache = {"status": "UNKNOWN", "details": "", "timestamp": 0.0}
+        
+    return db_pref
+
+@app.get("/api/watchlist/smc")
+def get_smc_watchlist(db: Session = Depends(get_db)):
+    pref = db.query(PreferenceModel).filter(PreferenceModel.key == "smc_monitored_coins").first()
+    if pref and pref.value:
+        try:
+            return json.loads(pref.value)
+        except Exception:
+            return []
+    return []
+
+@app.post("/api/watchlist/smc")
+def update_smc_watchlist(watchlist: List[Dict[str, Any]], db: Session = Depends(get_db)):
+    pref = db.query(PreferenceModel).filter(PreferenceModel.key == "smc_monitored_coins").first()
+    json_val = json.dumps(watchlist)
+    if pref:
+        pref.value = json_val
+    else:
+        pref = PreferenceModel(key="smc_monitored_coins", value=json_val)
+        db.add(pref)
+    db.commit()
+    return {"status": "success", "message": "SMC Watchlist updated successfully."}
+
+@app.get("/api/watchlist/tcs")
+def get_tcs_watchlist(db: Session = Depends(get_db)):
+    pref = db.query(PreferenceModel).filter(PreferenceModel.key == "tcs_monitored_coins").first()
+    if pref and pref.value:
+        try:
+            return json.loads(pref.value)
+        except Exception:
+            return []
+    return []
+
+@app.post("/api/watchlist/tcs")
+def update_tcs_watchlist(watchlist: List[Dict[str, Any]], db: Session = Depends(get_db)):
+    pref = db.query(PreferenceModel).filter(PreferenceModel.key == "tcs_monitored_coins").first()
+    json_val = json.dumps(watchlist)
+    if pref:
+        pref.value = json_val
+    else:
+        pref = PreferenceModel(key="tcs_monitored_coins", value=json_val)
+        db.add(pref)
+    db.commit()
+    return {"status": "success", "message": "TCS Watchlist updated successfully."}
+
+# TRANSLATION ENDPOINTS
+@app.post("/api/translate")
+async def translate_text_endpoint(req: TranslateRequest, db: Session = Depends(get_db)):
+    pref = db.query(PreferenceModel).filter(PreferenceModel.key == "gemini_api_key").first()
+    api_key = pref.value if pref else None
+    
+    translated = await AIService.translate_text(req.text, api_key=api_key)
+    return {"translated": translated}
+
+# NEWS ENDPOINTS
+@app.get("/api/news")
+async def get_crypto_news():
+    try:
+        return await NewsService.fetch_news()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ANALYSIS ENDPOINTS
+@app.get("/api/analysis/history", response_model=List[AnalysisResponse])
+def get_analysis_history(db: Session = Depends(get_db)):
+    # Return latest analyses first
+    return db.query(AnalysisModel).order_by(AnalysisModel.timestamp.desc()).limit(50).all()
+
+@app.post("/api/analysis/trigger", response_model=AnalysisResponse)
+async def trigger_analysis(req: AnalysisRequest, db: Session = Depends(get_db)):
+    # 1. Retrieve the selected or active strategy
+    strategy = None
+    if req.custom_strategy_id:
+        strategy = db.query(StrategyModel).filter(StrategyModel.id == req.custom_strategy_id).first()
+    
+    if not strategy:
+        strategy = db.query(StrategyModel).filter(StrategyModel.is_active == True).first()
+        
+    if not strategy:
+        raise HTTPException(status_code=400, detail="No active strategy found in database.")
+    
+    # 2. Fetch live market data from Binance
+    try:
+        klines = await BinanceService.fetch_klines(symbol=req.symbol, interval=req.timeframe, limit=100)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Market data fetch error: {str(e)}")
+    
+    # 2.5. Get API Key from DB preferences if exists
+    pref = db.query(PreferenceModel).filter(PreferenceModel.key == "gemini_api_key").first()
+    api_key = pref.value if pref else None
+
+    # 3. Request analysis from AI Brain
+    analysis_result = await AIService.analyze_market(
+        symbol=req.symbol,
+        timeframe=req.timeframe,
+        klines=klines,
+        strategy_content=strategy.content,
+        api_key=api_key
+    )
+    
+    # 4. Save analysis to history database
+    db_analysis = AnalysisModel(
+        symbol=req.symbol.upper(),
+        timeframe=req.timeframe,
+        signal=analysis_result.get("signal", "NEUTRAL"),
+        confidence=analysis_result.get("confidence", 50),
+        reasoning=analysis_result.get("reasoning", ""),
+        invalidation=analysis_result.get("invalidation", ""),
+        risk_notes=analysis_result.get("risk_notes", ""),
+        chart_data=json.dumps(klines[-30:]) # Save last 30 candles for chart redraw
+    )
+    
+    db.add(db_analysis)
+    db.commit()
+    db.refresh(db_analysis)
+    
+    return db_analysis
+
+
+@app.post("/api/chat")
+async def chat_with_ai(req: ChatRequest, db: Session = Depends(get_db)):
+    # 1. Retrieve the active strategy
+    strategy = db.query(StrategyModel).filter(StrategyModel.is_active == True).first()
+    strategy_content = strategy.content if strategy else "No active strategy rules configured."
+    
+    # 2. Retrieve the active analysis context if an analysis_id is provided
+    analysis_context = ""
+    if req.analysis_id:
+        analysis = db.query(AnalysisModel).filter(AnalysisModel.id == req.analysis_id).first()
+        if analysis:
+            analysis_context = (
+                f"Active Analysis Context:\n"
+                f"- Symbol: {analysis.symbol}\n"
+                f"- Timeframe: {analysis.timeframe}\n"
+                f"- Current Signal: {analysis.signal}\n"
+                f"- Confidence Level: {analysis.confidence}%\n"
+                f"- Reasoning: {analysis.reasoning}\n"
+                f"- Invalidation rules: {analysis.invalidation}\n"
+                f"- Risk warnings: {analysis.risk_notes}\n"
+            )
+            
+    # 3. Get API Key from DB preferences if exists
+    pref = db.query(PreferenceModel).filter(PreferenceModel.key == "gemini_api_key").first()
+    api_key = pref.value if pref else None
+    
+    # 4. Fetch dynamic chat response from Gemini
+    response_text = await AIService.chat_response(
+        message=req.message,
+        strategy_content=strategy_content,
+        analysis_context=analysis_context,
+        chat_history=req.history or [],
+        api_key=api_key
+    )
+    
+    return {"response": response_text}
+
+
+@app.post("/api/silverbullet/analyze", response_model=SilverBulletResponse)
+async def silverbullet_analyze(req: SilverBulletRequest, db: Session = Depends(get_db)):
+    # Retrieve Gemini API Key from DB
+    pref = db.query(PreferenceModel).filter(PreferenceModel.key == "gemini_api_key").first()
+    api_key = pref.value if pref else None
+    
+    # Run analysis
+    result = await AIService.analyze_silver_bullet(req.dict(), api_key=api_key)
+    
+    # Sanitize float fields
+    for field in ["liquidity_target", "stop_loss_level", "equilibrium_price", "breakeven_trigger"]:
+        val = result.get(field)
+        if val is not None:
+            if isinstance(val, str):
+                val_clean = val.strip().lower()
+                if val_clean in ["none", "n/a", "null", ""]:
+                    result[field] = None
+                else:
+                    try:
+                        result[field] = float(val)
+                    except ValueError:
+                        result[field] = None
+            else:
+                try:
+                    result[field] = float(val)
+                except (ValueError, TypeError):
+                    result[field] = None
+
+    # Ensure correct format in response
+    return SilverBulletResponse(
+        is_valid=result.get("is_valid", False),
+        status_message=result.get("status_message") or "Success",
+        market_structure_status=result.get("market_structure_status"),
+        daily_bias=result.get("daily_bias"),
+        liquidity_target=result.get("liquidity_target"),
+        entry_price_area=result.get("entry_price_area"),
+        stop_loss_level=result.get("stop_loss_level"),
+        target_reward_ratio=result.get("target_reward_ratio"),
+        reasoning=result.get("reasoning"),
+        invalidation=result.get("invalidation"),
+        risk_notes=result.get("risk_notes"),
+        
+        # Advanced strategy computed variables
+        equilibrium_price=result.get("equilibrium_price"),
+        zone_type=result.get("zone_type"),
+        daily_open_relation=result.get("daily_open_relation"),
+        killzone_valid=result.get("killzone_valid"),
+        counter_trend_locked=result.get("counter_trend_locked"),
+        
+        # Antigravity Master Spec fields
+        erl_irl_state=result.get("erl_irl_state"),
+        swept_liquidity_pool=result.get("swept_liquidity_pool"),
+        mitigated_pd_array_type=result.get("mitigated_pd_array_type"),
+        is_advanced_setup=result.get("is_advanced_setup"),
+        advanced_setup_status=result.get("advanced_setup_status"),
+        
+        # Detailed 10-Step Silver Bullet fields
+        sb_step_1_time_window_ok=result.get("sb_step_1_time_window_ok"),
+        sb_step_1_details=result.get("sb_step_1_details"),
+        sb_step_2_liquidity_sweep_ok=result.get("sb_step_2_liquidity_sweep_ok"),
+        sb_step_2_details=result.get("sb_step_2_details"),
+        sb_step_3_displacement_mss_ok=result.get("sb_step_3_displacement_mss_ok"),
+        sb_step_3_details=result.get("sb_step_3_details"),
+        sb_step_4_fvg_bpr_ok=result.get("sb_step_4_fvg_bpr_ok"),
+        sb_step_4_details=result.get("sb_step_4_details"),
+        sb_step_5_entry_exec_ok=result.get("sb_step_5_entry_exec_ok"),
+        sb_step_5_details=result.get("sb_step_5_details"),
+        sb_step_6_risk_mgmt_ok=result.get("sb_step_6_risk_mgmt_ok"),
+        sb_step_6_details=result.get("sb_step_6_details"),
+        sb_step_7_london_asian_sweep_ok=result.get("sb_step_7_london_asian_sweep_ok"),
+        sb_step_7_details=result.get("sb_step_7_details"),
+        sb_step_8_htf_pd_mitigation_ok=result.get("sb_step_8_htf_pd_mitigation_ok"),
+        sb_step_8_details=result.get("sb_step_8_details"),
+        sb_step_9_ltf_choch_ok=result.get("sb_step_9_ltf_choch_ok"),
+        sb_step_9_details=result.get("sb_step_9_details"),
+        sb_step_10_fvg_limit_ok=result.get("sb_step_10_fvg_limit_ok"),
+        sb_step_10_details=result.get("sb_step_10_details"),
+        
+        confidence=result.get("confidence", 0),
+        news_lockout_active=result.get("news_lockout_active", False),
+        active_news_event=result.get("active_news_event"),
+        upcoming_news_events=result.get("upcoming_news_events"),
+        original_extreme_entry=result.get("original_extreme_entry"),
+        fvg_boundary_entry=result.get("fvg_boundary_entry"),
+        po3_phase=result.get("po3_phase"),
+        m1_liquidity_sweep=result.get("m1_liquidity_sweep"),
+        displacement_choch=result.get("displacement_choch"),
+        fvg_ob_confluence=result.get("fvg_ob_confluence"),
+        fib_retracement=result.get("fib_retracement"),
+        fib_zone_ok=result.get("fib_zone_ok"),
+        double_mitigation_ok=result.get("double_mitigation_ok"),
+        rejection_wick_ok=result.get("rejection_wick_ok"),
+        rsi_ok=result.get("rsi_ok"),
+        frvp_ok=result.get("frvp_ok"),
+        tp1_target=result.get("tp1_target"),
+        tp2_target=result.get("tp2_target"),
+        tp1_rr=result.get("tp1_rr"),
+        tp2_rr=result.get("tp2_rr"),
+        breakeven_trigger=result.get("breakeven_trigger"),
+        rules_checklist=result.get("rules_checklist"),
+        total_rules=result.get("total_rules"),
+        passed_rules_count=result.get("passed_rules_count"),
+        failed_rules_count=result.get("failed_rules_count"),
+        pipeline=result.get("pipeline"),
+        setup_path=result.get("setup_path"),
+        setup_route=result.get("setup_route"),
+        setup_model=result.get("setup_model")
+    )
+
+
+@app.post("/api/smc/analyze", response_model=SilverBulletResponse)
+async def smc_analyze(req: SilverBulletRequest, db: Session = Depends(get_db)):
+    result = await AIService.calculate_programmatic_smc(req.dict())
+    # Sanitize float fields
+    for field in ["liquidity_target", "stop_loss_level", "equilibrium_price", "breakeven_trigger"]:
+        val = result.get(field)
+        if val is not None:
+            if isinstance(val, str):
+                val_clean = val.strip().lower()
+                if val_clean in ["none", "n/a", "null", ""]:
+                    result[field] = None
+                else:
+                    try:
+                        result[field] = float(val)
+                    except ValueError:
+                        result[field] = None
+            else:
+                try:
+                    result[field] = float(val)
+                except (ValueError, TypeError):
+                    result[field] = None
+
+    return SilverBulletResponse(
+        is_valid=result.get("is_valid", False),
+        status_message=result.get("status_message") or "Success",
+        market_structure_status=result.get("market_structure_status"),
+        daily_bias=result.get("daily_bias"),
+        liquidity_target=result.get("liquidity_target"),
+        entry_price_area=result.get("entry_price_area"),
+        stop_loss_level=result.get("stop_loss_level"),
+        target_reward_ratio=result.get("target_reward_ratio"),
+        reasoning=result.get("reasoning"),
+        invalidation=result.get("invalidation"),
+        risk_notes=result.get("risk_notes"),
+        
+        equilibrium_price=result.get("equilibrium_price"),
+        zone_type=result.get("zone_type"),
+        daily_open_relation=result.get("daily_open_relation"),
+        killzone_valid=result.get("killzone_valid"),
+        counter_trend_locked=result.get("counter_trend_locked"),
+        
+        erl_irl_state=result.get("erl_irl_state"),
+        swept_liquidity_pool=result.get("swept_liquidity_pool"),
+        mitigated_pd_array_type=result.get("mitigated_pd_array_type"),
+        is_advanced_setup=result.get("is_advanced_setup"),
+        advanced_setup_status=result.get("advanced_setup_status"),
+        
+        sb_step_1_time_window_ok=result.get("sb_step_1_time_window_ok"),
+        sb_step_1_details=result.get("sb_step_1_details"),
+        sb_step_2_liquidity_sweep_ok=result.get("sb_step_2_liquidity_sweep_ok"),
+        sb_step_2_details=result.get("sb_step_2_details"),
+        sb_step_3_displacement_mss_ok=result.get("sb_step_3_displacement_mss_ok"),
+        sb_step_3_details=result.get("sb_step_3_details"),
+        sb_step_4_fvg_bpr_ok=result.get("sb_step_4_fvg_bpr_ok"),
+        sb_step_4_details=result.get("sb_step_4_details"),
+        sb_step_5_entry_exec_ok=result.get("sb_step_5_entry_exec_ok"),
+        sb_step_5_details=result.get("sb_step_5_details"),
+        sb_step_6_risk_mgmt_ok=result.get("sb_step_6_risk_mgmt_ok"),
+        sb_step_6_details=result.get("sb_step_6_details"),
+        sb_step_7_london_asian_sweep_ok=result.get("sb_step_7_london_asian_sweep_ok"),
+        sb_step_7_details=result.get("sb_step_7_details"),
+        sb_step_8_htf_pd_mitigation_ok=result.get("sb_step_8_htf_pd_mitigation_ok"),
+        sb_step_8_details=result.get("sb_step_8_details"),
+        sb_step_9_ltf_choch_ok=result.get("sb_step_9_ltf_choch_ok"),
+        sb_step_9_details=result.get("sb_step_9_details"),
+        sb_step_10_fvg_limit_ok=result.get("sb_step_10_fvg_limit_ok"),
+        sb_step_10_details=result.get("sb_step_10_details"),
+        
+        confidence=result.get("confidence", 0),
+        news_lockout_active=result.get("news_lockout_active", False),
+        active_news_event=result.get("active_news_event"),
+        upcoming_news_events=result.get("upcoming_news_events"),
+        original_extreme_entry=result.get("original_extreme_entry"),
+        fvg_boundary_entry=result.get("fvg_boundary_entry"),
+        po3_phase=result.get("po3_phase"),
+        m1_liquidity_sweep=result.get("m1_liquidity_sweep"),
+        displacement_choch=result.get("displacement_choch"),
+        fvg_ob_confluence=result.get("fvg_ob_confluence"),
+        fib_retracement=result.get("fib_retracement"),
+        fib_zone_ok=result.get("fib_zone_ok"),
+        double_mitigation_ok=result.get("double_mitigation_ok"),
+        rejection_wick_ok=result.get("rejection_wick_ok"),
+        rsi_ok=result.get("rsi_ok"),
+        frvp_ok=result.get("frvp_ok"),
+        tp1_target=result.get("tp1_target"),
+        tp2_target=result.get("tp2_target"),
+        tp1_rr=result.get("tp1_rr"),
+        tp2_rr=result.get("tp2_rr"),
+        breakeven_trigger=result.get("breakeven_trigger"),
+        rules_checklist=result.get("rules_checklist"),
+        total_rules=result.get("total_rules"),
+        passed_rules_count=result.get("passed_rules_count"),
+        failed_rules_count=result.get("failed_rules_count"),
+        pipeline=result.get("pipeline"),
+        setup_path=result.get("setup_path"),
+        setup_route=result.get("setup_route"),
+        setup_model=result.get("setup_model"),
+        execution_mode=result.get("execution_mode", "SCALP_PRO"),
+        confluence_score=result.get("confluence_score")
+    )
+
+
+@app.post("/api/tcs/analyze", response_model=SilverBulletResponse)
+async def tcs_analyze(req: SilverBulletRequest, db: Session = Depends(get_db)):
+    result = await AIService.calculate_programmatic_tcs(req.dict())
+    
+    # Sanitize float fields
+    for field in ["liquidity_target", "stop_loss_level", "equilibrium_price", "breakeven_trigger"]:
+        val = result.get(field)
+        if val is not None:
+            if isinstance(val, str):
+                val_clean = val.strip().lower()
+                if val_clean in ["none", "n/a", "null", ""]:
+                    result[field] = None
+                else:
+                    try:
+                        result[field] = float(val)
+                    except ValueError:
+                        result[field] = None
+            else:
+                try:
+                    result[field] = float(val)
+                except (ValueError, TypeError):
+                    result[field] = None
+
+    return SilverBulletResponse(
+        is_valid=result.get("is_valid", False),
+        status_message=result.get("status_message") or "Success",
+        market_structure_status=result.get("market_structure_status"),
+        daily_bias=result.get("daily_bias"),
+        liquidity_target=result.get("liquidity_target"),
+        entry_price_area=result.get("entry_price_area"),
+        stop_loss_level=result.get("stop_loss_level"),
+        target_reward_ratio=result.get("target_reward_ratio"),
+        reasoning=result.get("reasoning"),
+        invalidation=result.get("invalidation"),
+        risk_notes=result.get("risk_notes"),
+        
+        equilibrium_price=result.get("equilibrium_price"),
+        zone_type=result.get("zone_type"),
+        daily_open_relation=result.get("daily_open_relation"),
+        killzone_valid=result.get("killzone_valid"),
+        counter_trend_locked=result.get("counter_trend_locked"),
+        
+        erl_irl_state=result.get("erl_irl_state"),
+        swept_liquidity_pool=result.get("swept_liquidity_pool"),
+        mitigated_pd_array_type=result.get("mitigated_pd_array_type"),
+        is_advanced_setup=result.get("is_advanced_setup"),
+        advanced_setup_status=result.get("advanced_setup_status"),
+        
+        sb_step_1_time_window_ok=result.get("sb_step_1_time_window_ok"),
+        sb_step_1_details=result.get("sb_step_1_details"),
+        sb_step_2_liquidity_sweep_ok=result.get("sb_step_2_liquidity_sweep_ok"),
+        sb_step_2_details=result.get("sb_step_2_details"),
+        sb_step_3_displacement_mss_ok=result.get("sb_step_3_displacement_mss_ok"),
+        sb_step_3_details=result.get("sb_step_3_details"),
+        sb_step_4_fvg_bpr_ok=result.get("sb_step_4_fvg_bpr_ok"),
+        sb_step_4_details=result.get("sb_step_4_details"),
+        sb_step_5_entry_exec_ok=result.get("sb_step_5_entry_exec_ok"),
+        sb_step_5_details=result.get("sb_step_5_details"),
+        sb_step_6_risk_mgmt_ok=result.get("sb_step_6_risk_mgmt_ok"),
+        sb_step_6_details=result.get("sb_step_6_details"),
+        sb_step_7_london_asian_sweep_ok=result.get("sb_step_7_london_asian_sweep_ok"),
+        sb_step_7_details=result.get("sb_step_7_details"),
+        sb_step_8_htf_pd_mitigation_ok=result.get("sb_step_8_htf_pd_mitigation_ok"),
+        sb_step_8_details=result.get("sb_step_8_details"),
+        sb_step_9_ltf_choch_ok=result.get("sb_step_9_ltf_choch_ok"),
+        sb_step_9_details=result.get("sb_step_9_details"),
+        sb_step_10_fvg_limit_ok=result.get("sb_step_10_fvg_limit_ok"),
+        sb_step_10_details=result.get("sb_step_10_details"),
+        
+        confidence=result.get("confidence", 0),
+        news_lockout_active=result.get("news_lockout_active", False),
+        active_news_event=result.get("active_news_event"),
+        upcoming_news_events=result.get("upcoming_news_events"),
+        original_extreme_entry=result.get("original_extreme_entry"),
+        fvg_boundary_entry=result.get("fvg_boundary_entry"),
+        po3_phase=result.get("po3_phase"),
+        m1_liquidity_sweep=result.get("m1_liquidity_sweep"),
+        displacement_choch=result.get("displacement_choch"),
+        fvg_ob_confluence=result.get("fvg_ob_confluence"),
+        fib_retracement=result.get("fib_retracement"),
+        fib_zone_ok=result.get("fib_zone_ok"),
+        double_mitigation_ok=result.get("double_mitigation_ok"),
+        rejection_wick_ok=result.get("rejection_wick_ok"),
+        rsi_ok=result.get("rsi_ok"),
+        frvp_ok=result.get("frvp_ok"),
+        tp1_target=result.get("tp1_target"),
+        tp2_target=result.get("tp2_target"),
+        tp1_rr=result.get("tp1_rr"),
+        tp2_rr=result.get("tp2_rr"),
+        breakeven_trigger=result.get("breakeven_trigger"),
+        rules_checklist=result.get("rules_checklist"),
+        total_rules=result.get("total_rules"),
+        passed_rules_count=result.get("passed_rules_count"),
+        failed_rules_count=result.get("failed_rules_count"),
+        pipeline=result.get("pipeline"),
+        setup_path=result.get("setup_path"),
+        setup_route=result.get("setup_route"),
+        setup_model=result.get("setup_model")
+    )
+
+
+@app.get("/api/smc/detect-bias")
+async def detect_smc_bias(symbol: str, timeframe: str = "15m"):
+    try:
+        bias = AIService._detect_market_structure_bias(symbol, timeframe, fallback_bias="BULLISH")
+        return {"bias": bias}
+    except Exception as e:
+        return {"bias": "BULLISH"}
+
+
+@app.post("/api/tracker/start")
+async def tracker_start(req: SilverBulletRequest, db: Session = Depends(get_db)):
+    pref = db.query(PreferenceModel).filter(PreferenceModel.key == "gemini_api_key").first()
+    api_key = pref.value if pref else None
+    if not req.symbol:
+        raise HTTPException(status_code=400, detail="Symbol is required")
+    start_tracking(req.symbol, req.dict(), api_key=api_key)
+    return {"status": "SUCCESS", "message": f"Started tracking {req.symbol}"}
+
+@app.post("/api/tracker/stop")
+async def tracker_stop(req: dict):
+    symbol = req.get("symbol")
+    if not symbol:
+        raise HTTPException(status_code=400, detail="Symbol is required")
+    stop_tracking(symbol)
+    return {"status": "SUCCESS", "message": f"Stopped tracking {symbol}"}
+
+@app.get("/api/tracker/status")
+async def tracker_status():
+    return get_trackers_status()
+
+
+
+import httpx
+
+SYMBOL_MAP = {
+    "GOLD": "GC=F",
+    "XAUUSD": "GC=F",
+    "XAU/USD": "GC=F",
+    "EURUSD": "EURUSD=X",
+    "EUR/USD": "EURUSD=X",
+    "GBPUSD": "GBPUSD=X",
+    "AUDUSD": "AUDUSD=X",
+    "USDJPY": "JPY=X",
+}
+
+async def fetch_yahoo_finance(yahoo_symbol: str):
+    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{yahoo_symbol}?interval=1d&range=2d"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    }
+    async with httpx.AsyncClient() as client:
+        res = await client.get(url, headers=headers, timeout=5.0)
+        if res.status_code != 200:
+            raise Exception(f"Yahoo Finance returned status {res.status_code}")
+        data = res.json()
+        result = data.get("chart", {}).get("result", [])
+        if not result:
+            raise Exception("No Yahoo Finance chart result found")
+            
+        quote = result[0].get("indicators", {}).get("quote", [{}])[0]
+        meta = result[0].get("meta", {})
+        
+        opens = quote.get("open", [])
+        highs = quote.get("high", [])
+        lows = quote.get("low", [])
+        closes = quote.get("close", [])
+        
+        if not highs or not lows:
+            raise Exception("Incomplete quote data from Yahoo Finance")
+            
+        if len(highs) == 1:
+            pdh = float(highs[0]) if highs[0] is not None else 0.0
+            pdl = float(lows[0]) if lows[0] is not None else 0.0
+            open_val = float(opens[0]) if opens[0] is not None else 0.0
+            close_val = float(closes[0]) if closes[0] is not None else 0.0
+            curr_price = float(meta.get("regularMarketPrice", close_val))
+        else:
+            pdh = float(highs[0]) if highs[0] is not None else 0.0
+            pdl = float(lows[0]) if lows[0] is not None else 0.0
+            open_val = float(opens[0]) if opens[0] is not None else 0.0
+            close_val = float(closes[0]) if closes[0] is not None else 0.0
+            curr_price = float(meta.get("regularMarketPrice") or closes[1] or close_val)
+            
+        return {
+            "symbol": yahoo_symbol,
+            "pdh": pdh,
+            "pdl": pdl,
+            "open": open_val,
+            "close": close_val,
+            "current_price": curr_price
+        }
+
+@app.get("/api/market/price")
+async def get_market_price(symbol: str, include_trends: bool = True, timeframe: str = "1m"):
+    original_symbol = symbol.strip().upper()
+    symbol_upper = original_symbol
+    if symbol_upper.endswith(".P"):
+        symbol_upper = symbol_upper[:-2]
+    if not symbol_upper:
+        raise HTTPException(status_code=400, detail="Symbol parameter is required")
+        
+    import asyncio
+    # 1. Try Yahoo Finance mapping
+    yahoo_symbol = SYMBOL_MAP.get(symbol_upper)
+    if yahoo_symbol:
+        try:
+            res_data = await fetch_yahoo_finance(yahoo_symbol)
+            if include_trends:
+                trend_1h, trend_15m, trend_5m, trend_3m, trend_1m = await asyncio.gather(
+                    asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "1h", "BULLISH"),
+                    asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "15m", "BULLISH"),
+                    asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "5m", "BULLISH"),
+                    asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "3m", "BULLISH"),
+                    asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "1m", "BULLISH")
+                )
+                if timeframe == "3m":
+                    daily_bias = trend_3m
+                elif timeframe == "5m":
+                    daily_bias = trend_5m
+                elif timeframe == "15m":
+                    daily_bias = trend_15m
+                elif timeframe == "1h":
+                    daily_bias = trend_1h
+                else:
+                    daily_bias = trend_1m
+            else:
+                trend_1h, trend_15m, trend_5m, trend_3m, trend_1m = "PENDING", "PENDING", "PENDING", "PENDING", "PENDING"
+                daily_bias = "PENDING"
+            res_data["daily_bias"] = daily_bias
+            res_data["trend_1m"] = trend_1m
+            res_data["trend_3m"] = trend_3m
+            res_data["trend_5m"] = trend_5m
+            res_data["trend_15m"] = trend_15m
+            res_data["trend_1h"] = trend_1h
+            res_data["symbol"] = original_symbol
+            return res_data
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Failed to fetch Yahoo Finance: {str(e)}")
+            
+    # 2. Try Binance (assuming crypto)
+    binance_symbol = symbol_upper
+    if not binance_symbol.endswith("USDT") and len(binance_symbol) <= 5:
+        binance_symbol = f"{binance_symbol}USDT"
+        
+    async with httpx.AsyncClient() as client:
+        # Try Binance Spot first, then fallback to Binance Futures
+        apis = [
+            {"name": "Binance Spot", "url": f"https://api.binance.com/api/v3/klines?symbol={binance_symbol}&interval=1d&limit=2"},
+            {"name": "Binance Futures", "url": f"https://fapi.binance.com/fapi/v1/klines?symbol={binance_symbol}&interval=1d&limit=2"}
+        ]
+        
+        data = None
+        for api in apis:
+            try:
+                res = await client.get(api["url"], timeout=5.0)
+                if res.status_code == 200:
+                    data = res.json()
+                    break
+            except Exception:
+                pass
+                
+        if data is not None and len(data) >= 2:
+            prev_candle = data[0]
+            curr_candle = data[1]
+            fallback_bias = "BULLISH"
+            if include_trends:
+                trend_1h, trend_15m, trend_5m, trend_3m, trend_1m = await asyncio.gather(
+                    asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "1h", "BULLISH"),
+                    asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "15m", "BULLISH"),
+                    asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "5m", "BULLISH"),
+                    asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "3m", "BULLISH"),
+                    asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "1m", "BULLISH")
+                )
+                if timeframe == "3m":
+                    daily_bias = trend_3m
+                elif timeframe == "5m":
+                    daily_bias = trend_5m
+                elif timeframe == "15m":
+                    daily_bias = trend_15m
+                elif timeframe == "1h":
+                    daily_bias = trend_1h
+                else:
+                    daily_bias = trend_1m
+            else:
+                trend_1h, trend_15m, trend_5m, trend_3m, trend_1m = "PENDING", "PENDING", "PENDING", "PENDING", "PENDING"
+                daily_bias = "PENDING"
+            return {
+                "symbol": original_symbol,
+                "pdh": float(prev_candle[2]),
+                "pdl": float(prev_candle[3]),
+                "open": float(prev_candle[1]),
+                "close": float(prev_candle[4]),
+                "current_price": float(curr_candle[4]),
+                "daily_bias": daily_bias,
+                "trend_1m": trend_1m,
+                "trend_3m": trend_3m,
+                "trend_5m": trend_5m,
+                "trend_15m": trend_15m,
+                "trend_1h": trend_1h
+            }
+            
+        # 3. Fallback: try Yahoo Finance as {symbol}-USD
+        try:
+            yf_symbol = symbol_upper
+            if yf_symbol.endswith("USDT"):
+                yf_symbol = yf_symbol[:-4]
+            elif yf_symbol.endswith("USD"):
+                yf_symbol = yf_symbol[:-3]
+            res_data = await fetch_yahoo_finance(f"{yf_symbol}-USD")
+            if include_trends:
+                trend_1h, trend_15m, trend_5m, trend_3m, trend_1m = await asyncio.gather(
+                    asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "1h", "BULLISH"),
+                    asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "15m", "BULLISH"),
+                    asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "5m", "BULLISH"),
+                    asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "3m", "BULLISH"),
+                    asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "1m", "BULLISH")
+                )
+                if timeframe == "3m":
+                    daily_bias = trend_3m
+                elif timeframe == "5m":
+                    daily_bias = trend_5m
+                elif timeframe == "15m":
+                    daily_bias = trend_15m
+                elif timeframe == "1h":
+                    daily_bias = trend_1h
+                else:
+                    daily_bias = trend_1m
+            else:
+                trend_1h, trend_15m, trend_5m, trend_3m, trend_1m = "PENDING", "PENDING", "PENDING", "PENDING", "PENDING"
+                daily_bias = "PENDING"
+            res_data["daily_bias"] = daily_bias
+            res_data["trend_1m"] = trend_1m
+            res_data["trend_3m"] = trend_3m
+            res_data["trend_5m"] = trend_5m
+            res_data["trend_15m"] = trend_15m
+            res_data["trend_1h"] = trend_1h
+            res_data["symbol"] = original_symbol
+            return res_data
+        except Exception:
+            try:
+                res_data = await fetch_yahoo_finance(symbol_upper)
+                if include_trends:
+                    trend_1h, trend_15m, trend_5m, trend_3m, trend_1m = await asyncio.gather(
+                        asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "1h", "BULLISH"),
+                        asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "15m", "BULLISH"),
+                        asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "5m", "BULLISH"),
+                        asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "3m", "BULLISH"),
+                        asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "1m", "BULLISH")
+                    )
+                    if timeframe == "3m":
+                        daily_bias = trend_3m
+                    elif timeframe == "5m":
+                        daily_bias = trend_5m
+                    elif timeframe == "15m":
+                        daily_bias = trend_15m
+                    elif timeframe == "1h":
+                        daily_bias = trend_1h
+                    elif trend_1h == "BULLISH" and trend_15m == "BULLISH":
+                        daily_bias = "BULLISH"
+                    elif trend_1h == "BEARISH" and trend_15m == "BEARISH":
+                        daily_bias = "BEARISH"
+                    else:
+                        daily_bias = "NEUTRAL"
+                else:
+                    trend_1h, trend_15m, trend_5m, trend_3m, trend_1m = "PENDING", "PENDING", "PENDING", "PENDING", "PENDING"
+                    daily_bias = "PENDING"
+                res_data["daily_bias"] = daily_bias
+                res_data["trend_1m"] = trend_1m
+                res_data["trend_3m"] = trend_3m
+                res_data["trend_5m"] = trend_5m
+                res_data["trend_15m"] = trend_15m
+                res_data["trend_1h"] = trend_1h
+                res_data["symbol"] = original_symbol
+                return res_data
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"Failed to fetch market data for {symbol}: {str(e)}")
+
+async def fetch_current_price_for_symbol(symbol: str) -> float:
+    symbol_upper = symbol.upper()
+    if symbol_upper.endswith(".P"):
+        symbol_upper = symbol_upper[:-2]
+    yahoo_symbol = SYMBOL_MAP.get(symbol_upper)
+    if yahoo_symbol:
+        try:
+            data = await fetch_yahoo_finance(yahoo_symbol)
+            return data["current_price"]
+        except Exception:
+            pass
+            
+    binance_symbol = symbol_upper
+    if not binance_symbol.endswith("USDT") and len(binance_symbol) <= 5:
+        binance_symbol = f"{binance_symbol}USDT"
+        
+    try:
+        price = await BinanceService.fetch_ticker_price(binance_symbol)
+        return price
+    except Exception:
+        pass
+        
+    try:
+        data = await fetch_yahoo_finance(f"{symbol_upper}-USD")
+        return data["current_price"]
+    except Exception:
+        try:
+            data = await fetch_yahoo_finance(symbol_upper)
+            return data["current_price"]
+        except Exception:
+            return 0.0
+
+@app.post("/api/trades/log", response_model=LoggedTradeResponse)
+async def log_trade(trade: LoggedTradeCreate, db: Session = Depends(get_db)):
+    # Verify the setup using Gemini AI before logging (Rule 9 and User request)
+    from app.tracker import get_current_price, standardize_symbol
+    from app.market import get_candles
+    
+    price = get_current_price(trade.symbol)
+    if price is None or price <= 0:
+        price = trade.entry_price
+        
+    daily_open = price
+    pdh = price * 1.01
+    pdl = price * 0.99
+    try:
+        sym = standardize_symbol(trade.symbol)
+        daily_candles = get_candles(sym, "1d", limit=2)
+        if daily_candles:
+            daily_open = daily_candles[-1]["open"]
+        if len(daily_candles) >= 2:
+            pdh = daily_candles[-2]["high"]
+            pdl = daily_candles[-2]["low"]
+    except Exception:
+        pass
+
+    payload = {
+        "symbol": trade.symbol,
+        "timeframe": trade.timeframe or "1m",
+        "current_price": price,
+        "pdh": pdh,
+        "pdl": pdl,
+        "daily_open": daily_open,
+        "strategy_model": "double_mitigation"
+    }
+    
+    try:
+        ai_result = await AIService.calculate_programmatic_smc(payload)
+        is_valid = ai_result.get("is_valid", False)
+        confidence = ai_result.get("confidence", 0)
+        
+        if not is_valid:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Gemini AI rejected this setup: {ai_result.get('entry_price_area', 'No Entry')}. (Gemini AI විසින් මෙම setup එක ප්‍රතික්ෂේප කර ඇත.)"
+            )
+        if confidence < 90:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Gemini AI confidence is {confidence}%, which is below the mandatory 90% threshold. (Gemini AI විශ්වාසනීයත්වය 90% ට වඩා අඩු බැවින් ඇතුළත් කළ නොහැක.)"
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Gemini verification failed during logging: {e}. Falling back to local validation.")
+        pass
+
+    try:
+        import asyncio
+        await asyncio.to_thread(
+            AIService.validate_trade_stop_loss,
+            symbol=trade.symbol,
+            timeframe=trade.timeframe or "1m",
+            direction=trade.direction,
+            stop_loss=trade.stop_loss
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    db_trade = LoggedTradeModel(
+        symbol=trade.symbol,
+        direction=trade.direction,
+        entry_price=trade.entry_price,
+        stop_loss=trade.stop_loss,
+        take_profit=trade.take_profit,
+        confidence=trade.confidence,
+        strategy_type=trade.strategy_type or "SMC",
+        timeframe=trade.timeframe or "1m",
+        status="PENDING"
+    )
+    db.add(db_trade)
+    db.commit()
+    db.refresh(db_trade)
+
+    # Phase 2: Auto-Trading Execution
+    try:
+        from app.models import PreferenceModel
+        from app.execution_module import BinanceExecutor
+        import asyncio
+
+        auto_trade_pref = db.query(PreferenceModel).filter(PreferenceModel.key == "auto_trade_enabled").first()
+        is_auto_trade = auto_trade_pref.value.lower() == "true" if auto_trade_pref else False
+
+        if is_auto_trade:
+            # Get API credentials
+            from app.config import settings
+            api_key = settings.BINANCE_API_KEY
+            api_secret = settings.BINANCE_API_SECRET
+            
+            # Get Risk Percentage (Default to 1.0%)
+            risk_pref = db.query(PreferenceModel).filter(PreferenceModel.key == "risk_percentage").first()
+            risk_pct = float(risk_pref.value) if risk_pref else 1.0
+
+            # Get mock account balance for now (Could fetch live from Binance)
+            account_balance = 1000.0  
+            
+            qty = BinanceExecutor.calculate_lot_size(
+                account_balance=account_balance,
+                risk_percentage=risk_pct,
+                entry_price=trade.entry_price,
+                stop_loss=trade.stop_loss
+            )
+
+            if qty > 0 and api_key and api_secret:
+                executor = BinanceExecutor(api_key, api_secret)
+                side = "BUY" if trade.direction == "BULLISH" else "SELL"
+                
+                # Execute asynchronously without blocking the response
+                asyncio.create_task(executor.place_limit_order(
+                    symbol=trade.symbol,
+                    side=side,
+                    quantity=qty,
+                    price=trade.entry_price,
+                    stop_loss=trade.stop_loss,
+                    take_profit=trade.take_profit
+                ))
+    except Exception as e:
+        logger.error(f"Failed to trigger auto-execution: {e}")
+
+    return db_trade
+
+@app.get("/api/trades/history", response_model=List[LoggedTradeResponse])
+async def get_trade_history(strategy_type: Optional[str] = None, db: Session = Depends(get_db)):
+    query = db.query(LoggedTradeModel)
+    if strategy_type:
+        query = query.filter(LoggedTradeModel.strategy_type == strategy_type.upper())
+    trades = query.all()
+    import datetime
+    for trade in trades:
+        if trade.status in ["PENDING", "ACTIVE", "RUNNING"]:
+            try:
+                # Dynamic Counter-MSS/Choch Invalidation Check for PENDING trades
+                if trade.status == "PENDING":
+                    try:
+                        # For 1m scalp entries, check 15m trend for counter-bias to allow normal 1m pullbacks.
+                        # For 15m entries, check 1H trend.
+                        tf = "15m" if (trade.timeframe or "1m") == "1m" else "1h"
+                        import asyncio
+                        current_bias = await asyncio.to_thread(
+                            AIService._detect_market_structure_bias,
+                            trade.symbol,
+                            tf,
+                            trade.direction
+                        )
+                        is_counter = (trade.direction == "BULLISH" and current_bias == "BEARISH") or \
+                                     (trade.direction == "BEARISH" and current_bias == "BULLISH")
+                        
+                        # Invalidate if current price breaches the stop loss level before entry is hit
+                        is_sl_breached = False
+                        current_price = await fetch_current_price_for_symbol(trade.symbol)
+                        if current_price > 0:
+                            if trade.direction == "BULLISH" and current_price < trade.stop_loss:
+                                is_sl_breached = True
+                            elif trade.direction == "BEARISH" and current_price > trade.stop_loss:
+                                is_sl_breached = True
+                                
+                        if is_counter or is_sl_breached:
+                            trade.status = "INVALIDATED"
+                            db.commit()
+                            reason = f"{tf} counter-trend" if is_counter else "Stop loss breached before entry"
+                            print(f"Counter-MSS/Choch detected: Pending trade {trade.id} ({trade.symbol}) is now INVALIDATED ({reason}).")
+                            continue
+                    except Exception as mss_err:
+                        print(f"Error checking counter-MSS for pending trade: {mss_err}")
+
+                sym = trade.symbol.upper()
+                if sym.endswith(".P"):
+                    sym = sym[:-2]
+                binance_symbol = sym
+                if not binance_symbol.endswith("USDT") and len(binance_symbol) <= 5:
+                    binance_symbol = f"{binance_symbol}USDT"
+                
+                # Fetch recent 100 1-minute candles from Binance
+                from app.market import get_candles
+                import asyncio
+                candles = await asyncio.to_thread(
+                    get_candles,
+                    binance_symbol,
+                    "1m",
+                    100
+                )
+                
+                ts = trade.timestamp
+                if isinstance(ts, str):
+                    ts = datetime.datetime.fromisoformat(ts.replace('Z', '+00:00'))
+                if hasattr(ts, 'tzinfo') and ts.tzinfo is not None:
+                    ts = ts.replace(tzinfo=None)
+                trade_start_time = ts
+                valid_candles = [c for c in candles if c["close_time"] >= trade_start_time]
+                
+                if not valid_candles:
+                    current_price = await fetch_current_price_for_symbol(trade.symbol)
+                    if current_price > 0:
+                        if trade.status == "PENDING":
+                            if trade.direction == "BULLISH":
+                                if current_price <= trade.entry_price:
+                                    trade.status = "RUNNING"
+                                    db.commit()
+                            elif trade.direction == "BEARISH":
+                                if current_price >= trade.entry_price:
+                                    trade.status = "RUNNING"
+                                    db.commit()
+                        if trade.status in ["ACTIVE", "RUNNING"]:
+                            if trade.direction == "BULLISH":
+                                if current_price >= trade.take_profit:
+                                    trade.status = "WIN"
+                                    db.commit()
+                                elif current_price <= trade.stop_loss:
+                                    trade.status = "LOSS"
+                                    db.commit()
+                            elif trade.direction == "BEARISH":
+                                if current_price <= trade.take_profit:
+                                    trade.status = "WIN"
+                                    db.commit()
+                                elif current_price >= trade.stop_loss:
+                                    trade.status = "LOSS"
+                                    db.commit()
+                else:
+                    # Sort candles chronologically to simulate progress
+                    valid_candles.sort(key=lambda x: x["close_time"])
+                    sim_status = "PENDING"
+                    if trade.status in ["ACTIVE", "RUNNING"]:
+                        sim_status = "RUNNING"
+                    start_price = valid_candles[0]["open"] if valid_candles else trade.entry_price
+                    for c in valid_candles:
+                        if sim_status == "PENDING":
+                            if trade.direction == "BULLISH":
+                                if start_price >= trade.entry_price:
+                                    if c["low"] <= trade.entry_price:
+                                        sim_status = "RUNNING"
+                                else:
+                                    if c["high"] >= trade.entry_price:
+                                        sim_status = "RUNNING"
+                            elif trade.direction == "BEARISH":
+                                if start_price <= trade.entry_price:
+                                    if c["high"] >= trade.entry_price:
+                                        sim_status = "RUNNING"
+                                else:
+                                    if c["low"] <= trade.entry_price:
+                                        sim_status = "RUNNING"
+                                    
+                        if sim_status == "RUNNING":
+                            if trade.direction == "BULLISH":
+                                if c["high"] >= trade.take_profit:
+                                    sim_status = "WIN"
+                                    break
+                                elif c["low"] <= trade.stop_loss:
+                                    sim_status = "LOSS"
+                                    break
+                            elif trade.direction == "BEARISH":
+                                if c["low"] <= trade.take_profit:
+                                    sim_status = "WIN"
+                                    break
+                                elif c["high"] >= trade.stop_loss:
+                                    sim_status = "LOSS"
+                                    break
+                                    
+                    if trade.status != sim_status:
+                        trade.status = sim_status
+                        db.commit()
+            except Exception as e:
+                print(f"Error checking trade status for {trade.symbol}: {e}")
+    return trades
+
+@app.post("/api/trades/{trade_id}/status", response_model=LoggedTradeResponse)
+def update_trade_status(trade_id: int, status_update: Dict[str, str], db: Session = Depends(get_db)):
+    db_trade = db.query(LoggedTradeModel).filter(LoggedTradeModel.id == trade_id).first()
+    if not db_trade:
+        raise HTTPException(status_code=404, detail="Trade not found")
+    new_status = status_update.get("status")
+    if new_status in ["PENDING", "ACTIVE", "RUNNING", "WIN", "LOSS", "INVALIDATED"]:
+        db_trade.status = new_status
+        db.commit()
+        db.refresh(db_trade)
+    return db_trade
+@app.post("/api/trades/{trade_id}/update", response_model=LoggedTradeResponse)
+def update_logged_trade(trade_id: int, req: TradeUpdateRequest, db: Session = Depends(get_db)):
+    db_trade = db.query(LoggedTradeModel).filter(LoggedTradeModel.id == trade_id).first()
+    if not db_trade:
+        raise HTTPException(status_code=404, detail="Trade not found")
+    
+    has_price_change = False
+    
+    if req.stop_loss is not None:
+        if req.stop_loss != db_trade.stop_loss:
+            try:
+                AIService.validate_trade_stop_loss(
+                    symbol=db_trade.symbol,
+                    timeframe=db_trade.timeframe or "1m",
+                    direction=db_trade.direction,
+                    stop_loss=req.stop_loss
+                )
+            except ValueError as e:
+                raise HTTPException(status_code=400, detail=str(e))
+            db_trade.stop_loss = req.stop_loss
+            has_price_change = True
+
+    if req.take_profit is not None:
+        if req.take_profit != db_trade.take_profit:
+            db_trade.take_profit = req.take_profit
+            has_price_change = True
+            
+    if req.entry_price is not None:
+        if req.entry_price != db_trade.entry_price:
+            db_trade.entry_price = req.entry_price
+            has_price_change = True
+            
+    if req.confidence is not None:
+        db_trade.confidence = req.confidence
+        
+    if req.status is not None:
+        db_trade.status = req.status
+    elif has_price_change:
+        db_trade.status = "PENDING"
+        
+    db.commit()
+    db.refresh(db_trade)
+    return db_trade
+
+
+
+@app.delete("/api/trades/{trade_id}")
+def delete_trade(trade_id: int, db: Session = Depends(get_db)):
+    db_trade = db.query(LoggedTradeModel).filter(LoggedTradeModel.id == trade_id).first()
+    if not db_trade:
+        raise HTTPException(status_code=404, detail="Trade not found")
+    db.delete(db_trade)
+    db.commit()
+    return {"message": "Trade deleted successfully"}
+
+
+

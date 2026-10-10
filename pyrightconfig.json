@@ -1,0 +1,26 @@
+{
+    "include": [
+        "backend",
+        "deploy_huggingface",
+        "scratch"
+    ],
+    "exclude": [
+        "**/node_modules",
+        "**/__pycache__",
+        "backend/.venv",
+        "scratch/hf_repo"
+    ],
+    "extraPaths": [
+        "backend",
+        "backend/app",
+        "deploy_huggingface",
+        "backend/.venv/Lib/site-packages"
+    ],
+    "venvPath": "backend",
+    "venv": ".venv",
+    "pythonVersion": "3.12",
+    "typeCheckingMode": "off",
+    "reportMissingImports": "none",
+    "reportMissingModuleSource": "none",
+    "reportUndefinedVariable": "warning"
+}

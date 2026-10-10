@@ -3,6 +3,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any, Optional
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 from .database import engine, Base, get_db, SessionLocal
 from .models import StrategyModel, AnalysisModel, PreferenceModel, LoggedTradeModel
@@ -133,10 +136,10 @@ The engine must strictly monitor setups only during these three independent oper
 *   LTF Execution: 5-Minute, 3-Minute, or 1-Minute charts (1-Minute chart is the optimal execution layer).
 
 #### C. Normal Scenario Entry Setup Mechanics
-*   Step 1: Identify a Liquidity Grab (Stop Hunt) -> Look for a clear sweep of a previous high/low (SSL Sweep or BSL Sweep) with an aggressive move beyond liquidity followed by a strong rejection candle footprint.
-*   Step 2: Confirm Market Structure Shift (MSS) -> Price must break a key swing level with strong momentum, confirming smart money directional change.
-*   Step 3: Locate an Inefficiency Array -> Locate a Fair Value Gap (BISI for Buy / SIBI for Sell) left inside the displacement leg between the MSS point and the liquidity grab low/high.
-*   Step 4: Enter the Trade -> Set a limit order at the midpoint (50% Consequent Encroachment) of the FVG, OR enter at market if price reaches the FVG and shows signs of immediate rejection.
+*   1. Liquidity Grab (Stop Hunt) -> Look for a clear sweep of a previous high/low (SSL Sweep or BSL Sweep) with an aggressive move beyond liquidity followed by a strong rejection candle footprint.
+*   2. Market Structure Shift (MSS) -> Price must break a key swing level with strong momentum, confirming smart money directional change.
+*   3. Inefficiency Array -> Locate a Fair Value Gap (BISI for Buy / SIBI for Sell) left inside the displacement leg between the MSS point and the liquidity grab low/high.
+*   4. Trade Execution -> Set a limit order at the midpoint (50% Consequent Encroachment) of the FVG, OR enter at market if price reaches the FVG and shows signs of immediate rejection.
 
 #### D. Advanced Scenario Setup Mechanics (9:00 AM Candlestick Range Filter)
 *   *Application Window:* Applied specifically to the 10:00 AM - 11:00 AM NY Silver Bullet Window.
@@ -295,10 +298,8 @@ async def get_gemini_status(db: Session = Depends(get_db)):
     try:
         from google import genai
         client = genai.Client(api_key=api_key)
-        client.models.generate_content(
-            model="gemini-flash-lite-latest",
-            contents="hi"
-        )
+        # Verify key validity using lightweight models.list() to authenticate without burning generation tokens
+        models_iter = client.models.list()
         _gemini_status_cache = {
             "status": "VALID",
             "details": "Gemini API connection is active and valid. | Gemini සම්බන්ධතාවය සක්‍රිය සහ වලංගු වේ.",
@@ -308,43 +309,94 @@ async def get_gemini_status(db: Session = Depends(get_db)):
         }
     except Exception as e:
         err_str = str(e)
+        print(f"DEBUG GEMINI STATUS CHECK ERROR: {err_str}")
         if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "quota" in err_str.lower():
             _gemini_status_cache = {
                 "status": "INVALID",
                 "details": "Gemini API Key has exceeded its quota (429 Rate Limited). Please try a new key or set up billing. | API Key එකෙහි සීමාව ඉක්මවා ඇත (429 Rate Limited).",
                 "timestamp": now,
-                "provider": "GEMINI"
+                "provider": "GEMINI",
+                "api_key": api_key
             }
         elif "401" in err_str or "API_KEY_INVALID" in err_str or "unauthenticated" in err_str.lower() or "invalid API key" in err_str.lower():
             _gemini_status_cache = {
                 "status": "INVALID",
                 "details": "Gemini API Key is invalid or expired. Please update it in Settings. | API Key එක වැරදි හෝ කල් ඉකුත් වී ඇත.",
                 "timestamp": now,
-                "provider": "GEMINI"
+                "provider": "GEMINI",
+                "api_key": api_key
             }
         else:
             _gemini_status_cache = {
                 "status": "ERROR",
                 "details": f"API Error: {err_str} | API දෝෂයකි: {err_str}",
                 "timestamp": now,
-                "provider": "GEMINI"
+                "provider": "GEMINI",
+                "api_key": api_key
             }
             
     return _gemini_status_cache
 
 @app.post("/api/telegram/test")
 async def test_telegram_alert():
-    success = await TelegramService.send_message(
-        "🔔 <b>Project Falcon Connection Test</b>\n\n"
-        "Your Telegram alert notification setup is working perfectly! 🚀\n"
-        "ඔබගේ ටෙලිග්‍රෑම් දැනුම්දීම් සැකසුම සාර්ථකව ක්‍රියාත්මක වේ! 🎯"
-    )
-    if success:
-        return {"status": "success", "message": "Test notification sent successfully to Telegram."}
-    else:
+    try:
+        from .services import BinanceService
+        from .chart_service import ChartService
+        # Fetch live BTC klines
+        klines = await BinanceService.fetch_klines("BTCUSDT", "5m", limit=50)
+        curr_price = float(klines[-1][4]) if klines else 65420.0
+        entry = round(curr_price * 0.9990, 2)
+        sl = round(entry * 0.9975, 2)
+        risk = entry - sl
+        tp1 = round(entry + (risk * 1.0), 2)
+        tp2 = round(entry + (risk * 2.0), 2)
+
+        caption, reply_markup = TelegramService.build_trade_alert(
+            symbol="BTCUSDT",
+            direction="LONG",
+            entry_price=entry,
+            stop_loss=sl,
+            tp1=tp1,
+            tp2=tp2,
+            leverage="15x - 20x (Cross)",
+            confidence=92,
+            trend_1h="BULLISH"
+        )
+
+        chart_bytes = ChartService.generate_smc_chart(
+            symbol="BTCUSDT",
+            timeframe="5m",
+            klines=klines,
+            entry=entry,
+            sl=sl,
+            tp1=tp1,
+            tp2=tp2,
+            direction="LONG"
+        )
+
+        if chart_bytes:
+            success = await TelegramService.send_photo(chart_bytes, caption, symbol="BTCUSDT", reply_markup=reply_markup)
+        else:
+            success = await TelegramService.send_message(caption, symbol="BTCUSDT", reply_markup=reply_markup)
+
+        if success:
+            return {"status": "success", "message": "Live BTC test chart alert sent successfully to Telegram."}
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Failed to send test notification. Please verify your Bot Token and Chat ID. | ටෙලිග්‍රෑම් පණිවිඩය යැවීමට නොහැකි විය."
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        import logging
+        logging.error(f"Error in test_telegram_alert: {e}")
+        success = await TelegramService.send_message("🔔 <b>Project Falcon Connection Test</b>\n\nTelegram connection is working! 🚀")
+        if success:
+            return {"status": "success", "message": "Test notification sent successfully to Telegram."}
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Failed to send test notification. Please verify your Bot Token and Chat ID. | ටෙලිග්‍රෑම් පණිවිඩය යැවීමට නොහැකි විය. කරුණාකර settings පරීක්ෂා කරන්න."
+            detail=f"Failed to send test notification: {e}"
         )
 
 from pydantic import BaseModel
@@ -551,7 +603,7 @@ async def silverbullet_analyze(req: SilverBulletRequest, db: Session = Depends(g
     result = await AIService.analyze_silver_bullet(req.dict(), api_key=api_key)
     
     # Sanitize float fields
-    for field in ["liquidity_target", "stop_loss_level", "equilibrium_price"]:
+    for field in ["liquidity_target", "stop_loss_level", "equilibrium_price", "breakeven_trigger"]:
         val = result.get(field)
         if val is not None:
             if isinstance(val, str):
@@ -638,7 +690,16 @@ async def silverbullet_analyze(req: SilverBulletRequest, db: Session = Depends(g
         tp1_target=result.get("tp1_target"),
         tp2_target=result.get("tp2_target"),
         tp1_rr=result.get("tp1_rr"),
-        tp2_rr=result.get("tp2_rr")
+        tp2_rr=result.get("tp2_rr"),
+        breakeven_trigger=result.get("breakeven_trigger"),
+        rules_checklist=result.get("rules_checklist"),
+        total_rules=result.get("total_rules"),
+        passed_rules_count=result.get("passed_rules_count"),
+        failed_rules_count=result.get("failed_rules_count"),
+        pipeline=result.get("pipeline"),
+        setup_path=result.get("setup_path"),
+        setup_route=result.get("setup_route"),
+        setup_model=result.get("setup_model")
     )
 
 
@@ -646,7 +707,7 @@ async def silverbullet_analyze(req: SilverBulletRequest, db: Session = Depends(g
 async def smc_analyze(req: SilverBulletRequest, db: Session = Depends(get_db)):
     result = await AIService.calculate_programmatic_smc(req.dict())
     # Sanitize float fields
-    for field in ["liquidity_target", "stop_loss_level", "equilibrium_price"]:
+    for field in ["liquidity_target", "stop_loss_level", "equilibrium_price", "breakeven_trigger"]:
         val = result.get(field)
         if val is not None:
             if isinstance(val, str):
@@ -729,7 +790,18 @@ async def smc_analyze(req: SilverBulletRequest, db: Session = Depends(get_db)):
         tp1_target=result.get("tp1_target"),
         tp2_target=result.get("tp2_target"),
         tp1_rr=result.get("tp1_rr"),
-        tp2_rr=result.get("tp2_rr")
+        tp2_rr=result.get("tp2_rr"),
+        breakeven_trigger=result.get("breakeven_trigger"),
+        rules_checklist=result.get("rules_checklist"),
+        total_rules=result.get("total_rules"),
+        passed_rules_count=result.get("passed_rules_count"),
+        failed_rules_count=result.get("failed_rules_count"),
+        pipeline=result.get("pipeline"),
+        setup_path=result.get("setup_path"),
+        setup_route=result.get("setup_route"),
+        setup_model=result.get("setup_model"),
+        execution_mode=result.get("execution_mode", "SCALP_PRO"),
+        confluence_score=result.get("confluence_score")
     )
 
 
@@ -738,7 +810,7 @@ async def tcs_analyze(req: SilverBulletRequest, db: Session = Depends(get_db)):
     result = await AIService.calculate_programmatic_tcs(req.dict())
     
     # Sanitize float fields
-    for field in ["liquidity_target", "stop_loss_level", "equilibrium_price"]:
+    for field in ["liquidity_target", "stop_loss_level", "equilibrium_price", "breakeven_trigger"]:
         val = result.get(field)
         if val is not None:
             if isinstance(val, str):
@@ -821,7 +893,16 @@ async def tcs_analyze(req: SilverBulletRequest, db: Session = Depends(get_db)):
         tp1_target=result.get("tp1_target"),
         tp2_target=result.get("tp2_target"),
         tp1_rr=result.get("tp1_rr"),
-        tp2_rr=result.get("tp2_rr")
+        tp2_rr=result.get("tp2_rr"),
+        breakeven_trigger=result.get("breakeven_trigger"),
+        rules_checklist=result.get("rules_checklist"),
+        total_rules=result.get("total_rules"),
+        passed_rules_count=result.get("passed_rules_count"),
+        failed_rules_count=result.get("failed_rules_count"),
+        pipeline=result.get("pipeline"),
+        setup_path=result.get("setup_path"),
+        setup_route=result.get("setup_route"),
+        setup_model=result.get("setup_model")
     )
 
 
@@ -918,7 +999,7 @@ async def fetch_yahoo_finance(yahoo_symbol: str):
         }
 
 @app.get("/api/market/price")
-async def get_market_price(symbol: str, include_trends: bool = True):
+async def get_market_price(symbol: str, include_trends: bool = True, timeframe: str = "1m"):
     original_symbol = symbol.strip().upper()
     symbol_upper = original_symbol
     if symbol_upper.endswith(".P"):
@@ -933,17 +1014,29 @@ async def get_market_price(symbol: str, include_trends: bool = True):
         try:
             res_data = await fetch_yahoo_finance(yahoo_symbol)
             if include_trends:
-                trend_1h, trend_15m, trend_5m, trend_1m = await asyncio.gather(
+                trend_1h, trend_15m, trend_5m, trend_3m, trend_1m = await asyncio.gather(
                     asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "1h", "BULLISH"),
                     asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "15m", "BULLISH"),
                     asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "5m", "BULLISH"),
+                    asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "3m", "BULLISH"),
                     asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "1m", "BULLISH")
                 )
+                if timeframe == "3m":
+                    daily_bias = trend_3m
+                elif timeframe == "5m":
+                    daily_bias = trend_5m
+                elif timeframe == "15m":
+                    daily_bias = trend_15m
+                elif timeframe == "1h":
+                    daily_bias = trend_1h
+                else:
+                    daily_bias = trend_1m
             else:
-                trend_1h, trend_15m, trend_5m, trend_1m = "PENDING", "PENDING", "PENDING", "PENDING"
-            daily_bias = trend_1m if include_trends else "PENDING"
+                trend_1h, trend_15m, trend_5m, trend_3m, trend_1m = "PENDING", "PENDING", "PENDING", "PENDING", "PENDING"
+                daily_bias = "PENDING"
             res_data["daily_bias"] = daily_bias
             res_data["trend_1m"] = trend_1m
+            res_data["trend_3m"] = trend_3m
             res_data["trend_5m"] = trend_5m
             res_data["trend_15m"] = trend_15m
             res_data["trend_1h"] = trend_1h
@@ -977,17 +1070,28 @@ async def get_market_price(symbol: str, include_trends: bool = True):
         if data is not None and len(data) >= 2:
             prev_candle = data[0]
             curr_candle = data[1]
-            fallback_bias = "BULLISH" if float(curr_candle[4]) >= float(prev_candle[1]) else "BEARISH"
+            fallback_bias = "BULLISH"
             if include_trends:
-                trend_1h, trend_15m, trend_5m, trend_1m = await asyncio.gather(
-                    asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "1h", fallback_bias),
-                    asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "15m", fallback_bias),
-                    asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "5m", fallback_bias),
-                    asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "1m", fallback_bias)
+                trend_1h, trend_15m, trend_5m, trend_3m, trend_1m = await asyncio.gather(
+                    asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "1h", "BULLISH"),
+                    asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "15m", "BULLISH"),
+                    asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "5m", "BULLISH"),
+                    asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "3m", "BULLISH"),
+                    asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "1m", "BULLISH")
                 )
+                if timeframe == "3m":
+                    daily_bias = trend_3m
+                elif timeframe == "5m":
+                    daily_bias = trend_5m
+                elif timeframe == "15m":
+                    daily_bias = trend_15m
+                elif timeframe == "1h":
+                    daily_bias = trend_1h
+                else:
+                    daily_bias = trend_1m
             else:
-                trend_1h, trend_15m, trend_5m, trend_1m = "PENDING", "PENDING", "PENDING", "PENDING"
-            daily_bias = trend_1m if include_trends else "PENDING"
+                trend_1h, trend_15m, trend_5m, trend_3m, trend_1m = "PENDING", "PENDING", "PENDING", "PENDING", "PENDING"
+                daily_bias = "PENDING"
             return {
                 "symbol": original_symbol,
                 "pdh": float(prev_candle[2]),
@@ -997,6 +1101,7 @@ async def get_market_price(symbol: str, include_trends: bool = True):
                 "current_price": float(curr_candle[4]),
                 "daily_bias": daily_bias,
                 "trend_1m": trend_1m,
+                "trend_3m": trend_3m,
                 "trend_5m": trend_5m,
                 "trend_15m": trend_15m,
                 "trend_1h": trend_1h
@@ -1011,17 +1116,29 @@ async def get_market_price(symbol: str, include_trends: bool = True):
                 yf_symbol = yf_symbol[:-3]
             res_data = await fetch_yahoo_finance(f"{yf_symbol}-USD")
             if include_trends:
-                trend_1h, trend_15m, trend_5m, trend_1m = await asyncio.gather(
+                trend_1h, trend_15m, trend_5m, trend_3m, trend_1m = await asyncio.gather(
                     asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "1h", "BULLISH"),
                     asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "15m", "BULLISH"),
                     asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "5m", "BULLISH"),
+                    asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "3m", "BULLISH"),
                     asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "1m", "BULLISH")
                 )
+                if timeframe == "3m":
+                    daily_bias = trend_3m
+                elif timeframe == "5m":
+                    daily_bias = trend_5m
+                elif timeframe == "15m":
+                    daily_bias = trend_15m
+                elif timeframe == "1h":
+                    daily_bias = trend_1h
+                else:
+                    daily_bias = trend_1m
             else:
-                trend_1h, trend_15m, trend_5m, trend_1m = "PENDING", "PENDING", "PENDING", "PENDING"
-            daily_bias = trend_1m if include_trends else "PENDING"
+                trend_1h, trend_15m, trend_5m, trend_3m, trend_1m = "PENDING", "PENDING", "PENDING", "PENDING", "PENDING"
+                daily_bias = "PENDING"
             res_data["daily_bias"] = daily_bias
             res_data["trend_1m"] = trend_1m
+            res_data["trend_3m"] = trend_3m
             res_data["trend_5m"] = trend_5m
             res_data["trend_15m"] = trend_15m
             res_data["trend_1h"] = trend_1h
@@ -1031,23 +1148,33 @@ async def get_market_price(symbol: str, include_trends: bool = True):
             try:
                 res_data = await fetch_yahoo_finance(symbol_upper)
                 if include_trends:
-                    trend_1h, trend_15m, trend_5m, trend_1m = await asyncio.gather(
+                    trend_1h, trend_15m, trend_5m, trend_3m, trend_1m = await asyncio.gather(
                         asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "1h", "BULLISH"),
                         asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "15m", "BULLISH"),
                         asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "5m", "BULLISH"),
+                        asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "3m", "BULLISH"),
                         asyncio.to_thread(AIService._detect_market_structure_bias, symbol_upper, "1m", "BULLISH")
                     )
-                    if trend_1h == "BULLISH" and trend_15m == "BULLISH":
+                    if timeframe == "3m":
+                        daily_bias = trend_3m
+                    elif timeframe == "5m":
+                        daily_bias = trend_5m
+                    elif timeframe == "15m":
+                        daily_bias = trend_15m
+                    elif timeframe == "1h":
+                        daily_bias = trend_1h
+                    elif trend_1h == "BULLISH" and trend_15m == "BULLISH":
                         daily_bias = "BULLISH"
                     elif trend_1h == "BEARISH" and trend_15m == "BEARISH":
                         daily_bias = "BEARISH"
                     else:
                         daily_bias = "NEUTRAL"
                 else:
-                    trend_1h, trend_15m, trend_5m, trend_1m = "PENDING", "PENDING", "PENDING", "PENDING"
+                    trend_1h, trend_15m, trend_5m, trend_3m, trend_1m = "PENDING", "PENDING", "PENDING", "PENDING", "PENDING"
                     daily_bias = "PENDING"
                 res_data["daily_bias"] = daily_bias
                 res_data["trend_1m"] = trend_1m
+                res_data["trend_3m"] = trend_3m
                 res_data["trend_5m"] = trend_5m
                 res_data["trend_15m"] = trend_15m
                 res_data["trend_1h"] = trend_1h
